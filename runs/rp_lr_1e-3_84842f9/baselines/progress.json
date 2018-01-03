@@ -1,0 +1,14 @@
+{"nupdates": 13900, "total_timesteps": 278000, "fps": 22, "policy_entropy": 1.1931718587875366, "value_loss": 9.372210479341447e-05, "explained_variance": -0.026560544967651367}
+{"nupdates": 14000, "total_timesteps": 280000, "fps": 22, "policy_entropy": 1.2739959955215454, "value_loss": 3.1629774639441166e-06, "explained_variance": 0.8569328486919403}
+{"nupdates": 14100, "total_timesteps": 282000, "fps": 22, "policy_entropy": 1.4970773458480835, "value_loss": 1.5424886441905983e-05, "explained_variance": -7.611808776855469}
+{"nupdates": 14200, "total_timesteps": 284000, "fps": 21, "policy_entropy": 1.6078822612762451, "value_loss": 3.260553057771176e-05, "explained_variance": -0.29998064041137695}
+{"nupdates": 14300, "total_timesteps": 286000, "fps": 21, "policy_entropy": 1.6031650304794312, "value_loss": 5.9499958297237754e-05, "explained_variance": 0.42809510231018066}
+{"nupdates": 14400, "total_timesteps": 288000, "fps": 21, "policy_entropy": 1.5938118696212769, "value_loss": 3.979448229074478e-05, "explained_variance": -1.2064011096954346}
+{"nupdates": 14500, "total_timesteps": 290000, "fps": 21, "policy_entropy": 1.6066595315933228, "value_loss": 3.139544787700288e-05, "explained_variance": 0.3387976884841919}
+{"nupdates": 14600, "total_timesteps": 292000, "fps": 21, "policy_entropy": 1.5889849662780762, "value_loss": 0.32129964232444763, "explained_variance": -0.15248441696166992}
+{"nupdates": 14700, "total_timesteps": 294000, "fps": 21, "policy_entropy": 1.5309656858444214, "value_loss": 1.5459492715308443e-05, "explained_variance": 0.06550359725952148}
+{"nupdates": 14800, "total_timesteps": 296000, "fps": 21, "policy_entropy": 1.4869681596755981, "value_loss": 8.473523485008627e-05, "explained_variance": -0.2958827018737793}
+{"nupdates": 14900, "total_timesteps": 298000, "fps": 21, "policy_entropy": 1.548271894454956, "value_loss": 2.4968710931716487e-05, "explained_variance": -0.851650595664978}
+{"nupdates": 15000, "total_timesteps": 300000, "fps": 21, "policy_entropy": 1.5852943658828735, "value_loss": 0.00011955343506997451, "explained_variance": -0.5833600759506226}
+{"nupdates": 15100, "total_timesteps": 302000, "fps": 21, "policy_entropy": 1.58289635181427, "value_loss": 6.543977178807836e-06, "explained_variance": -1.8203704357147217}
+{"nupdates": 15200, "total_timesteps": 304000, "fps": 21, "policy_entropy": 1.5665394067764282, "value_loss": 1.2165731277491432e-05, "explained_variance": -0.23567116260528564}
