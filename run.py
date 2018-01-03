@@ -72,12 +72,14 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     a2c_proc.start()
     train_proc.start()
 
+    """
     def profile(name, pid):
         with open(osp.join(log_dir, name + '.log'), 'w') as f:
             memory_profiler.memory_usage(pid, stream=f, timeout=99999)
     Process(target=profile, args=('a2c', a2c_proc.pid), daemon=True).start()
     Process(target=profile, args=('train', train_proc.pid), daemon=True).start()
     Process(target=profile, args=('interface', -1), daemon=True).start()
+    """
 
     pi.run(seg_pipe, pref_pipe)
 
