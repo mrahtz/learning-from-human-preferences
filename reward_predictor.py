@@ -190,8 +190,12 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs, log
 
 
 def save_pref_db(pref_db, fname):
+    # TODO: currently disabled to save disk space
+    return
+    """
     with open(fname, 'wb') as pkl_file:
         pickle.dump(pref_db, pkl_file)
+    """
 
 
 def load_pref_db(name):
