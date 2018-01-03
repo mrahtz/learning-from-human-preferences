@@ -175,6 +175,8 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs, log
         reward_model.train(pref_db_train, pref_db_val)
         recv_prefs(pref_pipe, pref_db_train, pref_db_val)
 
+        # TODO: currently disabled to save room
+        """
         if step % SAVE_FREQ == 0:
             print("Saving preferences...")
             fname = osp.join(log_dir, "train_%d.pkl" % step)
@@ -185,17 +187,14 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs, log
                 os.remove(osp.join(log_dir, "train_%d.pkl" % prev_save_step))
                 os.remove(osp.join(log_dir, "val_%d.pkl" % prev_save_step))
             prev_save_step = step
+        """
 
         step += 1
 
 
 def save_pref_db(pref_db, fname):
-    # TODO: currently disabled to save disk space
-    return
-    """
     with open(fname, 'wb') as pkl_file:
         pickle.dump(pref_db, pkl_file)
-    """
 
 
 def load_pref_db(name):
