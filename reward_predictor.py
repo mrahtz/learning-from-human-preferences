@@ -238,7 +238,9 @@ class RewardPredictorEnsemble:
                 'train_reward': ['localhost:2202']
             }
         cluster = tf.train.ClusterSpec(cluster_dict)
-        server = tf.train.Server(cluster, job_name=name)
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        server = tf.train.Server(cluster, job_name=name, config=config)
         sess = tf.Session(server.target, graph)
 
         with graph.as_default():
