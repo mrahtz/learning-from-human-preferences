@@ -235,7 +235,8 @@ class RewardPredictorEnsemble:
             cluster_dict = {
                 'a2c': ['localhost:2200'],
                 'pref_interface': ['localhost:2201'],
-                'train_reward': ['localhost:2202']
+                'train_reward': ['localhost:2202'],
+                'ps': ['localhost:2203']
             }
         cluster = tf.train.ClusterSpec(cluster_dict)
         config = tf.ConfigProto()
@@ -245,7 +246,7 @@ class RewardPredictorEnsemble:
 
         with graph.as_default():
             for i in range(n_preds):
-                with tf.device("/job:train_reward/task:0"):
+                with tf.device(tf.train.replica_device_setter(cluster=cluster_dict, ps_device="/job:ps/task:0", worker_device="/job:{}/task:0".format(name))):
                     with tf.variable_scope("pred_%d" % i):
                         # TODO: enable batchnorm later on
                         rp = RewardPredictor(dropout=dropout, batchnorm=False, lr=lr)
@@ -281,6 +282,9 @@ class RewardPredictorEnsemble:
                     print("done!")
                 else:
                     sess.run(tf.global_variables_initializer())
+
+        if name == 'ps':
+            server.join()
 
         self.acc_summ = tf.summary.scalar('accuracy', self.mean_accuracy)
         self.loss_summ = tf.summary.scalar('loss', self.mean_loss)
