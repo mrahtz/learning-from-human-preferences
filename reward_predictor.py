@@ -264,7 +264,7 @@ class RewardPredictorEnsemble:
             # of each ensemble member individually
             self.mean_accuracy = tf.reduce_mean(acc_ops)
 
-            if name != 'train_reward':
+            if name != 'ps':
                 while len(sess.run(tf.report_uninitialized_variables())) > 0:
                     print("%s waiting for variable initialization..." % name)
                     time.sleep(1.0)
