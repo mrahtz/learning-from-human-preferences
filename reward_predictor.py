@@ -218,7 +218,7 @@ class RewardPredictorEnsemble:
     def __init__(self,
                  name,
                  lr=1e-4,
-                 log_dir=None,
+                 log_dir='/tmp',
                  cluster_dict=None,
                  n_preds=3,
                  load_network=False,
@@ -290,11 +290,10 @@ class RewardPredictorEnsemble:
         self.loss_summ = tf.summary.scalar('loss', self.mean_loss)
         self.summaries = tf.summary.merge([self.acc_summ, self.loss_summ])
 
-        if log_dir is not None:
-            self.train_writer = tf.summary.FileWriter(
-                osp.join(log_dir, 'reward_pred', 'train'), flush_secs=5)
-            self.test_writer = tf.summary.FileWriter(
-                osp.join(log_dir, 'reward_pred', 'test'), flush_secs=5)
+        self.train_writer = tf.summary.FileWriter(
+            osp.join(log_dir, 'reward_pred', 'train'), flush_secs=5)
+        self.test_writer = tf.summary.FileWriter(
+            osp.join(log_dir, 'reward_pred', 'test'), flush_secs=5)
 
         self.sess = sess
         self.rps = rps
