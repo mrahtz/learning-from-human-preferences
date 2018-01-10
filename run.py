@@ -19,7 +19,7 @@ from baselines.common import set_global_seeds
 from baselines.common.atari_wrappers import wrap_deepmind
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from pref_interface import PrefInterface
-from reward_predictor import train_reward_predictor
+from reward_predictor import train_reward_predictor, RewardPredictorEnsemble
 
 def configure_logger(log_dir):
     baselines_dir = osp.join(log_dir, 'baselines')
@@ -59,6 +59,11 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     # Objective C APIs (invoked when dealing with GUI stuff) aren't happy if
     # running in a processed forked from a multithreaded parent.
     pi = PrefInterface(headless)
+
+    def ps():
+        reward_model = RewardPredictorEnsemble('ps')
+    ps_proc = Process(target=ps)
+    ps_proc.start()
 
     seg_pipe = Queue()
     pref_pipe = Queue()
