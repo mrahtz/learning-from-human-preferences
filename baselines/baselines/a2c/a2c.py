@@ -281,6 +281,8 @@ def learn(policy, env, seed, seg_pipe, go_pipe, log_dir, nsteps=5, nstack=4,
 
     print("Running...")
 
+    # nsteps: e.g. 5
+    # nenvs: e.g. 16
     nbatch = nenvs*nsteps
     tstart = time.time()
     train = False
