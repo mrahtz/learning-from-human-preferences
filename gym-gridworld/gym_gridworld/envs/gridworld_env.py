@@ -23,7 +23,7 @@ class GridWorldEnv(gym.Env):
         self.ale = ALE()
         seed = None
         self.np_random, seed1 = seeding.np_random(seed)
-        self.random_start = False
+        self.random_start = True
 
         self._reset()
 
