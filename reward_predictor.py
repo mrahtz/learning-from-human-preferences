@@ -264,18 +264,16 @@ class RewardPredictorEnsemble:
             # of each ensemble member individually
             self.mean_accuracy = tf.reduce_mean(acc_ops)
 
+            self.saver = tf.train.Saver(max_to_keep=1)
+            self.checkpoint_file = osp.join(log_dir, 'checkpoints',
+                                            'reward_network.ckpt')
+
+            # Only the ps process should initialize the network
             if name != 'ps':
                 while len(sess.run(tf.report_uninitialized_variables())) > 0:
                     print("%s waiting for variable initialization..." % name)
                     time.sleep(1.0)
             else:
-                # Only the main training process should initialize the
-                # network (to prevent the training process from loading
-                # a checkpoint and then another process resetting
-                # everything)
-                self.saver = tf.train.Saver(max_to_keep=1)
-                self.checkpoint_file = osp.join(log_dir, 'checkpoints',
-                                                'reward_network.ckpt')
                 if load_network:
                     print("Loading reward predictor checkpoint...", end="")
                     self.saver.restore(sess, self.checkpoint_file)
