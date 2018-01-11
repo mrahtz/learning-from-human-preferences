@@ -120,7 +120,7 @@ class PrefInterface:
             if len(self.segments) > 50:
                 del self.segments[0]
             assert len(self.segments) <= 50
-            print("No. segments:"< len(self.segments))
+            print("No. segments:", len(self.segments))
 
     def run(self, seg_pipe, pref_pipe):
         self.segments = []
