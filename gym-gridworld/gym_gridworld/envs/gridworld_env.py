@@ -13,7 +13,6 @@ class GridWorldEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self):
-        self.pos = [0, 0]
         self.size = [5, 5]
         self.observation_space = spaces.Box(low=0,
                                             high=255,
@@ -25,7 +24,7 @@ class GridWorldEnv(gym.Env):
         seed = None
         self.np_random, seed1 = seeding.np_random(seed)
 
-        self.steps = 0
+        self._reset()
 
     def get_action_meanings(self):
         return ['NOOP', 'DOWN', 'RIGHT', 'UP', 'LEFT']
