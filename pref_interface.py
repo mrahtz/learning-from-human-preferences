@@ -117,9 +117,10 @@ class PrefInterface:
             # (The maximum number of segments kept being 5,000 isn't mentioned
             # in the paper anywhere - it's just something I decided on. This
             # should be maximum ~ 700 MB.)
-            if len(self.segments) > 1000:
+            if len(self.segments) > 50:
                 del self.segments[0]
-            assert len(self.segments) <= 1000
+            assert len(self.segments) <= 50
+            print("No. segments:"< len(self.segments))
 
     def run(self, seg_pipe, pref_pipe):
         self.segments = []
