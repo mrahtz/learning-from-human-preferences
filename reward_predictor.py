@@ -21,7 +21,7 @@ if test:
     SAVE_FREQ = 1
     CKPT_FREQ = 1
 else:
-    N_INITIAL_PREFS = 500
+    N_INITIAL_PREFS = 30
     N_INITIAL_EPOCHS = 25
     SAVE_FREQ = 100
     CKPT_FREQ = 100
@@ -116,14 +116,16 @@ def recv_prefs(pref_pipe, pref_db_train, pref_db_val):
         else:
             pref_db_train.append(s1, s2, mu)
 
-        if len(pref_db_val) > 3000 * VAL_FRACTION:
+        if len(pref_db_val) > 50 * VAL_FRACTION:
             pref_db_val.del_first()
-        assert len(pref_db_val) <= 3000 * VAL_FRACTION
+        assert len(pref_db_val) <= 50 * VAL_FRACTION
+        print("pref_db_val len:", len(pref_db_val))
 
-        if len(pref_db_train) > 3000 * (1 - VAL_FRACTION):
+        if len(pref_db_train) > 50 * (1 - VAL_FRACTION):
             print("Database limit reached; dropping first preference")
             pref_db_train.del_first()
-        assert len(pref_db_train) <= 3000 * (1 - VAL_FRACTION)
+        assert len(pref_db_train) <= 50 * (1 - VAL_FRACTION)
+        print("pref_db_train len:", len(pref_db_train))
 
     print("%d preferences received" % (recv_prefs.n_prefs - n_prefs_start))
 
