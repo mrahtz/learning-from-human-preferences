@@ -23,6 +23,7 @@ class GridWorldEnv(gym.Env):
         self.ale = ALE()
         seed = None
         self.np_random, seed1 = seeding.np_random(seed)
+        self.random_start = False
 
         self._reset()
 
@@ -67,7 +68,12 @@ class GridWorldEnv(gym.Env):
         return ob, reward, episode_over, {}
 
     def _reset(self):
-        self.pos = [0, 0]
+        if self.random_start:
+            x = np.random.randint(low=0, high=160)
+            y = np.random.randint(low=0, high=210)
+            self.pos = [x, y]
+        else:
+            self.pos = [0, 0]
         self.steps = 0
         ob = self._get_ob()
         return ob
