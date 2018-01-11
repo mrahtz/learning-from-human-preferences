@@ -462,11 +462,11 @@ class RewardPredictorEnsemble:
 
             if self.n_steps and \
                self.n_steps % test_interval == 0:
-                if len(prefs_val) <= 128:
+                if len(prefs_val) <= 16:
                     val_batch = prefs_val.prefs
                 else:
                     idxs = np.random.choice(
-                        len(prefs_val.prefs), 128, replace=True)
+                        len(prefs_val.prefs), 16, replace=True)
                     val_batch = []
                     for idx in idxs:
                         val_batch.append(prefs_val.prefs[idx])
