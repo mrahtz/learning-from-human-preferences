@@ -38,7 +38,8 @@ def configure_logger(log_dir):
 
 
 def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
-        load_reward_network, load_prefs, headless, log_dir, ent_coef, db_max):
+        load_reward_network, load_prefs, headless, log_dir, ent_coef, db_max,
+        segs_max):
     configure_logger(log_dir)
 
     num_timesteps = int(num_frames / 4 * 1.1)
@@ -89,7 +90,7 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     Process(target=profile, args=('interface', -1), daemon=True).start()
     """
 
-    pi.run(seg_pipe, pref_pipe)
+    pi.run(seg_pipe, pref_pipe, segs_max)
 
     while True:
         import time
@@ -117,6 +118,7 @@ def main():
     parser.add_argument('--run_name', default=seconds_since_epoch)
     parser.add_argument('--ent_coef', type=float, default=0.01)
     parser.add_argument('--db_max', type=int, default=3000)
+    parser.add_argument('--segs_max', type=int, default=1000)
     args = parser.parse_args()
 
     git_rev = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).rstrip().decode()
@@ -139,7 +141,8 @@ def main():
         headless=args.headless,
         log_dir=log_dir,
         ent_coef=args.ent_coef,
-        db_max=args.db_max)
+        db_max=args.db_max,
+        segs_max=args.segs_max)
 
 
 if __name__ == '__main__':
