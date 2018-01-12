@@ -10,6 +10,9 @@ import subprocess
 
 import memory_profiler
 
+import sys
+sys.path.insert(1, 'baselines')
+
 import gym
 import gym_gridworld
 from baselines import bench, logger
@@ -20,9 +23,6 @@ from baselines.common.atari_wrappers import wrap_deepmind
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from pref_interface import PrefInterface
 from reward_predictor import train_reward_predictor, RewardPredictorEnsemble
-
-import sys
-sys.path.insert(1, 'baselines')
 
 def configure_logger(log_dir):
     baselines_dir = osp.join(log_dir, 'baselines')
