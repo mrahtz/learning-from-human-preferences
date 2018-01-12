@@ -109,7 +109,7 @@ class PrefInterface:
         # TODO: loop if already checked
         return check_idxs, check_s1, check_s2
 
-    def recv_segments(self, seg_pipe):
+    def recv_segments(self, seg_pipe, segs_max):
         while True:
             segment = seg_pipe.get()
             self.segments.append(segment)
@@ -117,15 +117,15 @@ class PrefInterface:
             # (The maximum number of segments kept being 5,000 isn't mentioned
             # in the paper anywhere - it's just something I decided on. This
             # should be maximum ~ 700 MB.)
-            if len(self.segments) > 50:
+            if len(self.segments) > segs_max:
                 del self.segments[0]
-            assert len(self.segments) <= 50
+            assert len(self.segments) <= segs_max
             print("No. segments:", len(self.segments))
 
-    def run(self, seg_pipe, pref_pipe):
+    def run(self, seg_pipe, pref_pipe, segs_max):
         self.segments = []
         self.reward_model = RewardPredictorEnsemble('pref_interface')
-        Thread(target=self.recv_segments, args=(seg_pipe, )).start()
+        Thread(target=self.recv_segments, args=(seg_pipe, segs_max)).start()
 
         while True:
             try:
