@@ -21,7 +21,7 @@ if test:
     SAVE_FREQ = 1
     CKPT_FREQ = 1
 else:
-    N_INITIAL_PREFS = 30
+    N_INITIAL_PREFS = 500
     N_INITIAL_EPOCHS = 25
     SAVE_FREQ = 100
     CKPT_FREQ = 100
