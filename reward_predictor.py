@@ -100,7 +100,7 @@ def reward_pred_net(s, dropout, batchnorm, reuse, training):
     return x
 
 
-def recv_prefs(pref_pipe, pref_db_train, pref_db_val):
+def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
     n_prefs_start = recv_prefs.n_prefs
     print("Receiving preferences...")
 
@@ -116,21 +116,24 @@ def recv_prefs(pref_pipe, pref_db_train, pref_db_val):
         else:
             pref_db_train.append(s1, s2, mu)
 
-        if len(pref_db_val) > 3000 * VAL_FRACTION:
+        if len(pref_db_val) > db_max * VAL_FRACTION:
             pref_db_val.del_first()
-        assert len(pref_db_val) <= 3000 * VAL_FRACTION
+        assert len(pref_db_val) <= db_max * VAL_FRACTION
+        print("pref_db_val len:", len(pref_db_val))
 
-        if len(pref_db_train) > 3000 * (1 - VAL_FRACTION):
+        if len(pref_db_train) > db_max * (1 - VAL_FRACTION):
             print("Database limit reached; dropping first preference")
             pref_db_train.del_first()
-        assert len(pref_db_train) <= 3000 * (1 - VAL_FRACTION)
+        assert len(pref_db_train) <= db_max * (1 - VAL_FRACTION)
+        print("pref_db_train len:", len(pref_db_train))
 
     print("%d preferences received" % (recv_prefs.n_prefs - n_prefs_start))
 
 recv_prefs.n_prefs = 0
 
 
-def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs, log_dir):
+def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs,
+        log_dir, db_max):
     reward_model = RewardPredictorEnsemble(
         'train_reward', lr, log_dir=log_dir, load_network=load_network)
 
@@ -144,7 +147,7 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs, log
     # Page 15: "We collect 500 comparisons from a randomly initialized policy
     # network at the beginning of training"
     while len(pref_db_train) < N_INITIAL_PREFS:
-        recv_prefs(pref_pipe, pref_db_train, pref_db_val)
+        recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
         print("Waiting for comparisons; %d so far..." % len(pref_db_train))
         time.sleep(1.0)
 
@@ -160,7 +163,7 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs, log
         for i in range(N_INITIAL_EPOCHS):
             print("Epoch %d" % i)
             reward_model.train(pref_db_train, pref_db_val)
-            recv_prefs(pref_pipe, pref_db_train, pref_db_val)
+            recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
 
     print("finished initial at")
     print(str(datetime.datetime.now()))
@@ -173,7 +176,7 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs, log
     prev_save_step = None
     while True:
         reward_model.train(pref_db_train, pref_db_val)
-        recv_prefs(pref_pipe, pref_db_train, pref_db_val)
+        recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
 
         # TODO: currently disabled to save room
         """
