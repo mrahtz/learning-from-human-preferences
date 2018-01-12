@@ -21,6 +21,9 @@ from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from pref_interface import PrefInterface
 from reward_predictor import train_reward_predictor, RewardPredictorEnsemble
 
+import sys
+sys.path.insert(1, 'baselines')
+
 def configure_logger(log_dir):
     baselines_dir = osp.join(log_dir, 'baselines')
     os.makedirs(baselines_dir)
