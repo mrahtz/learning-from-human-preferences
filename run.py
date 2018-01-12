@@ -35,7 +35,7 @@ def configure_logger(log_dir):
 
 
 def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
-        load_reward_network, load_prefs, headless, log_dir, ent_coef):
+        load_reward_network, load_prefs, headless, log_dir, ent_coef, db_max):
     configure_logger(log_dir)
 
     num_timesteps = int(num_frames / 4 * 1.1)
@@ -72,7 +72,7 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
         go_pipe, total_timesteps=num_timesteps, lr=lr, lrschedule=lrschedule,
         log_dir=log_dir, ent_coef=0.01), daemon=True)
     train_proc = Process(target=train_reward_predictor, args=(rp_lr, pref_pipe,
-        go_pipe, load_reward_network, load_prefs, log_dir), daemon=True)
+        go_pipe, load_reward_network, load_prefs, log_dir, db_max), daemon=True)
 
     a2c_proc.start()
     train_proc.start()
@@ -113,6 +113,7 @@ def main():
     seconds_since_epoch = str(int(time.time()))
     parser.add_argument('--run_name', default=seconds_since_epoch)
     parser.add_argument('--ent_coef', type=float, default=0.01)
+    parser.add_argument('--db_max', type=int, default=3000)
     args = parser.parse_args()
 
     git_rev = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).rstrip().decode()
@@ -134,7 +135,8 @@ def main():
         load_prefs=args.load_prefs,
         headless=args.headless,
         log_dir=log_dir,
-        ent_coef=args.ent_coef)
+        ent_coef=args.ent_coef,
+        db_max=args.db_max)
 
 
 if __name__ == '__main__':
