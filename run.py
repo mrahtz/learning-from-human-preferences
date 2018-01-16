@@ -39,7 +39,7 @@ def configure_logger(log_dir):
 
 def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
         load_reward_network, load_prefs, headless, log_dir, ent_coef, db_max,
-        segs_max):
+        segs_max, log_interval):
     configure_logger(log_dir)
 
     num_timesteps = int(num_frames / 4 * 1.1)
@@ -74,7 +74,7 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     go_pipe = Queue(maxsize=1)
     a2c_proc = Process(target=lambda: learn(policy_fn, env, seed, seg_pipe,
         go_pipe, total_timesteps=num_timesteps, lr=lr, lrschedule=lrschedule,
-        log_dir=log_dir, ent_coef=0.01), daemon=True)
+        log_dir=log_dir, ent_coef=0.01, log_interval=log_interval), daemon=True)
     train_proc = Process(target=train_reward_predictor, args=(rp_lr, pref_pipe,
         go_pipe, load_reward_network, load_prefs, log_dir, db_max), daemon=True)
 
@@ -119,6 +119,7 @@ def main():
     parser.add_argument('--ent_coef', type=float, default=0.01)
     parser.add_argument('--db_max', type=int, default=3000)
     parser.add_argument('--segs_max', type=int, default=1000)
+    parser.add_argument('--log_interval', type=int, default=100)
     args = parser.parse_args()
 
     git_rev = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).rstrip().decode()
@@ -142,7 +143,8 @@ def main():
         log_dir=log_dir,
         ent_coef=args.ent_coef,
         db_max=args.db_max,
-        segs_max=args.segs_max)
+        segs_max=args.segs_max,
+        log_interval=log_interval)
 
 
 if __name__ == '__main__':
