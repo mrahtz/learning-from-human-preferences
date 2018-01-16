@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import logging
 import os
 import os.path as osp
@@ -124,10 +124,12 @@ def main():
     parser.add_argument('--segs_max', type=int, default=1000)
     parser.add_argument('--log_interval', type=int, default=100)
     parser.add_argument('--test_mode', action='store_true')
+    parser.add_argument('--just_pretrain', action='store_true')
     args = parser.parse_args()
 
     params.init_params()
     params.params['test_mode'] = args.test_mode
+    params.params['just_pretrain'] = args.just_pretrain
 
     if args.test_mode:
         print("=== WARNING: running in test mode", file=sys.stderr)
