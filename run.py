@@ -144,7 +144,7 @@ def main():
         ent_coef=args.ent_coef,
         db_max=args.db_max,
         segs_max=args.segs_max,
-        log_interval=log_interval)
+        log_interval=args.log_interval)
 
 
 if __name__ == '__main__':
