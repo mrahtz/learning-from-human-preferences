@@ -160,10 +160,17 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs,
             print("Epoch %d" % i)
             reward_model.train(pref_db_train, pref_db_val)
             recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
+        ckpt_file = reward_model.save()
+        print("=== Finished initial training at", str(datetime.datetime.now()))
 
-    print("=== Finished initial training at", str(datetime.datetime.now()))
+    if params.params['just_pretrain']:
+        fname = osp.join(log_dir, "train_postpretrain.pkl")
+        save_pref_db(pref_db_train, fname)
+        fname = osp.join(log_dir, "val_postpretrain.pkl")
+        save_pref_db(pref_db_val, fname)
+        raise Exception("Pretraining completed")
 
-    print("=== Starting RL training")
+    print("=== Starting RL training at", str(datetime.datetime.now()))
     # Start RL training
     go_pipe.put(True)
 
@@ -434,6 +441,11 @@ class RewardPredictorEnsemble:
 
         return preds
 
+    def save(self):
+        ckpt_name = self.saver.save(self.sess, self.checkpoint_file,
+                                    self.n_steps)
+        return ckpt_name
+
     def train(self, prefs_train, prefs_val, test_interval=50):
         """
         Train the ensemble for one full epoch
@@ -500,8 +512,8 @@ class RewardPredictorEnsemble:
             self.n_steps += 1
 
             if self.n_steps % params.params['ckpt_freq'] == 0:
-                print("Saving checkpoint...")
-                self.saver.save(self.sess, self.checkpoint_file, self.n_steps)
+                print("=== Saving reward predictor checkpoint...")
+                self.save()
 
 
 class RewardPredictor:
