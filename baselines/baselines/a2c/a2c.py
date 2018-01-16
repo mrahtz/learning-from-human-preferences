@@ -284,7 +284,8 @@ def learn(policy, env, seed, seg_pipe, go_pipe, log_dir, nsteps=5, nstack=4,
     # nsteps: e.g. 5
     # nenvs: e.g. 16
     nbatch = nenvs*nsteps
-    tstart = time.time()
+    fps_tstart = time.time()
+    fps_nsteps = 0
     train = False
     for update in range(1, total_timesteps//nbatch+1):
         #print("Update %d" % update)
@@ -305,8 +306,11 @@ def learn(policy, env, seed, seg_pipe, go_pipe, log_dir, nsteps=5, nstack=4,
             obs, states, rewards, masks, actions, values)
 
         nseconds = time.time()-tstart
-        fps = int((update*nbatch)/nseconds)
         if update % log_interval == 0 or update == 1:
+            fps = fps_nsteps / (time.time() - fps_tstart)
+            fps_nsteps = 0
+            fps_tstart = time.time()
+            
             ev = explained_variance(values, rewards)
             logger.record_tabular("nupdates", update)
             logger.record_tabular("total_timesteps", update*nbatch)
