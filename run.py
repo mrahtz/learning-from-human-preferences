@@ -130,7 +130,7 @@ def main():
     params.params['test_mode'] = args.test_mode
 
     if args.test_mode:
-        print("=== WARNING: running in test mode ===", file=sys.stderr)
+        print("=== WARNING: running in test mode", file=sys.stderr)
         params.params['n_initial_prefs'] = 2
         params.params['n_initial_epochs'] = 1
         params.params['save_freq'] = 1

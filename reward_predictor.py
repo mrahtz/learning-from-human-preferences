@@ -142,9 +142,8 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs,
         print("Waiting for comparisons; %d so far..." % len(pref_db_train))
         time.sleep(1.0)
 
-    print("=== Received enough preferences at")
     import datetime
-    print(str(datetime.datetime.now()))
+    print("=== Received enough preferences at", str(datetime.datetime.now()))
 
     fname = osp.join(log_dir, "train_initial.pkl")
     save_pref_db(pref_db_train, fname)
@@ -162,10 +161,9 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs,
             reward_model.train(pref_db_train, pref_db_val)
             recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
 
-    print("=== finished initial at")
-    print(str(datetime.datetime.now()))
+    print("=== Finished initial training at", str(datetime.datetime.now()))
 
-    print("=== Starting RL training...")
+    print("=== Starting RL training")
     # Start RL training
     go_pipe.put(True)
 
@@ -176,7 +174,7 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs,
         recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
 
         if step % params.params['save_freq'] == 0:
-            print("Saving preferences...")
+            print("=== Saving preferences...")
             fname = osp.join(log_dir, "train_%d.pkl" % step)
             save_pref_db(pref_db_train, fname)
             fname = osp.join(log_dir, "val_%d.pkl" % step)
