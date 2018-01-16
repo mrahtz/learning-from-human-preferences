@@ -305,12 +305,13 @@ def learn(policy, env, seed, seg_pipe, go_pipe, log_dir, nsteps=5, nstack=4,
         policy_loss, value_loss, policy_entropy = model.train(
             obs, states, rewards, masks, actions, values)
 
-        nseconds = time.time()-tstart
+        fps_nsteps += nbatch
+
         if update % log_interval == 0 or update == 1:
             fps = fps_nsteps / (time.time() - fps_tstart)
             fps_nsteps = 0
             fps_tstart = time.time()
-            
+
             ev = explained_variance(values, rewards)
             logger.record_tabular("nupdates", update)
             logger.record_tabular("total_timesteps", update*nbatch)
