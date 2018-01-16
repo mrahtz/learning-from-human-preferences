@@ -1,20 +1,19 @@
 #!/usr/bin/env python
 import logging
 import os
+import os.path as osp
 import pickle
+import subprocess
+import sys
+import time
 from multiprocessing import Process, Queue
 from threading import Thread
-import time
-import os.path as osp
-import subprocess
 
 import memory_profiler
 
-import sys
-sys.path.insert(1, 'baselines')
-
 import gym
 import gym_gridworld
+import params
 from baselines import bench, logger
 from baselines.a2c.a2c import learn
 from baselines.a2c.policies import CnnPolicy
@@ -22,7 +21,11 @@ from baselines.common import set_global_seeds
 from baselines.common.atari_wrappers import wrap_deepmind
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from pref_interface import PrefInterface
-from reward_predictor import train_reward_predictor, RewardPredictorEnsemble
+from reward_predictor import RewardPredictorEnsemble, train_reward_predictor
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
+sys.path.insert(1, 'baselines')
+
 
 def configure_logger(log_dir):
     baselines_dir = osp.join(log_dir, 'baselines')
@@ -120,7 +123,23 @@ def main():
     parser.add_argument('--db_max', type=int, default=3000)
     parser.add_argument('--segs_max', type=int, default=1000)
     parser.add_argument('--log_interval', type=int, default=100)
+    parser.add_argument('--test_mode', action='store_true')
     args = parser.parse_args()
+
+    params.init_params()
+    params.params['test_mode'] = args.test_mode
+
+    if args.test_mode:
+        print("=== WARNING: running in test mode ===", file=sys.stderr)
+        params.params['n_initial_prefs'] = 2
+        params.params['n_initial_epochs'] = 1
+        params.params['save_freq'] = 1
+        params.params['ckpt_freq'] = 1
+    else:
+        params.params['n_initial_prefs'] = 500
+        params.params['n_initial_epochs'] = 25
+        params.params['save_freq'] = 100
+        params.params['ckpt_freq'] = 100
 
     git_rev = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).rstrip().decode()
     run_name = args.run_name + '_' + git_rev
