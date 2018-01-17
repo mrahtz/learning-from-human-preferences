@@ -1,2 +1,0 @@
-model_checkpoint_path: "reward_network.ckpt-2500"
-all_model_checkpoint_paths: "reward_network.ckpt-2500"
