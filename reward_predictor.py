@@ -1,6 +1,4 @@
-import copy
 import datetime
-import glob
 import os
 import os.path as osp
 import pickle
@@ -122,15 +120,15 @@ def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
 recv_prefs.n_prefs = 0
 
 
-def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs,
-                           log_dir, db_max):
+def train_reward_predictor(lr, pref_pipe, go_pipe, load_network,
+                           load_prefs_dir, log_dir, db_max):
     reward_model = RewardPredictorEnsemble(
         'train_reward', lr, log_dir=log_dir, load_network=load_network)
 
-    if load_prefs:
+    if load_prefs_dir:
         print("Loading preferences...")
-        pref_db_val = load_pref_db('val')
-        pref_db_train = load_pref_db('train')
+        # TODO make this more flexible
+        pref_db_train, pref_db_val = load_pref_db(load_prefs_dir)
     else:
         pref_db_val = PrefDB()
         pref_db_train = PrefDB()
@@ -142,7 +140,6 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs,
         print("Waiting for comparisons; %d so far..." % len(pref_db_train))
         time.sleep(1.0)
 
-    import datetime
     print("=== Received enough preferences at", str(datetime.datetime.now()))
 
     fname = osp.join(log_dir, "train_initial.pkl")
@@ -160,7 +157,7 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs,
             print("Epoch %d" % i)
             reward_model.train(pref_db_train, pref_db_val)
             recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
-        ckpt_file = reward_model.save()
+        reward_model.save()
         print("=== Finished initial training at", str(datetime.datetime.now()))
 
     if params.params['just_pretrain']:
@@ -199,12 +196,12 @@ def save_pref_db(pref_db, fname):
         pickle.dump(pref_db, pkl_file)
 
 
-def load_prefs(path):
-    train_fname = glob.glob(osp.join(path, "train_.*\.pkl"))
+def load_pref_db(pref_dir):
+    train_fname = osp.join(pref_dir, 'train_initial.pkl')
     with open(train_fname, 'rb') as pkl_file:
         pref_db_train = pickle.load(pkl_file)
 
-    val_fname = glob.glob(osp.join(path, "val_.*\.pkl"))
+    val_fname = osp.join(pref_dir, 'val_initial.pkl')
     with open(val_fname, 'rb') as pkl_file:
         pref_db_val = pickle.load(pkl_file)
 
@@ -515,6 +512,8 @@ class RewardPredictorEnsemble:
             if self.n_steps % params.params['ckpt_freq'] == 0:
                 print("=== Saving reward predictor checkpoint...")
                 self.save()
+
+            break
 
 
 class RewardPredictor:
