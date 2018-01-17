@@ -296,8 +296,10 @@ class RewardPredictorEnsemble:
         if name == 'ps':
             server.join()
 
-        self.acc_summ = tf.summary.scalar('accuracy', self.mean_accuracy)
-        self.loss_summ = tf.summary.scalar('loss', self.mean_loss)
+        self.acc_summ = tf.summary.scalar('reward predictor accuracy',
+                                          self.mean_accuracy)
+        self.loss_summ = tf.summary.scalar('reward predictor loss',
+                                           self.mean_loss)
         self.summaries = tf.summary.merge([self.acc_summ, self.loss_summ])
 
         self.train_writer = tf.summary.FileWriter(
@@ -455,7 +457,7 @@ class RewardPredictorEnsemble:
                                                            len(prefs_val)))
 
         for batch_n, batch in enumerate(
-                batch_iter(prefs_train.prefs, batch_size=16, shuffle=True)):
+                batch_iter(prefs_train.prefs, batch_size=32, shuffle=True)):
             n_prefs = len(batch)
             print("Batch %d: %d preferences" % (batch_n, n_prefs))
             # TODO: refactor this so that each can be taken directly from
@@ -478,13 +480,12 @@ class RewardPredictorEnsemble:
                                          feed_dict)
             self.train_writer.add_summary(summaries, self.n_steps)
 
-            if self.n_steps and \
-               self.n_steps % test_interval == 0:
-                if len(prefs_val) <= 16:
+            if self.n_steps and self.n_steps % test_interval == 0:
+                if len(prefs_val) <= 32:
                     val_batch = prefs_val.prefs
                 else:
                     idxs = np.random.choice(
-                        len(prefs_val.prefs), 16, replace=True)
+                        len(prefs_val.prefs), 32, replace=True)
                     val_batch = []
                     for idx in idxs:
                         val_batch.append(prefs_val.prefs[idx])
@@ -504,8 +505,9 @@ class RewardPredictorEnsemble:
 
                 acc_summ, accuracies, losses = self.sess.run(
                     [self.acc_summ, self.acc_ops, self.loss_ops], feed_dict)
-                print("Accuracies:", accuracies)
-                print("Losses:", losses)
+                if params.params['debug']:
+                    print("Accuracies:", accuracies)
+                    print("Losses:", losses)
                 self.test_writer.add_summary(acc_summ, self.n_steps)
 
             print("Trained %d steps" % self.n_steps)
