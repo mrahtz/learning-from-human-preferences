@@ -1,4 +1,5 @@
-#!/usr/bin/env python3 -u
+#!/bin/sh
+''''exec python -u -- "$0" ${1+"$@"} # '''
 import logging
 import os
 import os.path as osp
