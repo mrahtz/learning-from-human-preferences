@@ -206,11 +206,11 @@ def save_pref_db(pref_db, fname):
 
 
 def load_pref_db(pref_dir):
-    train_fname = osp.join(pref_dir, 'train_initial.pkl')
+    train_fname = osp.join(pref_dir, 'train_postpretrain.pkl')
     with open(train_fname, 'rb') as pkl_file:
         pref_db_train = pickle.load(pkl_file)
 
-    val_fname = osp.join(pref_dir, 'val_initial.pkl')
+    val_fname = osp.join(pref_dir, 'val_postpretrain.pkl')
     with open(val_fname, 'rb') as pkl_file:
         pref_db_val = pickle.load(pkl_file)
 
