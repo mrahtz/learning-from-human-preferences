@@ -1,32 +1,21 @@
 import copy
+import datetime
+import glob
 import os
+import os.path as osp
 import pickle
 import queue
 import time
-import os.path as osp
-import glob
-import datetime
 
 import numpy as np
+import tensorflow as tf
 from numpy.testing import assert_equal
 
-import tensorflow as tf
+import params
 from utils import PrefDB, RunningStat
 
-test = False
-
-if test:
-    N_INITIAL_PREFS = 2
-    N_INITIAL_EPOCHS = 1
-    SAVE_FREQ = 1
-    CKPT_FREQ = 1
-else:
-    N_INITIAL_PREFS = 500
-    N_INITIAL_EPOCHS = 25
-    SAVE_FREQ = 100
-    CKPT_FREQ = 100
-
 VAL_FRACTION = 0.2
+
 
 def batch_iter(data, batch_size, shuffle=False):
     idxs = list(range(len(data)))
@@ -129,15 +118,17 @@ def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
 
     print("%d preferences received" % (recv_prefs.n_prefs - n_prefs_start))
 
+
 recv_prefs.n_prefs = 0
 
 
 def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs,
-        log_dir, db_max):
+                           log_dir, db_max):
     reward_model = RewardPredictorEnsemble(
         'train_reward', lr, log_dir=log_dir, load_network=load_network)
 
     if load_prefs:
+        print("Loading preferences...")
         pref_db_val = load_pref_db('val')
         pref_db_train = load_pref_db('train')
     else:
@@ -146,29 +137,40 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs,
 
     # Page 15: "We collect 500 comparisons from a randomly initialized policy
     # network at the beginning of training"
-    while len(pref_db_train) < N_INITIAL_PREFS:
+    while len(pref_db_train) < params.params['n_initial_prefs']:
         recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
         print("Waiting for comparisons; %d so far..." % len(pref_db_train))
         time.sleep(1.0)
 
-    print("Received enough rpeferences at")
     import datetime
-    print(str(datetime.datetime.now()))
+    print("=== Received enough preferences at", str(datetime.datetime.now()))
+
+    fname = osp.join(log_dir, "train_initial.pkl")
+    save_pref_db(pref_db_train, fname)
+    fname = osp.join(log_dir, "val_initial.pkl")
+    save_pref_db(pref_db_val, fname)
 
     if not load_network:
-        print("Training for %d epochs..." % N_INITIAL_EPOCHS)
+        print("Training for %d epochs..." % params.params['n_initial_epochs'])
         # Page 14: "In the Atari domain we also pretrain the reward predictor
-        # for 200 epochs before beginning RL training, to reduce the likelihood of
-        # irreversibly learning a bad policy based on an untrained predictor."
-        for i in range(N_INITIAL_EPOCHS):
+        # for 200 epochs before beginning RL training, to reduce the likelihood
+        # of irreversibly learning a bad policy based on an untrained
+        # predictor."
+        for i in range(params.params['n_initial_epochs']):
             print("Epoch %d" % i)
             reward_model.train(pref_db_train, pref_db_val)
             recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
+        ckpt_file = reward_model.save()
+        print("=== Finished initial training at", str(datetime.datetime.now()))
 
-    print("finished initial at")
-    print(str(datetime.datetime.now()))
+    if params.params['just_pretrain']:
+        fname = osp.join(log_dir, "train_postpretrain.pkl")
+        save_pref_db(pref_db_train, fname)
+        fname = osp.join(log_dir, "val_postpretrain.pkl")
+        save_pref_db(pref_db_val, fname)
+        raise Exception("Pretraining completed")
 
-    print("Starting RL training...")
+    print("=== Starting RL training at", str(datetime.datetime.now()))
     # Start RL training
     go_pipe.put(True)
 
@@ -178,10 +180,8 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs,
         reward_model.train(pref_db_train, pref_db_val)
         recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
 
-        # TODO: currently disabled to save room
-        """
-        if step % SAVE_FREQ == 0:
-            print("Saving preferences...")
+        if step % params.params['save_freq'] == 0:
+            print("=== Saving preferences...")
             fname = osp.join(log_dir, "train_%d.pkl" % step)
             save_pref_db(pref_db_train, fname)
             fname = osp.join(log_dir, "val_%d.pkl" % step)
@@ -190,7 +190,6 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network, load_prefs,
                 os.remove(osp.join(log_dir, "train_%d.pkl" % prev_save_step))
                 os.remove(osp.join(log_dir, "val_%d.pkl" % prev_save_step))
             prev_save_step = step
-        """
 
         step += 1
 
@@ -200,11 +199,16 @@ def save_pref_db(pref_db, fname):
         pickle.dump(pref_db, pkl_file)
 
 
-def load_pref_db(name):
-    print("Loading preferences...")
-    with open('pref_db_%s.pkl' % name, 'rb') as pkl_file:
-        pref_db = pickle.load(pkl_file)
-    return pref_db
+def load_prefs(path):
+    train_fname = glob.glob(osp.join(path, "train_.*\.pkl"))
+    with open(train_fname, 'rb') as pkl_file:
+        pref_db_train = pickle.load(pkl_file)
+
+    val_fname = glob.glob(osp.join(path, "val_.*\.pkl"))
+    with open(val_fname, 'rb') as pkl_file:
+        pref_db_val = pickle.load(pkl_file)
+
+    return pref_db_train, pref_db_val
 
 
 class RewardPredictorEnsemble:
@@ -249,10 +253,15 @@ class RewardPredictorEnsemble:
 
         with graph.as_default():
             for i in range(n_preds):
-                with tf.device(tf.train.replica_device_setter(cluster=cluster_dict, ps_device="/job:ps/task:0", worker_device="/job:{}/task:0".format(name))):
+                with tf.device(
+                        tf.train.replica_device_setter(
+                            cluster=cluster_dict,
+                            ps_device="/job:ps/task:0",
+                            worker_device="/job:{}/task:0".format(name))):
                     with tf.variable_scope("pred_%d" % i):
                         # TODO: enable batchnorm later on
-                        rp = RewardPredictor(dropout=dropout, batchnorm=False, lr=lr)
+                        rp = RewardPredictor(
+                            dropout=dropout, batchnorm=False, lr=lr)
                 reward_ops.append(rp.r1)
                 pred_ops.append(rp.pred)
                 train_ops.append(rp.train)
@@ -432,6 +441,11 @@ class RewardPredictorEnsemble:
 
         return preds
 
+    def save(self):
+        ckpt_name = self.saver.save(self.sess, self.checkpoint_file,
+                                    self.n_steps)
+        return ckpt_name
+
     def train(self, prefs_train, prefs_val, test_interval=50):
         """
         Train the ensemble for one full epoch
@@ -497,9 +511,9 @@ class RewardPredictorEnsemble:
 
             self.n_steps += 1
 
-            if self.n_steps % CKPT_FREQ == 0:
-                print("Saving checkpoint...")
-                self.saver.save(self.sess, self.checkpoint_file, self.n_steps)
+            if self.n_steps % params.params['ckpt_freq'] == 0:
+                print("=== Saving reward predictor checkpoint...")
+                self.save()
 
 
 class RewardPredictor:
