@@ -2,14 +2,10 @@
 import logging
 import os
 import os.path as osp
-import pickle
 import subprocess
 import sys
 import time
 from multiprocessing import Process, Queue
-from threading import Thread
-
-import memory_profiler
 
 import gym
 import gym_gridworld
@@ -42,8 +38,8 @@ def configure_logger(log_dir):
 
 
 def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
-          load_reward_network, load_prefs, headless, log_dir, ent_coef, db_max,
-          segs_max, log_interval):
+          load_reward_network, load_prefs_dir, headless, log_dir, ent_coef,
+          db_max, segs_max, log_interval):
     configure_logger(log_dir)
 
     num_timesteps = int(num_frames / 4 * 1.1)
@@ -71,7 +67,7 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     pi = PrefInterface(headless)
 
     def ps():
-        reward_model = RewardPredictorEnsemble('ps')
+        RewardPredictorEnsemble('ps')
     ps_proc = Process(target=ps)
     ps_proc.start()
 
@@ -83,7 +79,7 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
         log_dir=log_dir, ent_coef=0.01, log_interval=log_interval), daemon=True)
     train_proc = Process(
         target=train_reward_predictor,
-        args=(rp_lr, pref_pipe, go_pipe, load_reward_network, load_prefs,
+        args=(rp_lr, pref_pipe, go_pipe, load_reward_network, load_prefs_dir,
               log_dir, db_max),
         daemon=True)
 
@@ -91,6 +87,7 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     train_proc.start()
 
     """
+    import memory_profiler
     def profile(name, pid):
         with open(osp.join(log_dir, name + '.log'), 'w') as f:
             memory_profiler.memory_usage(pid, stream=f, timeout=99999)
@@ -131,7 +128,7 @@ def main():
         default=80)
     parser.add_argument('--n_envs', type=int, default=4)
     parser.add_argument('--load_reward_network', action='store_true')
-    parser.add_argument('--load_prefs', action='store_true')
+    parser.add_argument('--load_prefs_dir')
     parser.add_argument('--headless', action='store_true', default=True)
     seconds_since_epoch = str(int(time.time()))
     parser.add_argument('--run_name', default=seconds_since_epoch)
@@ -178,7 +175,7 @@ def main():
         lrschedule=args.lrschedule,
         num_cpu=args.n_envs,
         load_reward_network=args.load_reward_network,
-        load_prefs=args.load_prefs,
+        load_prefs_dir=args.load_prefs_dir,
         headless=args.headless,
         log_dir=log_dir,
         ent_coef=args.ent_coef,
