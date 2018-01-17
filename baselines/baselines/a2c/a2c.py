@@ -219,8 +219,9 @@ class Runner(object):
 
                 for step_n in range(self.nsteps):
                     if dones[step_n]:
-                        print("Env %d: episode finished, true reward %d" %
-                            (env_n, self.true_reward[env_n]))
+                        if params.params['debug']:
+                            print("Env %d: episode finished, true reward %d" %
+                                  (env_n, self.true_reward[env_n]))
 
                         self.sess.run(
                             self.tr_ops[env_n].assign(self.true_reward[env_n]))
