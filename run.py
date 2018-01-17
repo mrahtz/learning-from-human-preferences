@@ -39,7 +39,7 @@ def configure_logger(log_dir):
 
 
 def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
-          load_reward_network, load_prefs_dir, headless, log_dir, ent_coef,
+          rp_ckpt_dir, load_prefs_dir, headless, log_dir, ent_coef,
           db_max, segs_max, log_interval):
     configure_logger(log_dir)
 
@@ -84,8 +84,8 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
         log_dir=log_dir, ent_coef=0.01, log_interval=log_interval), daemon=True)
     train_proc = Process(
         target=train_reward_predictor,
-        args=(rp_lr, pref_pipe, go_pipe, load_reward_network, load_prefs_dir,
-              log_dir, db_max),
+        args=(rp_lr, pref_pipe, go_pipe, load_prefs_dir, log_dir, db_max,
+              rp_ckpt_dir),
         daemon=True)
 
     a2c_proc.start()
@@ -131,7 +131,7 @@ def main():
         type=int,
         default=80)
     parser.add_argument('--n_envs', type=int, default=4)
-    parser.add_argument('--load_reward_network', action='store_true')
+    parser.add_argument('--rp_ckpt_dir')
     parser.add_argument('--load_prefs_dir')
     parser.add_argument('--headless', action='store_true', default=True)
     seconds_since_epoch = str(int(time.time()))
@@ -143,12 +143,14 @@ def main():
     parser.add_argument('--test_mode', action='store_true')
     parser.add_argument('--just_pretrain', action='store_true')
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--no_pretrain', action='store_true')
     args = parser.parse_args()
 
     params.init_params()
     params.params['test_mode'] = args.test_mode
     params.params['just_pretrain'] = args.just_pretrain
     params.params['debug'] = args.debug
+    params.params['no_pretrain'] = args.no_pretrain
 
     if args.test_mode:
         print("=== WARNING: running in test mode", file=sys.stderr)
@@ -158,7 +160,7 @@ def main():
         params.params['ckpt_freq'] = 1
     else:
         params.params['n_initial_prefs'] = 500
-        params.params['n_initial_epochs'] = 25
+        params.params['n_initial_epochs'] = 10000
         params.params['save_freq'] = 100
         params.params['ckpt_freq'] = 100
 
@@ -178,7 +180,7 @@ def main():
         rp_lr=args.rp_lr,
         lrschedule=args.lrschedule,
         num_cpu=args.n_envs,
-        load_reward_network=args.load_reward_network,
+        rp_ckpt_dir=args.rp_ckpt_dir,
         load_prefs_dir=args.load_prefs_dir,
         headless=args.headless,
         log_dir=log_dir,
