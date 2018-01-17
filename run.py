@@ -123,7 +123,7 @@ def main():
         choices=['constant', 'linear'],
         default='linear')
     parser.add_argument('--lr', type=float, default=7e-4)
-    parser.add_argument('--rp_lr', type=float, default=1e-4)
+    parser.add_argument('--rp_lr', type=float, default=2e-4)
     parser.add_argument(
         '--million_frames',
         help='How many frames to train (/ 1e6). '
@@ -160,7 +160,7 @@ def main():
         params.params['ckpt_freq'] = 1
     else:
         params.params['n_initial_prefs'] = 500
-        params.params['n_initial_epochs'] = 10000
+        params.params['n_initial_epochs'] = 100
         params.params['save_freq'] = 100
         params.params['ckpt_freq'] = 100
 
