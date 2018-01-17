@@ -128,6 +128,8 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
     # TODO clean up the checkpoint passing around
     if rp_ckpt_dir is not None:
         load_network = True
+    else:
+        load_network = False
     reward_model = RewardPredictorEnsemble(
         'train_reward', lr, log_dir=log_dir, load_network=load_network,
         rp_ckpt_dir=rp_ckpt_dir)
