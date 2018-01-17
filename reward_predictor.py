@@ -96,7 +96,7 @@ def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
 
     while True:
         try:
-            s1, s2, mu = pref_pipe.get(block=False)
+            s1, s2, mu = pref_pipe.get(timeout=0.1)
             recv_prefs.n_prefs += 1
         except queue.Empty:
             break
@@ -515,8 +515,6 @@ class RewardPredictorEnsemble:
             if self.n_steps % params.params['ckpt_freq'] == 0:
                 print("=== Saving reward predictor checkpoint...")
                 self.save()
-
-            break
 
 
 class RewardPredictor:
