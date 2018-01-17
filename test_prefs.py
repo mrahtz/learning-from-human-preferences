@@ -94,7 +94,7 @@ for k, segment in prefs_train.segments.items():
     reward = np.sum(rp.reward_unnormalized(np.array(segment)))
     print("Segment %d: %.1f" % (k, reward))
     rewards[k] = reward
-print("done!")
+print("Calculating rewards done!")
 print()
 
 print("Test 2: are the preferences calculated based on the rewards right?")

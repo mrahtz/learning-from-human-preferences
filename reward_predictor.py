@@ -399,7 +399,8 @@ class RewardPredictorEnsemble:
         # "...and then averaging the results."
         rs = np.mean(ensemble_rs, axis=0)
         assert_equal(rs.shape, (n_steps,))
-        print("Sending back rewards", rs)
+        if params.params['debug']:
+            print("Sending back rewards", rs)
 
         return rs
 
