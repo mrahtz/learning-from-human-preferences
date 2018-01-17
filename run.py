@@ -43,6 +43,7 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     configure_logger(log_dir)
 
     num_timesteps = int(num_frames / 4 * 1.1)
+
     # divide by 4 due to frameskip, then do a little extras so episodes end
 
     def make_env(rank):
@@ -55,7 +56,9 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
                 and osp.join(logger.get_dir(), "{}.monitor.json".format(rank)))
             gym.logger.setLevel(logging.WARN)
             return wrap_deepmind(env)
+
         return _thunk
+
     set_global_seeds(seed)
     env = SubprocVecEnv([make_env(i) for i in range(num_cpu)])
     policy_fn = CnnPolicy
@@ -68,6 +71,7 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
 
     def ps():
         RewardPredictorEnsemble('ps')
+
     ps_proc = Process(target=ps)
     ps_proc.start()
 
@@ -85,7 +89,6 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
 
     a2c_proc.start()
     train_proc.start()
-
     """
     import memory_profiler
     def profile(name, pid):
