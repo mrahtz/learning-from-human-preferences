@@ -1,12 +1,13 @@
 import os.path as osp
-import time
 import queue
-
-import numpy as np
-from numpy.testing import assert_equal
+import time
 
 import joblib
+import numpy as np
 import tensorflow as tf
+from numpy.testing import assert_equal
+
+import params
 from baselines import logger
 from baselines.a2c.utils import (Scheduler, cat_entropy, discount_with_dones,
                                  find_trainable_variables, make_path, mse)
@@ -178,7 +179,8 @@ class Runner(object):
             for n, done in enumerate(dones):
                 if done:
                     self.obs[n] = self.obs[n]*0
-                    print("Env %d done" % n)
+                    if params.params['debug']:
+                        print("Env %d done" % n)
             # SubprocVecEnv automatically resets when done
             self.update_obs(obs)
             mb_rewards.append(rewards)
@@ -201,9 +203,10 @@ class Runner(object):
             # for the data from each environment
             assert_equal(mb_obs.shape, (nenvs, self.nsteps, 84, 84, 4))
             for env_n, obs in enumerate(mb_obs):
-                print("Env %d" % env_n)
                 assert_equal(obs.shape, (self.nsteps, 84, 84, 4))
-                print(mb_actions[env_n])
+                if params.params['debug']:
+                    print("Env %d" % env_n)
+                    print(mb_actions[env_n])
                 rewards = self.reward_model.reward(obs)
                 assert_equal(rewards.shape, (self.nsteps,))
                 mb_rewards[env_n] = rewards
@@ -216,8 +219,9 @@ class Runner(object):
 
                 for step_n in range(self.nsteps):
                     if dones[step_n]:
-                        print("Env %d: episode finished, true reward %d" %
-                            (env_n, self.true_reward[env_n]))
+                        if params.params['debug']:
+                            print("Env %d: episode finished, true reward %d" %
+                                  (env_n, self.true_reward[env_n]))
 
                         self.sess.run(
                             self.tr_ops[env_n].assign(self.true_reward[env_n]))
@@ -297,7 +301,8 @@ def learn(policy, env, seed, seg_pipe, go_pipe, log_dir, nsteps=5, nstack=4,
             try:
                 go_pipe.get(block=False)
             except queue.Empty:
-                print("RL training signal not yet given; skipping training")
+                if params.params['debug']:
+                    print("RL training signal not yet given; skipping training")
                 continue
             else:
                 train = True

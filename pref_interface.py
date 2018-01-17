@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-import os.path
-import pickle
 import queue
 import time
 from itertools import combinations
@@ -12,9 +10,9 @@ import numpy as np
 import pyglet
 from numpy.testing import assert_equal
 
+import params
 from dot_utils import predict_preference
 from reward_predictor import RewardPredictorEnsemble
-from scipy.ndimage import zoom
 
 
 class Im(object):
@@ -26,21 +24,27 @@ class Im(object):
     def imshow(self, arr):
         if self.window is None:
             height, width = arr.shape
-            self.window = pyglet.window.Window(width=width, height=height, display=self.display)
+            self.window = pyglet.window.Window(
+                width=width, height=height, display=self.display)
             self.width = width
             self.height = height
             self.isopen = True
-        assert arr.shape == (self.height, self.width), "You passed in an image with the wrong number shape"
-        image = pyglet.image.ImageData(self.width, self.height, 'L', arr.tobytes(), pitch=-self.width)
+        assert arr.shape == (
+            self.height,
+            self.width), "You passed in an image with the wrong number shape"
+        image = pyglet.image.ImageData(
+            self.width, self.height, 'L', arr.tobytes(), pitch=-self.width)
         self.window.clear()
         self.window.switch_to()
         self.window.dispatch_events()
-        image.blit(0,0)
+        image.blit(0, 0)
         self.window.flip()
+
     def close(self):
         if self.isopen:
             self.window.close()
             self.isopen = False
+
     def __del__(self):
         self.close()
 
@@ -69,7 +73,8 @@ class PrefInterface:
         else:
             idxs = range(len(self.segments))
 
-        print("Calculating preferences...")
+        if params.params['debug']:
+            print("Calculating preferences...")
         s1s = []
         s2s = []
         pair_idxs = list(combinations(idxs, 2))
@@ -78,7 +83,8 @@ class PrefInterface:
             s2s.append(self.segments[i2])
         pair_preds = self.reward_model.preferences(s1s, s2s)
         pair_preds = np.array(pair_preds)
-        print("done!")
+        if params.params['debug']:
+            print("done!")
 
         n_preds = self.reward_model.n_preds
         assert_equal(pair_preds.shape, (n_preds, len(pair_idxs), 2))
@@ -102,9 +108,10 @@ class PrefInterface:
         check_idxs = pair_idxs[highest_var_i]
         check_s1 = self.segments[check_idxs[0]]
         check_s2 = self.segments[check_idxs[1]]
-        print("Pair with highest variance is", check_idxs)
-        print("Predictions are:")
-        print(seg_0_preds[:, highest_var_i])
+        if params.params['debug']:
+            print("Pair with highest variance is", check_idxs)
+            print("Predictions are:")
+            print(seg_0_preds[:, highest_var_i])
 
         # TODO: loop if already checked
         return check_idxs, check_s1, check_s2
@@ -120,7 +127,8 @@ class PrefInterface:
             if len(self.segments) > segs_max:
                 del self.segments[0]
             assert len(self.segments) <= segs_max
-            print("No. segments:", len(self.segments))
+            if params.params['debug']:
+                print("No. segments:", len(self.segments))
 
     def run(self, seg_pipe, pref_pipe, segs_max):
         self.segments = []

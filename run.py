@@ -1,15 +1,12 @@
-#!/usr/bin/env python3 -u
+#!/bin/sh
+''''exec python -u -- "$0" ${1+"$@"} # '''
 import logging
 import os
 import os.path as osp
-import pickle
 import subprocess
 import sys
 import time
 from multiprocessing import Process, Queue
-from threading import Thread
-
-import memory_profiler
 
 import gym
 import gym_gridworld
@@ -42,11 +39,12 @@ def configure_logger(log_dir):
 
 
 def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
-          load_reward_network, load_prefs, headless, log_dir, ent_coef, db_max,
-          segs_max, log_interval):
+          rp_ckpt_dir, load_prefs_dir, headless, log_dir, ent_coef,
+          db_max, segs_max, log_interval):
     configure_logger(log_dir)
 
     num_timesteps = int(num_frames / 4 * 1.1)
+
     # divide by 4 due to frameskip, then do a little extras so episodes end
 
     def make_env(rank):
@@ -59,7 +57,9 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
                 and osp.join(logger.get_dir(), "{}.monitor.json".format(rank)))
             gym.logger.setLevel(logging.WARN)
             return wrap_deepmind(env)
+
         return _thunk
+
     set_global_seeds(seed)
     env = SubprocVecEnv([make_env(i) for i in range(num_cpu)])
     policy_fn = CnnPolicy
@@ -71,7 +71,8 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     pi = PrefInterface(headless)
 
     def ps():
-        reward_model = RewardPredictorEnsemble('ps')
+        RewardPredictorEnsemble('ps')
+
     ps_proc = Process(target=ps)
     ps_proc.start()
 
@@ -83,14 +84,14 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
         log_dir=log_dir, ent_coef=0.01, log_interval=log_interval), daemon=True)
     train_proc = Process(
         target=train_reward_predictor,
-        args=(rp_lr, pref_pipe, go_pipe, load_reward_network, load_prefs,
-              log_dir, db_max),
+        args=(rp_lr, pref_pipe, go_pipe, load_prefs_dir, log_dir, db_max,
+              rp_ckpt_dir),
         daemon=True)
 
     a2c_proc.start()
     train_proc.start()
-
     """
+    import memory_profiler
     def profile(name, pid):
         with open(osp.join(log_dir, name + '.log'), 'w') as f:
             memory_profiler.memory_usage(pid, stream=f, timeout=99999)
@@ -122,7 +123,7 @@ def main():
         choices=['constant', 'linear'],
         default='linear')
     parser.add_argument('--lr', type=float, default=7e-4)
-    parser.add_argument('--rp_lr', type=float, default=1e-4)
+    parser.add_argument('--rp_lr', type=float, default=2e-4)
     parser.add_argument(
         '--million_frames',
         help='How many frames to train (/ 1e6). '
@@ -130,8 +131,8 @@ def main():
         type=int,
         default=80)
     parser.add_argument('--n_envs', type=int, default=4)
-    parser.add_argument('--load_reward_network', action='store_true')
-    parser.add_argument('--load_prefs', action='store_true')
+    parser.add_argument('--rp_ckpt_dir')
+    parser.add_argument('--load_prefs_dir')
     parser.add_argument('--headless', action='store_true', default=True)
     seconds_since_epoch = str(int(time.time()))
     parser.add_argument('--run_name', default=seconds_since_epoch)
@@ -141,11 +142,15 @@ def main():
     parser.add_argument('--log_interval', type=int, default=100)
     parser.add_argument('--test_mode', action='store_true')
     parser.add_argument('--just_pretrain', action='store_true')
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--no_pretrain', action='store_true')
     args = parser.parse_args()
 
     params.init_params()
     params.params['test_mode'] = args.test_mode
     params.params['just_pretrain'] = args.just_pretrain
+    params.params['debug'] = args.debug
+    params.params['no_pretrain'] = args.no_pretrain
 
     if args.test_mode:
         print("=== WARNING: running in test mode", file=sys.stderr)
@@ -155,7 +160,7 @@ def main():
         params.params['ckpt_freq'] = 1
     else:
         params.params['n_initial_prefs'] = 500
-        params.params['n_initial_epochs'] = 25
+        params.params['n_initial_epochs'] = 100
         params.params['save_freq'] = 100
         params.params['ckpt_freq'] = 100
 
@@ -175,8 +180,8 @@ def main():
         rp_lr=args.rp_lr,
         lrschedule=args.lrschedule,
         num_cpu=args.n_envs,
-        load_reward_network=args.load_reward_network,
-        load_prefs=args.load_prefs,
+        rp_ckpt_dir=args.rp_ckpt_dir,
+        load_prefs_dir=args.load_prefs_dir,
         headless=args.headless,
         log_dir=log_dir,
         ent_coef=args.ent_coef,
