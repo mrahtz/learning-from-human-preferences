@@ -123,10 +123,14 @@ def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
 recv_prefs.n_prefs = 0
 
 
-def train_reward_predictor(lr, pref_pipe, go_pipe, load_network,
-                           load_prefs_dir, log_dir, db_max):
+def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
+                           db_max, rp_ckpt_dir):
+    # TODO clean up the checkpoint passing around
+    if rp_ckpt_dir is not None:
+        load_network = True
     reward_model = RewardPredictorEnsemble(
-        'train_reward', lr, log_dir=log_dir, load_network=load_network)
+        'train_reward', lr, log_dir=log_dir, load_network=load_network,
+        rp_ckpt_dir=rp_ckpt_dir)
 
     if load_prefs_dir:
         print("Loading preferences...")
@@ -150,7 +154,7 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network,
     fname = osp.join(log_dir, "val_initial.pkl")
     save_pref_db(pref_db_val, fname)
 
-    if not load_network:
+    if not params.params['no_pretrain']:
         print("Training for %d epochs..." % params.params['n_initial_epochs'])
         # Page 14: "In the Atari domain we also pretrain the reward predictor
         # for 200 epochs before beginning RL training, to reduce the likelihood
@@ -159,7 +163,7 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_network,
         for i in range(params.params['n_initial_epochs']):
             print("Epoch %d" % i)
             reward_model.train(pref_db_train, pref_db_val)
-            recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
+            #recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
         reward_model.save()
         print("=== Finished initial training at", str(datetime.datetime.now()))
 
@@ -229,6 +233,7 @@ class RewardPredictorEnsemble:
                  cluster_dict=None,
                  n_preds=3,
                  load_network=False,
+                 rp_ckpt_dir=None,
                  dropout=0.5):
         rps = []
         reward_ops = []
@@ -280,15 +285,20 @@ class RewardPredictorEnsemble:
             self.checkpoint_file = osp.join(log_dir, 'checkpoints',
                                             'reward_network.ckpt')
 
-            # Only the ps process should initialize the network
-            if name != 'ps':
+            # Only the reward predictor training process should initialize the
+            # network
+            if name != 'train_reward':
                 while len(sess.run(tf.report_uninitialized_variables())) > 0:
                     print("%s waiting for variable initialization..." % name)
                     time.sleep(1.0)
             else:
                 if load_network:
-                    print("Loading reward predictor checkpoint...", end="")
-                    self.saver.restore(sess, self.checkpoint_file)
+                    # TODO fix
+                    ckpt_file = rp_ckpt_dir
+                    print("Loading reward predictor checkpoint from {}...".
+                          format(ckpt_file),
+                          end="")
+                    self.saver.restore(sess, ckpt_file)
                     print("done!")
                 else:
                     sess.run(tf.global_variables_initializer())
