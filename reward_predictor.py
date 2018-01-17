@@ -37,12 +37,17 @@ def batch_iter(data, batch_size, shuffle=False):
         start_idx += batch_size
 
 
-def conv_layer(x, filters, kernel_size, strides,
-               batchnorm, training, name, reuse):
+def conv_layer(x, filters, kernel_size, strides, batchnorm, training, name,
+               reuse):
     # TODO: L2 loss
-    x = tf.layers.conv2d(x, filters, kernel_size, strides,
-                         activation=None,
-                         name=name, reuse=reuse)
+    x = tf.layers.conv2d(
+        x,
+        filters,
+        kernel_size,
+        strides,
+        activation=None,
+        name=name,
+        reuse=reuse)
     if batchnorm:
         x = tf.layers.batch_normalization(x, training=training)
     x = tf.nn.leaky_relu(x, alpha=0.01)
@@ -58,9 +63,7 @@ def dense_layer(x, units, name, reuse, activation):
     # => fully connected layers don't use batch norm or dropout
     # => fully-connected layers have no activation function?
     # TODO: L2 loss
-    x = tf.layers.dense(x, units,
-                        activation=None,
-                        name=name, reuse=reuse)
+    x = tf.layers.dense(x, units, activation=None, name=name, reuse=reuse)
     if activation:
         x = tf.nn.leaky_relu(x, alpha=0.01)
     return x
@@ -81,7 +84,7 @@ def reward_pred_net(s, dropout, batchnorm, reuse, training):
     x = tf.reshape(x, [-1, int(w * h * c)])
 
     x = dense_layer(x, 64, "d1", reuse, activation=True)
-    x = dense_layer(x, 1,  "d2", reuse, activation=False)
+    x = dense_layer(x, 1, "d2", reuse, activation=False)
     x = x[:, 0]
 
     return x
@@ -350,7 +353,7 @@ class RewardPredictorEnsemble:
         assert_equal(len(rs[0]), n_steps)
 
         rs = np.mean(rs, axis=0)
-        assert_equal(rs.shape, (n_steps,))
+        assert_equal(rs.shape, (n_steps, ))
 
         return rs
 
@@ -395,7 +398,7 @@ class RewardPredictorEnsemble:
 
         # "...and then averaging the results."
         rs = np.mean(ensemble_rs, axis=0)
-        assert_equal(rs.shape, (n_steps,))
+        assert_equal(rs.shape, (n_steps, ))
         if params.params['debug']:
             print("Sending back rewards", rs)
 
@@ -448,8 +451,8 @@ class RewardPredictorEnsemble:
         """
         Train the ensemble for one full epoch
         """
-        print("Training/testing with %d/%d preferences" %
-              (len(prefs_train), len(prefs_val)))
+        print("Training/testing with %d/%d preferences" % (len(prefs_train),
+                                                           len(prefs_val)))
 
         for batch_n, batch in enumerate(
                 batch_iter(prefs_train.prefs, batch_size=16, shuffle=True)):
