@@ -163,7 +163,7 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
         for i in range(params.params['n_initial_epochs']):
             print("Epoch %d" % i)
             reward_model.train(pref_db_train, pref_db_val)
-            #recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
+            recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
         reward_model.save()
         print("=== Finished initial training at", str(datetime.datetime.now()))
 
