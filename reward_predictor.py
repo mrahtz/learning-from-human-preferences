@@ -330,7 +330,7 @@ class RewardPredictorEnsemble:
         self.pred_ops = pred_ops
         self.n_preds = n_preds
         self.n_steps = 0
-        self.r_norm = RunningStat()
+        self.r_norm = RunningStat(shape=n_preds)
 
     def raw_rewards(self, obs):
         """
@@ -387,6 +387,9 @@ class RewardPredictorEnsemble:
         assert_equal(len(ensemble_rs), len(self.rps))
         assert_equal(len(ensemble_rs[0]), n_steps)
 
+        if params.params['debug']:
+            print("Raw rewards:", ensemble_rs)
+
         # TODO: I'm assuming that normalization is only applied
         # to the rewards fed to the policy network
         # Page 4:
@@ -399,15 +402,23 @@ class RewardPredictorEnsemble:
         # Page 5:
         # "The estimate r^ is defined by independently normalizing each of
         #  these predictors..."
-        for i, r_seq in enumerate(ensemble_rs):
-            for r in r_seq:
-                self.r_norm.push(r)
 
-            r_seq = r_seq - self.r_norm.mean
-            if self.r_norm.std != 0:
-                r_seq = r_seq / self.r_norm.std * 0.05
+        # ensemble_rs is n_preds x n_steps
+        ensemble_rs = np.array(ensemble_rs).transpose()
+        # now n_steps x n_preds
 
-            ensemble_rs[i] = r_seq
+        for ensemble_rs_step in ensemble_rs:
+            self.r_norm.push(ensemble_rs_step)
+        ensemble_rs -= self.r_norm.mean
+        ensemble_rs /= (self.r_norm.std + 1e-12)
+        ensemble_rs *= 0.05
+
+        ensemble_rs = ensemble_rs.transpose()
+        # now n_preds x n_steps again
+
+        if params.params['debug']:
+            print("Reward mean/stddev:", self.r_norm.mean, self.r_norm.std)
+            print("Ensemble rewards post-normalisation:", ensemble_rs)
 
         assert_equal(len(ensemble_rs), len(self.rps))
         assert_equal(len(ensemble_rs[0]), n_steps)
