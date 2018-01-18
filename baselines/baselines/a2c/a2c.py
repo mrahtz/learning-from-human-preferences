@@ -292,7 +292,6 @@ def learn(policy, env, seed, seg_pipe, go_pipe, log_dir, nsteps=5, nstack=4,
     fps_nsteps = 0
     train = False
     for update in range(1, total_timesteps//nbatch+1):
-        #print("Update %d" % update)
         # Run for nsteps
         obs, states, rewards, masks, actions, values = runner.run()
 
@@ -302,7 +301,7 @@ def learn(policy, env, seed, seg_pipe, go_pipe, log_dir, nsteps=5, nstack=4,
                 go_pipe.get(block=False)
             except queue.Empty:
                 if params.params['debug']:
-                    print("RL training signal not yet given; skipping training")
+                    print("Training signal not yet given; skipping training")
                 continue
             else:
                 train = True
@@ -325,12 +324,10 @@ def learn(policy, env, seed, seg_pipe, go_pipe, log_dir, nsteps=5, nstack=4,
             logger.record_tabular("value_loss", float(value_loss))
             logger.record_tabular("explained_variance", float(ev))
             logger.dump_tabular()
-        if save_interval and (update % save_interval == 0 or update == 1) and logger.get_dir():
-            savepath = osp.join(logger.get_dir(), 'checkpoint%.5i'%update)
+        if save_interval and (update % save_interval == 0
+                              or update == 1) and logger.get_dir():
+            savepath = osp.join(logger.get_dir(), 'checkpoint%.5i' % update)
             print('Saving to', savepath)
             model.save(savepath)
 
     env.close()
-
-if __name__ == '__main__':
-    main()
