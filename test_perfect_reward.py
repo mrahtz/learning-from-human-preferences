@@ -23,26 +23,26 @@ def rew(env):
 def main():
     env = wrap_deepmind(gym.make("GridWorldNoFrameskip-v4"))
 
-    env.reset()
-    done = False
-    os = []
-    while not done:
-        pos_pre = env.unwrapped.pos[:]
-        steps_pre = env.unwrapped.steps
-        rs = []
-        for action in range(env.unwrapped.action_space.n):
-            o, _, s, _ = env.step(action)
-            r = rew(env)
-            rs.append(r)
-            env.unwrapped.pos[:] = pos_pre
-            env.unwrapped.steps = steps_pre
-        action = np.argmax(rs)
-        #action = env.unwrapped.action_space.sample()
-        o, r, done, _ = env.step(action)
-        os.append(o)
-        env.render()
-
-    print(predict_reward(os))
+    for i in range(5):
+        env.reset()
+        done = False
+        os = []
+        while not done:
+            pos_pre = env.unwrapped.pos[:]
+            steps_pre = env.unwrapped.steps
+            rs = []
+            for action in range(env.unwrapped.action_space.n):
+                o, _, s, _ = env.step(action)
+                r = rew(env)
+                rs.append(r)
+                env.unwrapped.pos[:] = pos_pre
+                env.unwrapped.steps = steps_pre
+            action = np.argmax(rs)
+            #action = env.unwrapped.action_space.sample()
+            o, r, done, _ = env.step(action)
+            os.append(o)
+            #env.render()
+        print(predict_reward(os))
 
 
 if __name__ == '__main__':
