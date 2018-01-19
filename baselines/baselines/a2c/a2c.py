@@ -207,6 +207,8 @@ class Runner(object):
                 if params.params['debug']:
                     print("Env %d" % env_n)
                     print(mb_actions[env_n])
+                    print([self.env.action_meanings[i] for i in
+                            mb_actions[env_n]])
                 rewards = self.reward_model.reward(obs)
                 assert_equal(rewards.shape, (self.nsteps,))
                 mb_rewards[env_n] = rewards
