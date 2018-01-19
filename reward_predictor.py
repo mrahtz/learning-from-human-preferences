@@ -72,19 +72,12 @@ def dense_layer(x, units, name, reuse, activation):
 def reward_pred_net(s, dropout, batchnorm, reuse, training):
     x = s
 
-    x = conv_layer(x, 16, 7, 3, batchnorm, training, "c1", reuse)
+    x = x[:, :, :, -1]  # Select most recent frame
+    w, h = x.get_shape()[1:]
+    x = tf.reshape(x, [-1, int(w * h)])
+    x = dense_layer(x, 8192, 'd1', reuse, activation=True)
     x = tf.layers.dropout(x, dropout, training=training)
-    x = conv_layer(x, 16, 5, 2, batchnorm, training, "c2", reuse)
-    x = tf.layers.dropout(x, dropout, training=training)
-    x = conv_layer(x, 16, 3, 1, batchnorm, training, "c3", reuse)
-    x = tf.layers.dropout(x, dropout, training=training)
-    x = conv_layer(x, 16, 3, 1, batchnorm, training, "c4", reuse)
-
-    w, h, c = x.get_shape()[1:]
-    x = tf.reshape(x, [-1, int(w * h * c)])
-
-    x = dense_layer(x, 64, "d1", reuse, activation=True)
-    x = dense_layer(x, 1, "d2", reuse, activation=False)
+    x = dense_layer(x, 1, 'd2', reuse, activation=False)
     x = x[:, 0]
 
     return x
@@ -177,9 +170,9 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
         print("=== Finished initial training at", str(datetime.datetime.now()))
 
     if params.params['just_pretrain']:
-        fname = osp.join(log_dir, "train_postpretrain.pkl")
+        fname = osp.join(log_dir, "train_initial.pkl")
         save_pref_db(pref_db_train, fname)
-        fname = osp.join(log_dir, "val_postpretrain.pkl")
+        fname = osp.join(log_dir, "val_initial.pkl")
         save_pref_db(pref_db_val, fname)
         raise Exception("Pretraining completed")
 
@@ -213,11 +206,11 @@ def save_pref_db(pref_db, fname):
 
 
 def load_pref_db(pref_dir):
-    train_fname = osp.join(pref_dir, 'train_postpretrain.pkl')
+    train_fname = osp.join(pref_dir, 'train_initial.pkl')
     with open(train_fname, 'rb') as pkl_file:
         pref_db_train = pickle.load(pkl_file)
 
-    val_fname = osp.join(pref_dir, 'val_postpretrain.pkl')
+    val_fname = osp.join(pref_dir, 'val_initial.pkl')
     with open(val_fname, 'rb') as pkl_file:
         pref_db_val = pickle.load(pkl_file)
 
