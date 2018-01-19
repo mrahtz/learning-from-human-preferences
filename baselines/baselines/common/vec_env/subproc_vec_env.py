@@ -19,6 +19,8 @@ def worker(remote, env_fn_wrapper):
             break
         elif cmd == 'get_spaces':
             remote.send((env.action_space, env.observation_space))
+        elif cmd == 'get_action_meanings':
+            remote.send(env.unwrapped.get_action_meanings())
         else:
             raise NotImplementedError
 
@@ -49,6 +51,9 @@ class SubprocVecEnv(VecEnv):
 
         self.remotes[0].send(('get_spaces', None))
         self.action_space, self.observation_space = self.remotes[0].recv()
+
+        self.remotes[0].send(('get_action_meanings', None))
+        self.action_meanings = self.remotes[0].recv()
 
 
     def step(self, actions):
