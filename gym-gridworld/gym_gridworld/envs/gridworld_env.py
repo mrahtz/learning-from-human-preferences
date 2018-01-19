@@ -67,6 +67,9 @@ class GridWorldEnv(gym.Env):
 
         return ob, reward, episode_over, {}
 
+    def get_action_meanings(self):
+        return ['NOOP', 'DOWN', 'RIGHT', 'UP', 'LEFT']
+
     def _reset(self):
         if self.random_start:
             x = np.random.randint(low=0, high=160)
