@@ -164,7 +164,7 @@ def main():
         params.params['ckpt_freq'] = 1
     else:
         params.params['n_initial_prefs'] = 500
-        params.params['n_initial_epochs'] = 100
+        params.params['n_initial_epochs'] = 20
         params.params['save_freq'] = 10
         params.params['ckpt_freq'] = 100
 
