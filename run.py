@@ -144,6 +144,7 @@ def main():
     parser.add_argument('--just_pretrain', action='store_true')
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--no_pretrain', action='store_true')
+    parser.add_argument('--save_prefs', action='store_true')
     args = parser.parse_args()
 
     params.init_params()
@@ -151,6 +152,7 @@ def main():
     params.params['just_pretrain'] = args.just_pretrain
     params.params['debug'] = args.debug
     params.params['no_pretrain'] = args.no_pretrain
+    params.params['save_prefs'] = args.save_prefs
 
     if args.test_mode:
         print("=== WARNING: running in test mode", file=sys.stderr)
@@ -161,7 +163,7 @@ def main():
     else:
         params.params['n_initial_prefs'] = 500
         params.params['n_initial_epochs'] = 100
-        params.params['save_freq'] = 100
+        params.params['save_freq'] = 10
         params.params['ckpt_freq'] = 100
 
     git_rev = subprocess.check_output(['git', 'rev-parse', '--short',
