@@ -17,6 +17,7 @@ class GridWorldEnv(gym.Env):
         self.observation_space = spaces.Box(low=0,
                                             high=255,
                                             shape=(210, 160, 3))
+        self.centre = np.array([80, 105])
         self.action_space = spaces.Discrete(5)
         self.viewer = None
 
@@ -41,6 +42,9 @@ class GridWorldEnv(gym.Env):
 
     def _step(self, action):
         assert action >= 0 and action <= 4
+
+        self.prev_pos = self.pos[:]
+
         if action == 0:
             # NOOP
             pass
@@ -63,9 +67,20 @@ class GridWorldEnv(gym.Env):
         else:
             episode_over = True
 
-        reward = 0.
+        
+        dist1 = np.linalg.norm(self.prev_pos - self.centre)
+        dist2 = np.linalg.norm(self.pos - self.centre)
+        if dist2 < dist1:
+            reward = 1
+        elif dist2 == dist1:
+            reward = 0
+        else:
+            reward = -1
 
         return ob, reward, episode_over, {}
+
+    def get_action_meanings(self):
+        return ['NOOP', 'DOWN', 'RIGHT', 'UP', 'LEFT']
 
     def _reset(self):
         if self.random_start:
