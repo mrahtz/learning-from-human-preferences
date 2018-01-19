@@ -102,17 +102,22 @@ def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
             break
 
         if np.random.rand() < VAL_FRACTION:
+            print("Sending pref to val")
             pref_db_val.append(s1, s2, mu)
+            print("Val len is now {}".format(len(pref_db_val)))
         else:
+            print("Sending pref to train")
             pref_db_train.append(s1, s2, mu)
+            print(":rain len is now {}".format(len(pref_db_train)))
 
         if len(pref_db_val) > db_max * VAL_FRACTION:
+            print("Val database limit reached; dropping first preference")
             pref_db_val.del_first()
         assert len(pref_db_val) <= db_max * VAL_FRACTION
         print("pref_db_val len:", len(pref_db_val))
 
         if len(pref_db_train) > db_max * (1 - VAL_FRACTION):
-            print("Database limit reached; dropping first preference")
+            print("Train database limit reached; dropping first preference")
             pref_db_train.del_first()
         assert len(pref_db_train) <= db_max * (1 - VAL_FRACTION)
         print("pref_db_train len:", len(pref_db_train))
@@ -188,7 +193,7 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
         reward_model.train(pref_db_train, pref_db_val)
         recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
 
-        if step % params.params['save_freq'] == 0:
+        if params.params['save_prefs'] and step % params.params['save_freq'] == 0:
             print("=== Saving preferences...")
             fname = osp.join(log_dir, "train_%d.pkl" % step)
             save_pref_db(pref_db_train, fname)
