@@ -1,7 +1,10 @@
-#!/usr/bin/env python
+#!/bin/sh
+''''exec python -u -- "$0" ${1+"$@"} # '''
 import logging
 import os
 import os.path as osp
+import subprocess
+import time
 from multiprocessing import Queue
 
 import gym
@@ -28,8 +31,8 @@ def configure_logger(log_dir):
     logger.Logger.CURRENT = logger.Logger(
         dir=baselines_dir, output_formats=formats)
 
-def train(env_id, num_frames, seed, policy, lrschedule, num_cpu):
-    configure_logger('/tmp/run')
+def train(env_id, num_frames, seed, policy, lrschedule, num_cpu, log_dir):
+    configure_logger(log_dir)
     num_timesteps = int(num_frames / 4 * 1.1)
 
     # divide by 4 due to frameskip, then do a little extras so episodes end
@@ -67,7 +70,7 @@ def train(env_id, num_frames, seed, policy, lrschedule, num_cpu):
         lrschedule=lrschedule,
         orig_rewards=True,
         gen_segs=False,
-        log_dir='/tmp/run',
+        log_dir=log_dir,
         log_interval=10)
     env.close()
 
@@ -96,11 +99,21 @@ def main():
         'This number gets divided by 4 due to frameskip',
         type=int,
         default=40)
+    seconds_since_epoch = str(int(time.time()))
+    parser.add_argument('--run_name', default=seconds_since_epoch)
     args = parser.parse_args()
 
     params.init_params()
     params.params['debug'] = True
     params.params['print_lr'] = False
+
+    git_rev = subprocess.check_output(['git', 'rev-parse', '--short',
+                                       'HEAD']).rstrip().decode()
+    run_name = args.run_name + '_' + git_rev
+    log_dir = osp.join('runs', run_name)
+    if osp.exists(log_dir):
+        raise Exception("Log directory '%s' already exists" % log_dir)
+    os.makedirs(log_dir)
 
     train(
         args.env,
@@ -108,7 +121,8 @@ def main():
         seed=args.seed,
         policy=args.policy,
         lrschedule=args.lrschedule,
-        num_cpu=args.n_envs)
+        num_cpu=args.n_envs,
+        log_dir=log_dir)
 
 
 if __name__ == '__main__':
