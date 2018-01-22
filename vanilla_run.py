@@ -12,7 +12,7 @@ import gym_gridworld
 import params
 from baselines import bench, logger
 from baselines.a2c.a2c import learn
-from baselines.a2c.policies import CnnPolicy, NnPolicy
+from baselines.a2c.policies import CnnPolicy, NnPolicy, MlpPolicy
 from baselines.common import set_global_seeds
 from baselines.common.atari_wrappers import wrap_deepmind
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
@@ -56,6 +56,8 @@ def train(env_id, num_frames, seed, policy, lrschedule, num_cpu, log_dir):
         policy_fn = CnnPolicy
     elif policy == 'nn':
         policy_fn = NnPolicy
+    elif policy == 'mlp':
+        policy_fn = MlpPolicy
     seg_pipe = Queue()
     go_pipe = Queue()
     go_pipe.put(True)
@@ -85,7 +87,7 @@ def main():
     parser.add_argument(
         '--policy',
         help='Policy architecture',
-        choices=['cnn', 'lstm', 'lnlstm', 'nn'],
+        choices=['cnn', 'lstm', 'lnlstm', 'nn', 'mlp'],
         default='cnn')
     parser.add_argument(
         '--lrschedule',
