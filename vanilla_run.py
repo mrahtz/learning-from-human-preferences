@@ -12,7 +12,7 @@ import gym_gridworld
 import params
 from baselines import bench, logger
 from baselines.a2c.a2c import learn
-from baselines.a2c.policies import CnnPolicy, LnLstmPolicy, LstmPolicy, NnPolicy
+from baselines.a2c.policies import CnnPolicy, NnPolicy
 from baselines.common import set_global_seeds
 from baselines.common.atari_wrappers import wrap_deepmind
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
@@ -30,6 +30,7 @@ def configure_logger(log_dir):
     formats = [json, tb]
     logger.Logger.CURRENT = logger.Logger(
         dir=baselines_dir, output_formats=formats)
+
 
 def train(env_id, num_frames, seed, policy, lrschedule, num_cpu, log_dir):
     configure_logger(log_dir)
@@ -53,10 +54,6 @@ def train(env_id, num_frames, seed, policy, lrschedule, num_cpu, log_dir):
     env = SubprocVecEnv([make_env(i) for i in range(num_cpu)])
     if policy == 'cnn':
         policy_fn = CnnPolicy
-    elif policy == 'lstm':
-        policy_fn = LstmPolicy
-    elif policy == 'lnlstm':
-        policy_fn = LnLstmPolicy
     elif policy == 'nn':
         policy_fn = NnPolicy
     seg_pipe = Queue()
