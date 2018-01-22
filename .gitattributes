@@ -1,3 +1,4 @@
 pref_db_train.pkl filter=lfs diff=lfs merge=lfs -text
 pref_db_val.pkl filter=lfs diff=lfs merge=lfs -text
 *.pkl filter=lfs diff=lfs merge=lfs -text
+reward_network.ckpt* filter=lfs diff=lfs merge=lfs -text
