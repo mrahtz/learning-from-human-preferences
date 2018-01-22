@@ -121,3 +121,44 @@ class CnnPolicy(object):
         self.vf = vf
         self.step = step
         self.value = value
+
+
+class NnPolicy(object):
+
+    def __init__(self,
+                 sess,
+                 ob_space,
+                 ac_space,
+                 nenv,
+                 nsteps,
+                 nstack,
+                 reuse=False):
+        nbatch = nenv*nsteps
+        nh, nw, nc = ob_space.shape
+        ob_shape = (nbatch, nh, nw, nc*nstack)
+        nact = ac_space.n
+        X = tf.placeholder(tf.uint8, ob_shape)  # obs
+        with tf.variable_scope("model", reuse=reuse):
+            x = tf.cast(X, tf.float32)/255.
+            w, h, c = x.get_shape()[1:]
+            x = tf.reshape(x, [-1, int(w * h * c)])
+            x = fc(x, 'fc1', nh=512, init_scale=np.sqrt(2))
+            pi = fc(x, 'pi', nact, act=lambda x: x)
+            vf = fc(x, 'v', 1, act=lambda x: x)
+
+        v0 = vf[:, 0]
+        a0 = sample(pi)
+        self.initial_state = []  # not stateful
+
+        def step(ob, *_args, **_kwargs):
+            a, v = sess.run([a0, v0], {X: ob})
+            return a, v, []  # dummy state
+
+        def value(ob, *_args, **_kwargs):
+            return sess.run(v0, {X: ob})
+
+        self.X = X
+        self.pi = pi
+        self.vf = vf
+        self.step = step
+        self.value = value
