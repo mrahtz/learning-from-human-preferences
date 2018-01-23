@@ -222,47 +222,22 @@ class Runner(object):
                 assert_equal(rewards.shape, (self.nsteps,))
                 mb_rewards[env_n] = rewards
 
-        if self.orig_rewards:
-            for env_n, (rs, dones) in enumerate(zip(mb_rewards, mb_dones)):
-                assert_equal(rs.shape, (self.nsteps, ))
-                assert_equal(dones.shape, (self.nsteps, ))
-                for step_n in range(self.nsteps):
-                    self.true_reward[env_n] += rs[step_n]
-                    if dones[step_n]:
-                        if run_params.params['debug']:
-                            print("Env %d: episode finished, true reward %d" %
-                                  (env_n, self.true_reward[env_n]))
-                        self.sess.run(
-                            self.tr_ops[env_n].assign(self.true_reward[env_n]))
-                        summ = self.sess.run(self.summ_ops[env_n])
-                        self.writer.add_summary(summ, self.n_episodes[env_n])
+        for env_n, (rs, dones) in enumerate(zip(mb_rewards, mb_dones)):
+            assert_equal(rs.shape, (self.nsteps, ))
+            assert_equal(dones.shape, (self.nsteps, ))
+            for step_n in range(self.nsteps):
+                self.true_reward[env_n] += rs[step_n]
+                if dones[step_n]:
+                    if run_params.params['debug']:
+                        print("Env %d: episode finished, true reward %d" %
+                              (env_n, self.true_reward[env_n]))
+                    self.sess.run(
+                        self.tr_ops[env_n].assign(self.true_reward[env_n]))
+                    summ = self.sess.run(self.summ_ops[env_n])
+                    self.writer.add_summary(summ, self.n_episodes[env_n])
 
-                        self.true_reward[env_n] = 0
-                        self.n_episodes[env_n] += 1
-        else:
-            for env_n, (obs, dones) in enumerate(zip(mb_obs, mb_dones)):
-                from dot_utils import predict_reward_frame
-                assert_equal(obs.shape, (self.nsteps, 84, 84, 4))
-                assert_equal(dones.shape, (self.nsteps, ))
-
-                for step_n in range(self.nsteps):
-                    if dones[step_n]:
-                        if run_params.params['debug']:
-                            print("Env %d: episode finished, true reward %d" %
-                                  (env_n, self.true_reward[env_n]))
-
-                        self.sess.run(
-                            self.tr_ops[env_n].assign(self.true_reward[env_n]))
-                        summ = self.sess.run(self.summ_ops[env_n])
-                        self.writer.add_summary(summ, self.n_episodes[env_n])
-
-                        self.true_reward[env_n] = 0
-                        self.n_episodes[env_n] += 1
-                        # We ignore the observation here because it'll have been
-                        # zeroed out by the main step loop above
-                        continue
-                    r = predict_reward_frame(obs[step_n, :, :, 0])
-                    self.true_reward[env_n] += r
+                    self.true_reward[env_n] = 0
+                    self.n_episodes[env_n] += 1
 
         mb_obs = mb_obs.reshape(self.batch_ob_shape)
 
