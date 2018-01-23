@@ -25,8 +25,10 @@ class RunningStat(object):
         return self._M
     @property
     def var(self):
-        assert self._n >= 2
-        return self._S/(self._n - 1)
+        if self._n >= 2:
+            return self._S/(self._n - 1)
+        else:
+            return np.square(self._M)
     @property
     def std(self):
         return np.sqrt(self.var)
