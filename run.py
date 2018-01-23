@@ -145,6 +145,7 @@ def main():
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--no_pretrain', action='store_true')
     parser.add_argument('--save_prefs', action='store_true')
+    parser.add_argument('--network', default='onelayer')
     args = parser.parse_args()
 
     params.init_params()
@@ -153,6 +154,7 @@ def main():
     params.params['debug'] = args.debug
     params.params['no_pretrain'] = args.no_pretrain
     params.params['save_prefs'] = args.save_prefs
+    params.params['network'] = args.network
 
     if args.test_mode:
         print("=== WARNING: running in test mode", file=sys.stderr)
@@ -162,7 +164,7 @@ def main():
         params.params['ckpt_freq'] = 1
     else:
         params.params['n_initial_prefs'] = 500
-        params.params['n_initial_epochs'] = 100
+        params.params['n_initial_epochs'] = 20
         params.params['save_freq'] = 10
         params.params['ckpt_freq'] = 100
 

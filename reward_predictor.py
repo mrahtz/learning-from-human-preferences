@@ -72,13 +72,13 @@ def dense_layer(x, units, name, reuse, activation):
 def reward_pred_net(s, dropout, batchnorm, reuse, training):
     x = s
 
-    x = x[:, :, :, -1]  # Select most recent frame
-    w, h = x.get_shape()[1:]
-    x = tf.reshape(x, [-1, int(w * h)])
-    x = dense_layer(x, 8192, 'd1', reuse, activation=True)
-    x = tf.layers.dropout(x, dropout, training=training)
-    x = dense_layer(x, 1, 'd2', reuse, activation=False)
-    x = x[:, 0]
+    if params.params['network'] == 'onelayer':
+        x = x[:, :, :, -1]  # Select most recent frame
+        w, h = x.get_shape()[1:]
+        x = tf.reshape(x, [-1, int(w * h)])
+        x = dense_layer(x, 8192, 'd1', reuse, activation=True)
+        x = dense_layer(x, 1, 'd2', reuse, activation=False)
+        x = x[:, 0]
 
     return x
 
@@ -170,9 +170,9 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
         print("=== Finished initial training at", str(datetime.datetime.now()))
 
     if params.params['just_pretrain']:
-        fname = osp.join(log_dir, "train_initial.pkl")
+        fname = osp.join(log_dir, "train_postpretrain.pkl")
         save_pref_db(pref_db_train, fname)
-        fname = osp.join(log_dir, "val_initial.pkl")
+        fname = osp.join(log_dir, "val_postpretrain.pkl")
         save_pref_db(pref_db_val, fname)
         raise Exception("Pretraining completed")
 
@@ -206,12 +206,18 @@ def save_pref_db(pref_db, fname):
 
 
 def load_pref_db(pref_dir):
-    train_fname = osp.join(pref_dir, 'train_initial.pkl')
+    train_fname = osp.join(pref_dir, 'train_postpretrain.pkl')
+    if not os.path.isfile(train_fname):
+        train_fname = osp.join(pref_dir, 'train_initial.pkl')
     with open(train_fname, 'rb') as pkl_file:
+        print("Loading training preferences from '{}'".format(train_fname))
         pref_db_train = pickle.load(pkl_file)
 
-    val_fname = osp.join(pref_dir, 'val_initial.pkl')
+    val_fname = osp.join(pref_dir, 'val_postpretrain.pkl')
+    if not os.path.isfile(val_fname):
+        val_fname = osp.join(pref_dir, 'val_initial.pkl')
     with open(val_fname, 'rb') as pkl_file:
+        print("Loading validation preferences from '{}'".format(val_fname))
         pref_db_val = pickle.load(pkl_file)
 
     return pref_db_train, pref_db_val
