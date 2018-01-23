@@ -11,7 +11,7 @@ import pyglet
 from numpy.testing import assert_equal
 
 import params
-from dot_utils import predict_preference
+from dot_utils import predict_action_preference
 from reward_predictor import RewardPredictorEnsemble
 
 
@@ -145,7 +145,7 @@ class PrefInterface:
                 continue
 
         while True:
-            mu = predict_preference(s1, s2)
+            mu = predict_action_preference(s1, s2)
             print("Segment pair %d and %d:" % (n1, n2), mu)
             pref_pipe.put((s1, s2, mu))
             (n1, n2), s1, s2 = self.get_seg_pair()
