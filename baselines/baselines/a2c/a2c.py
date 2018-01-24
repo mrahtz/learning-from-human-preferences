@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 from numpy.testing import assert_equal
 
-import params
+import params as run_params
 from baselines import logger
 from baselines.a2c.utils import (Scheduler, cat_entropy, discount_with_dones,
                                  find_trainable_variables, make_path, mse)
@@ -62,8 +62,9 @@ class Model(object):
             advs = rewards - values
             for step in range(len(obs)):
                 cur_lr = lr.value()
-            import datetime
-            print(str(datetime.datetime.now()), cur_lr)
+            if run_params.params['print_lr']:
+                import datetime
+                print(str(datetime.datetime.now()), cur_lr)
             td_map = {train_model.X:obs, A:actions, ADV:advs, R:rewards, LR:cur_lr}
             if states != []:
                 td_map[train_model.S] = states
@@ -179,7 +180,7 @@ class Runner(object):
             for n, done in enumerate(dones):
                 if done:
                     self.obs[n] = self.obs[n]*0
-                    if params.params['debug']:
+                    if run_params.params['debug']:
                         print("Env %d done" % n)
             # SubprocVecEnv automatically resets when done
             self.update_obs(obs)
@@ -199,21 +200,46 @@ class Runner(object):
 
         if self.gen_segs:
             self.gen_segments(mb_obs, mb_dones)
-        if not self.orig_rewards:
+
+        if self.orig_rewards:
+            for env_n, obs in enumerate(mb_obs):
+                assert_equal(obs.shape, (self.nsteps, 84, 84, 4))
+                if run_params.params['debug']:
+                    print("Env %d" % env_n)
+                    print(mb_actions[env_n])
+                    print([self.env.action_meanings[i] for i in mb_actions[env_n]])
+                    print(mb_rewards[env_n])
+        else:
             # for the data from each environment
             assert_equal(mb_obs.shape, (nenvs, self.nsteps, 84, 84, 4))
             for env_n, obs in enumerate(mb_obs):
                 assert_equal(obs.shape, (self.nsteps, 84, 84, 4))
-                if params.params['debug']:
+                if run_params.params['debug']:
                     print("Env %d" % env_n)
                     print(mb_actions[env_n])
-                    print([self.env.action_meanings[i] for i in
-                            mb_actions[env_n]])
+                    print([self.env.action_meanings[i] for i in mb_actions[env_n]])
                 rewards = self.reward_model.reward(obs)
                 assert_equal(rewards.shape, (self.nsteps,))
                 mb_rewards[env_n] = rewards
 
-        if not self.orig_rewards:
+        if self.orig_rewards:
+            for env_n, (rs, dones) in enumerate(zip(mb_rewards, mb_dones)):
+                assert_equal(rs.shape, (self.nsteps, ))
+                assert_equal(dones.shape, (self.nsteps, ))
+                for step_n in range(self.nsteps):
+                    self.true_reward[env_n] += rs[step_n]
+                    if dones[step_n]:
+                        if run_params.params['debug']:
+                            print("Env %d: episode finished, true reward %d" %
+                                  (env_n, self.true_reward[env_n]))
+                        self.sess.run(
+                            self.tr_ops[env_n].assign(self.true_reward[env_n]))
+                        summ = self.sess.run(self.summ_ops[env_n])
+                        self.writer.add_summary(summ, self.n_episodes[env_n])
+
+                        self.true_reward[env_n] = 0
+                        self.n_episodes[env_n] += 1
+        else:
             for env_n, (obs, dones) in enumerate(zip(mb_obs, mb_dones)):
                 from dot_utils import predict_reward_frame
                 assert_equal(obs.shape, (self.nsteps, 84, 84, 4))
@@ -221,7 +247,7 @@ class Runner(object):
 
                 for step_n in range(self.nsteps):
                     if dones[step_n]:
-                        if params.params['debug']:
+                        if run_params.params['debug']:
                             print("Env %d: episode finished, true reward %d" %
                                   (env_n, self.true_reward[env_n]))
 
@@ -302,7 +328,7 @@ def learn(policy, env, seed, seg_pipe, go_pipe, log_dir, nsteps=5, nstack=4,
             try:
                 go_pipe.get(block=False)
             except queue.Empty:
-                if params.params['debug']:
+                if run_params.params['debug']:
                     print("Training signal not yet given; skipping training")
                 continue
             else:
