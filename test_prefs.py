@@ -1,69 +1,59 @@
 #!/usr/bin/env python3
 
 import argparse
-import queue
-import time
-from collections import OrderedDict
+import os
 from multiprocessing import Process, Queue
 
-import numpy as np
-
-from dot_utils import predict_reward
 from pref_interface import vid_proc
-from reward_predictor import RewardPredictorEnsemble, batch_iter, load_pref_db
-from scipy.ndimage import zoom
-
-parser = argparse.ArgumentParser()
-parser.add_argument("--load", action="store_true")
-args = parser.parse_args()
-
-
-def train(cmd_q):
-    rp = RewardPredictorEnsemble(
-        'train_reward', cluster_dict, load_network=args.load, dropout=0.0)
-    stop = False
-    while True:
-        try:
-            cmd_q.get(block=False)
-            stop = True
-            print("Stopping training...")
-        except queue.Empty:
-            pass
-
-        if stop or args.load:
-            time.sleep(1)
-        else:
-            rp.train(prefs_train, prefs_val, test_interval=1)
-
-
 q = Queue()
 Process(target=vid_proc, args=(q,)).start()
 
+import numpy as np
+import params
+from dot_utils import predict_reward
+from reward_predictor import RewardPredictorEnsemble, batch_iter, load_pref_db
+from scipy.ndimage import zoom
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
+
+
+def ps(cluster_dict, rp_ckpt_dir):
+    RewardPredictorEnsemble(
+        name='ps',
+        cluster_dict=cluster_dict,
+        load_network=True,
+        rp_ckpt_dir=rp_ckpt_dir)
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("ckpt")
+parser.add_argument("prefs_dir")
+args = parser.parse_args()
+
+params.init_params()
+params.params['network'] = 'onelayer'
+params.params['debug'] = False
+
 cluster_dict = {
-    'test': ['localhost:2200'],
-    'train_reward': ['localhost:2201'],
+    'ps': ['localhost:2200'],
+    'train_reward': ['localhost:2201']
 }
-
-prefs_train = load_pref_db('train')
-prefs_val = load_pref_db('val')
-
-cmd_q = Queue()
-p = Process(target=train, args=(cmd_q, ), daemon=True)
-p.start()
-
+Process(target=ps, args=(cluster_dict, args.ckpt), daemon=True).start()
 rp = RewardPredictorEnsemble(
-    'test', cluster_dict, load_network=args.load, dropout=0.0)
+    name='train_reward',
+    cluster_dict=cluster_dict,
+    load_network=True,
+    rp_ckpt_dir=args.ckpt)
 
-if args.load:
-    cmd_q.put('stop')
-else:
-    time.sleep(60.0)
-    cmd_q.put('stop')
+prefs_train, prefs_val = load_pref_db(args.prefs_dir)
 
 print("Calculating preferences...")
 
+while len(prefs_train) > 8:
+    prefs_train.del_first()
+
 predicted_prefs = []
-for batch_n, batch in enumerate(batch_iter(prefs_train.prefs, batch_size=16)):
+for batch_n, batch in enumerate(batch_iter(prefs_train.prefs, batch_size=64)):
     print("Batch %d" % batch_n)
     s1s = []
     s2s = []
@@ -90,9 +80,10 @@ input()
 
 print("Calculating rewards...")
 rewards = {}
-for k, segment in prefs_train.segments.items():
-    reward = np.sum(rp.reward_unnormalized(np.array(segment)))
-    print("Segment %d: %.1f" % (k, reward))
+for i, (k, segment) in enumerate(prefs_train.segments.items()):
+    reward = np.sum(rp.reward(np.array(segment)))
+    print("Segment %d/%d (key %d): %.1f" % (i + 1, len(prefs_train.segments), k,
+                                            reward))
     rewards[k] = reward
 print("Calculating rewards done!")
 print()
