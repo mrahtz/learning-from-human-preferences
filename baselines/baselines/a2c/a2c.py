@@ -354,7 +354,7 @@ def learn(policy, env, seed, seg_pipe, go_pipe, log_dir, nsteps=5, nstack=4,
             logger.dump_tabular()
         if save_interval and (update % save_interval == 0
                               or update == 1) and logger.get_dir():
-            savepath = osp.join(logger.get_dir(), 'checkpoint%.5i' % update)
+            savepath = osp.join(logger.get_dir(), 'checkpoint')
             print('Saving to', savepath)
             model.save(savepath)
 
