@@ -88,7 +88,7 @@ def main():
         '--policy',
         help='Policy architecture',
         choices=['cnn', 'lstm', 'lnlstm', 'nn', 'mlp'],
-        default='cnn')
+        default='mlp')
     parser.add_argument(
         '--lrschedule',
         help='Learning rate schedule',
