@@ -57,7 +57,7 @@ def predict_preference(s1, s2):
 def predict_action_preference(s1, s2):
     sums = []
     for s in [s1, s2]:
-        sums.append(predict_actions_reward(s))
+        sums.append(predict_action_rewards(s))
     if sums[0] > sums[1]:
         predicted_mu = (1.0, 0.0)
     elif sums[0] == sums[1]:
