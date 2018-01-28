@@ -129,7 +129,10 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
     else:
         load_network = False
     reward_model = RewardPredictorEnsemble(
-        'train_reward', lr, log_dir=log_dir, load_network=load_network,
+        'train_reward',
+        lr,
+        log_dir=log_dir,
+        load_network=load_network,
         rp_ckpt_dir=rp_ckpt_dir)
 
     if load_prefs_dir:
@@ -303,9 +306,10 @@ class RewardPredictorEnsemble:
                 if load_network:
                     # TODO fix
                     ckpt_file = rp_ckpt_dir
-                    print("Loading reward predictor checkpoint from {}...".
-                          format(ckpt_file),
-                          end="")
+                    print(
+                        "Loading reward predictor checkpoint from {}...".format(
+                            ckpt_file),
+                        end="")
                     self.saver.restore(sess, ckpt_file)
                     print("done!")
                 else:
