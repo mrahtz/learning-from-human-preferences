@@ -146,6 +146,7 @@ def main():
     parser.add_argument('--no_pretrain', action='store_true')
     parser.add_argument('--save_prefs', action='store_true')
     parser.add_argument('--network', default='onelayer')
+    parser.add_argument('--just_prefs', action='store_true')
     args = parser.parse_args()
 
     params.init_params()
@@ -155,6 +156,7 @@ def main():
     params.params['no_pretrain'] = args.no_pretrain
     params.params['save_prefs'] = args.save_prefs
     params.params['network'] = args.network
+    params.params['just_prefs'] = args.just_prefs
 
     if args.test_mode:
         print("=== WARNING: running in test mode", file=sys.stderr)

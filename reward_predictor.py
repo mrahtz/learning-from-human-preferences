@@ -152,11 +152,14 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
 
     print("=== Received enough preferences at", str(datetime.datetime.now()))
 
-    if params.params['save_prefs']:
+    if params.params['just_prefs'] or params.params['save_prefs']:
         fname = osp.join(log_dir, "train_initial.pkl")
         save_pref_db(pref_db_train, fname)
         fname = osp.join(log_dir, "val_initial.pkl")
         save_pref_db(pref_db_val, fname)
+
+    if params.params['just_prefs']:
+        raise Exception("Preference generation completed")
 
     if not params.params['no_pretrain']:
         print("Training for %d epochs..." % params.params['n_initial_epochs'])
