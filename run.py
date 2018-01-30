@@ -130,7 +130,7 @@ def main():
         'This number gets divided by 4 due to frameskip',
         type=int,
         default=80)
-    parser.add_argument('--n_envs', type=int, default=4)
+    parser.add_argument('--n_envs', type=int, default=2)
     parser.add_argument('--rp_ckpt_dir')
     parser.add_argument('--load_prefs_dir')
     parser.add_argument('--headless', action='store_true', default=True)
