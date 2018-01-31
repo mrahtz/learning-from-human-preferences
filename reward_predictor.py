@@ -54,7 +54,13 @@ def conv_layer(x, filters, kernel_size, strides, batchnorm, training, name,
     return x
 
 
-def dense_layer(x, units, name, reuse, activation):
+def dense_layer(x,
+                units,
+                name,
+                reuse,
+                activation,
+                batchnorm=False,
+                training=False):
     # Page 15:
     # "This input is fed through 4 convolutional layers...with leaky ReLU
     # nonlinearities (α = 0.01). This is followed by a fully connected layer of
@@ -64,6 +70,8 @@ def dense_layer(x, units, name, reuse, activation):
     # => fully-connected layers have no activation function?
     # TODO: L2 loss
     x = tf.layers.dense(x, units, activation=None, name=name, reuse=reuse)
+    if batchnorm:
+        x = tf.layers.batch_normalization(x, training=training)
     if activation:
         x = tf.nn.leaky_relu(x, alpha=0.01)
     return x
@@ -72,18 +80,40 @@ def dense_layer(x, units, name, reuse, activation):
 def reward_pred_net(s, dropout, batchnorm, reuse, training):
     x = s
 
-    layers = [int(n) for n in params.params['network'].split('-')]
+    if params.params['network'] == 'cheat':
+        xmin1 = tf.cast(tf.reduce_max(tf.argmin(x[..., -2], 1), 1), tf.float32)
+        ymin1 = tf.cast(tf.reduce_max(tf.argmin(x[..., -2], 2), 1), tf.float32)
+        xmin2 = tf.cast(tf.reduce_max(tf.argmin(x[..., -1], 1), 1), tf.float32)
+        ymin2 = tf.cast(tf.reduce_max(tf.argmin(x[..., -1], 2), 1), tf.float32)
+        d1 = tf.sqrt((xmin1 - 24)**2 + (ymin1 - 24)**2)
+        d2 = tf.sqrt((xmin2 - 24)**2 + (ymin2 - 24)**2)
+        x = tf.sign(d2 - d1)
+        c = tf.Variable(0.0)
+        x = x + 1e-12*c
+    elif params.params['network'] == 'conv':
+        x = x[..., -1] - x[...,  -2]
+        x = conv_layer(x, 8, 4, 4, batchnorm, training, "c1", reuse)
 
-    # Difference between last two frames
-    x = x[:, :, :, -1] - x[:, :, :, -2]
-    w, h = x.get_shape()[1:]
-    x = tf.reshape(x, [-1, int(w * h)])
-    i = 1
-    for l in layers:
-        x = dense_layer(x, l, 'd{}'.format(i), reuse, activation=True)
-        i += 1
-    x = dense_layer(x, 1, 'd{}'.format(i), reuse, activation=False)
-    x = x[:, 0]
+        w, h, c = x.get_shape()[1:]
+        x = tf.reshape(x, [-1, int(w * h * c)])
+
+        x = dense_layer(x, 4, "d1", reuse, activation=True)
+        x = dense_layer(x, 1, "d2", reuse, activation=False)
+        x = x[:, 0]
+    else:
+        layers = [int(n) for n in params.params['network'].split('-')]
+
+        # Difference between last two frames
+        x = x[:, :, :, -1] - x[:, :, :, -2]
+        w, h = x.get_shape()[1:]
+        x = tf.reshape(x, [-1, int(w * h)])
+        i = 1
+        for l in layers:
+            x = dense_layer(x, l, 'd{}'.format(i), reuse, activation=True)
+            x = tf.layers.dropout(x, dropout, training=training)
+            i += 1
+        x = dense_layer(x, 1, 'd{}'.format(i), reuse, activation=False)
+        x = x[:, 0]
 
     return x
 
@@ -253,7 +283,7 @@ class RewardPredictorEnsemble:
                  lr=1e-4,
                  log_dir='/tmp',
                  cluster_dict=None,
-                 n_preds=3,
+                 n_preds=1,
                  load_network=False,
                  rp_ckpt_dir=None,
                  dropout=0.5):
@@ -426,11 +456,13 @@ class RewardPredictorEnsemble:
         ensemble_rs = np.array(ensemble_rs).transpose()
         # now n_steps x n_preds
 
+        """
         for ensemble_rs_step in ensemble_rs:
             self.r_norm.push(ensemble_rs_step)
         ensemble_rs -= self.r_norm.mean
         ensemble_rs /= (self.r_norm.std + 1e-12)
         ensemble_rs *= 0.05
+        """
 
         ensemble_rs = ensemble_rs.transpose()
         # now n_preds x n_steps again
@@ -493,7 +525,7 @@ class RewardPredictorEnsemble:
                                     self.n_steps)
         return ckpt_name
 
-    def train(self, prefs_train, prefs_val, test_interval=50):
+    def train(self, prefs_train, prefs_val, test_interval=10):
         """
         Train the ensemble for one full epoch
         """
