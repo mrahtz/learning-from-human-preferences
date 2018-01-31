@@ -89,13 +89,11 @@ def reward_pred_net(s, dropout, batchnorm, reuse, training):
 
 
 def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
-    n_prefs_start = recv_prefs.n_prefs
-    print("Receiving preferences...")
-
+    n_recvd = 0
     while True:
         try:
             s1, s2, mu = pref_pipe.get(timeout=0.1)
-            recv_prefs.n_prefs += 1
+            n_recvd += 1
         except queue.Empty:
             break
 
@@ -106,7 +104,7 @@ def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
         else:
             print("Sending pref to train")
             pref_db_train.append(s1, s2, mu)
-            print(":rain len is now {}".format(len(pref_db_train)))
+            print("Train len is now {}".format(len(pref_db_train)))
 
         if len(pref_db_val) > db_max * VAL_FRACTION:
             print("Val database limit reached; dropping first preference")
@@ -119,8 +117,7 @@ def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
             pref_db_train.del_first()
         assert len(pref_db_train) <= db_max * (1 - VAL_FRACTION)
         print("pref_db_train len:", len(pref_db_train))
-
-    print("%d preferences received" % (recv_prefs.n_prefs - n_prefs_start))
+    print("%d preferences received" % n_recvd)
 
 
 recv_prefs.n_prefs = 0
@@ -150,12 +147,17 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
 
     # Page 15: "We collect 500 comparisons from a randomly initialized policy
     # network at the beginning of training"
-    while len(pref_db_train) < params.params['n_initial_prefs']:
+    while True:
+        if len(pref_db_train) >= params.params['n_initial_prefs']:
+            break
+        print("Waiting for preferences; %d so far" % len(pref_db_train))
         recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
-        print("Waiting for comparisons; %d so far..." % len(pref_db_train))
         time.sleep(1.0)
 
-    print("=== Received enough preferences at", str(datetime.datetime.now()))
+    print("Finished accumulating initial preferences at",
+          str(datetime.datetime.now()))
+    print("({} preferences over {} segments)".format(
+        len(pref_db_train.prefs), len(pref_db_train.segments)))
 
     if params.params['just_prefs'] or params.params['save_prefs']:
         fname = osp.join(log_dir, "train_initial.pkl")
