@@ -4,14 +4,11 @@ import queue
 import time
 from itertools import combinations
 from multiprocessing import Process, Queue
-from threading import Thread
 
 import numpy as np
 import pyglet
-from numpy.testing import assert_equal
-
-import params
 from dot_utils import predict_action_preference
+from numpy.testing import assert_equal
 from reward_predictor import RewardPredictorEnsemble
 
 
@@ -56,7 +53,7 @@ class PrefInterface:
         if not headless:
             Process(target=vid_proc, args=(self.vid_q,), daemon=True).start()
 
-    def get_seg_pair(self):
+    def get_seg_pair(self, segments, pair_idxs):
         """
         - Calculate predicted preferences for every possible pair of segments
         - Calculate the pair with the highest uncertainty
@@ -64,30 +61,16 @@ class PrefInterface:
         - Send that pair of segments, along with segment IDs, to be checked by
           the user
         """
-        if len(self.segments) < 2:
-            raise Exception("Not enough segments yet")
-
-        if len(self.segments) > 10:
-            idxs = np.random.choice(
-                range(len(self.segments)), size=10, replace=False)
-        else:
-            idxs = range(len(self.segments))
-
-        if params.params['debug']:
-            print("Calculating preferences...")
         s1s = []
         s2s = []
-        pair_idxs = list(combinations(idxs, 2))
         for i1, i2 in pair_idxs:
-            s1s.append(self.segments[i1])
-            s2s.append(self.segments[i2])
+            s1s.append(segments[i1])
+            s2s.append(segments[i2])
         pair_preds = self.reward_model.preferences(s1s, s2s)
         pair_preds = np.array(pair_preds)
-        if params.params['debug']:
-            print("done!")
-
         n_preds = self.reward_model.n_preds
         assert_equal(pair_preds.shape, (n_preds, len(pair_idxs), 2))
+
         # Each predictor gives two outputs:
         # - p1: the probability of segment 1 being preferred
         # - p2: the probability of segment 2 being preferred
@@ -97,58 +80,69 @@ class PrefInterface:
         # If L is a list, var(L) = var(1 - L).
         # So we can calculate the variance based on either p1 or p2
         # and get the same result.
-        seg_0_preds = pair_preds[:, :, 0]
-        assert_equal(seg_0_preds.shape, (n_preds, len(pair_idxs)))
-        # Calculate variances across ensemble members
-        pair_vars = np.var(seg_0_preds, axis=0)
-        assert_equal(pair_vars.shape, (len(pair_idxs), ))
-        highest_var_i = np.argmax(pair_vars)
-        # Select this pair to show to the user
-        # TODO check more carefully
-        check_idxs = pair_idxs[highest_var_i]
-        check_s1 = self.segments[check_idxs[0]]
-        check_s2 = self.segments[check_idxs[1]]
-        if params.params['debug']:
-            print("Pair with highest variance is", check_idxs)
-            print("Predictions are:")
-            print(seg_0_preds[:, highest_var_i])
+        preds = pair_preds[:, :, 0]
+        assert_equal(preds.shape, (n_preds, len(pair_idxs)))
 
-        # TODO: loop if already checked
+        # Calculate variances across ensemble members
+        pred_vars = np.var(preds, axis=0)
+        assert_equal(pred_vars.shape, (len(pair_idxs), ))
+
+        highest_var_i = np.argmax(pred_vars)
+        check_idxs = pair_idxs[highest_var_i]
+        check_s1 = segments[check_idxs[0]]
+        check_s2 = segments[check_idxs[1]]
+
         return check_idxs, check_s1, check_s2
 
-    def recv_segments(self, seg_pipe, segs_max):
+    def recv_segments(self, segments, seg_pipe, segs_max):
+        n_segs = 0
         while True:
-            segment = seg_pipe.get()
-            self.segments.append(segment)
-
+            try:
+                segment = seg_pipe.get(timeout=0.1)
+                n_segs += 1
+            except queue.Empty:
+                break
+            segments.append(segment)
             # (The maximum number of segments kept being 5,000 isn't mentioned
             # in the paper anywhere - it's just something I decided on. This
             # should be maximum ~ 700 MB.)
-            if len(self.segments) > segs_max:
-                del self.segments[0]
-            assert len(self.segments) <= segs_max
-            if params.params['debug']:
-                print("No. segments:", len(self.segments))
+            if len(segments) > segs_max:
+                del segments[0]
+
+    def sample_segments(self, segments):
+        if len(segments) <= 10:
+            idxs = range(len(segments))
+        else:
+            n_segs = len(segments)
+            idxs = np.random.choice(range(n_segs),
+                                    size=10, replace=False)
+        return idxs
 
     def run(self, seg_pipe, pref_pipe, segs_max):
-        self.segments = []
+        tested_idxs = set()
+        segments = []
         self.reward_model = RewardPredictorEnsemble('pref_interface')
-        Thread(target=self.recv_segments, args=(seg_pipe, segs_max)).start()
 
         while True:
-            try:
-                (n1, n2), s1, s2 = self.get_seg_pair()
+            self.recv_segments(segments, seg_pipe, segs_max)
+            if len(segments) >= 2:
                 break
-            except Exception as e:
-                print(e)
-                time.sleep(1.0)
-                continue
+            print("Not enough segments yet; sleeping...")
+            time.sleep(1.0)
 
         while True:
-            mu = predict_action_preference(s1, s2)
-            print("Segment pair %d and %d:" % (n1, n2), mu)
-            pref_pipe.put((s1, s2, mu))
-            (n1, n2), s1, s2 = self.get_seg_pair()
+            pair_idxs = []
+            while len(pair_idxs) == 0:
+                self.recv_segments(segments, seg_pipe, segs_max)
+                idxs = self.sample_segments(segments)
+                pair_idxs = set(combinations(idxs, 2))
+                pair_idxs = pair_idxs - tested_idxs
+                pair_idxs = list(pair_idxs)
+            (n1, n2), s1, s2 = self.get_seg_pair(segments, pair_idxs)
+
+            pref = predict_action_preference(s1, s2)
+            pref_pipe.put((s1, s2, pref))
+            tested_idxs.add((n1, n2))
 
 
 def vid_proc(q):
