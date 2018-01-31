@@ -72,23 +72,18 @@ def dense_layer(x, units, name, reuse, activation):
 def reward_pred_net(s, dropout, batchnorm, reuse, training):
     x = s
 
-    if params.params['network'] == 'onelayer':
-        # Difference between last two frames
-        x = x[:, :, :, -1] - x[:, :, :, -2]
-        w, h = x.get_shape()[1:]
-        x = tf.reshape(x, [-1, int(w * h)])
-        x = dense_layer(x, 8192, 'd1', reuse, activation=True)
-        x = dense_layer(x, 1, 'd2', reuse, activation=False)
-        x = x[:, 0]
-    elif params.params['network'] == 'twolayer':
-        # Difference between last two frames
-        x = x[:, :, :, -1] - x[:, :, :, -2]
-        w, h = x.get_shape()[1:]
-        x = tf.reshape(x, [-1, int(w * h)])
-        x = dense_layer(x, 4096, 'd1', reuse, activation=True)
-        x = dense_layer(x, 2048, 'd2', reuse, activation=True)
-        x = dense_layer(x, 1, 'd3', reuse, activation=False)
-        x = x[:, 0]
+    layers = [int(n) for n in params.params['network'].split('-')]
+
+    # Difference between last two frames
+    x = x[:, :, :, -1] - x[:, :, :, -2]
+    w, h = x.get_shape()[1:]
+    x = tf.reshape(x, [-1, int(w * h)])
+    i = 1
+    for l in layers:
+        x = dense_layer(x, l, 'd{}'.format(i), reuse, activation=True)
+        i += 1
+    x = dense_layer(x, 1, 'd{}'.format(i), reuse, activation=False)
+    x = x[:, 0]
 
     return x
 
