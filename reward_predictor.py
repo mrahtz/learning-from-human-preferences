@@ -73,11 +73,13 @@ def reward_pred_net(s, dropout, batchnorm, reuse, training):
     x = s
 
     if params.params['network'] == 'onelayer':
-        x = x[:, :, :, -1]  # Select most recent frame
+        # Difference between last two frames
+        x = x[:, :, :, -1] - x[:, :, :, -2]
         w, h = x.get_shape()[1:]
         x = tf.reshape(x, [-1, int(w * h)])
         x = dense_layer(x, 8192, 'd1', reuse, activation=True)
-        x = dense_layer(x, 1, 'd2', reuse, activation=False)
+        x = dense_layer(x, 4096, 'd2', reuse, activation=True)
+        x = dense_layer(x, 1, 'd3', reuse, activation=False)
         x = x[:, 0]
 
     return x
@@ -179,6 +181,7 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
         save_pref_db(pref_db_train, fname)
         fname = osp.join(log_dir, "val_postpretrain.pkl")
         save_pref_db(pref_db_val, fname)
+    if params.params['just_pretrain']:
         raise Exception("Pretraining completed")
 
     print("=== Starting RL training at", str(datetime.datetime.now()))

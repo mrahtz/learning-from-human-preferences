@@ -13,7 +13,7 @@ import gym_gridworld
 import params
 from baselines import bench, logger
 from baselines.a2c.a2c import learn
-from baselines.a2c.policies import CnnPolicy
+from baselines.a2c.policies import MlpPolicy
 from baselines.common import set_global_seeds
 from baselines.common.atari_wrappers import wrap_deepmind
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
@@ -62,7 +62,7 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
 
     set_global_seeds(seed)
     env = SubprocVecEnv([make_env(i) for i in range(num_cpu)])
-    policy_fn = CnnPolicy
+    policy_fn = MlpPolicy
 
     # This has to be done here before any threads have been created by
     # TensorFlow, because it needs to spawn a GUI process (using fork()),
