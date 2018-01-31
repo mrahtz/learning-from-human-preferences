@@ -78,8 +78,7 @@ def reward_pred_net(s, dropout, batchnorm, reuse, training):
         w, h = x.get_shape()[1:]
         x = tf.reshape(x, [-1, int(w * h)])
         x = dense_layer(x, 8192, 'd1', reuse, activation=True)
-        x = dense_layer(x, 4096, 'd2', reuse, activation=True)
-        x = dense_layer(x, 1, 'd3', reuse, activation=False)
+        x = dense_layer(x, 1, 'd2', reuse, activation=False)
         x = x[:, 0]
 
     return x
