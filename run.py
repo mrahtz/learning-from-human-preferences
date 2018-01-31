@@ -163,6 +163,7 @@ def main():
     parser.add_argument('--network', default='onelayer')
     parser.add_argument('--just_prefs', action='store_true')
     parser.add_argument('--save_pretrain', action='store_true')
+    parser.add_argument('--print_lr', action='store_true')
     args = parser.parse_args()
 
     params.init_params()
@@ -174,6 +175,7 @@ def main():
     params.params['network'] = args.network
     params.params['just_prefs'] = args.just_prefs
     params.params['save_pretrain'] = args.save_pretrain
+    params.params['print_lr'] = args.print_lr
 
     if args.test_mode:
         print("=== WARNING: running in test mode", file=sys.stderr)
@@ -197,6 +199,10 @@ def main():
     if osp.exists(log_dir):
         raise Exception("Log directory '%s' already exists" % log_dir)
     os.makedirs(log_dir)
+
+    with open(osp.join(log_dir, 'args.txt'), 'w') as args_file:
+        print(args, file=args_file)
+        print(params.params, file=args_file)
 
     train(
         args.env,
