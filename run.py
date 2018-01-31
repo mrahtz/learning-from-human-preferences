@@ -15,7 +15,7 @@ from baselines import bench, logger
 from baselines.a2c.a2c import learn
 from baselines.a2c.policies import MlpPolicy
 from baselines.common import set_global_seeds
-from baselines.common.atari_wrappers import wrap_deepmind
+from baselines.common.atari_wrappers import wrap_deepmind_nomax
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble, train_reward_predictor
@@ -56,7 +56,7 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
                 logger.get_dir()
                 and osp.join(logger.get_dir(), "{}.monitor.json".format(rank)))
             gym.logger.setLevel(logging.WARN)
-            return wrap_deepmind(env)
+            return wrap_deepmind_nomax(env)
 
         return _thunk
 
