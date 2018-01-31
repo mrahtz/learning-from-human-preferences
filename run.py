@@ -197,6 +197,10 @@ def main():
         raise Exception("Log directory '%s' already exists" % log_dir)
     os.makedirs(log_dir)
 
+    with open(osp.join(log_dir, 'args.txt'), 'w') as args_file:
+        print(args, file=args_file)
+        print(params.params, file=args_file)
+
     train(
         args.env,
         num_frames=1e6 * args.million_frames,
