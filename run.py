@@ -187,8 +187,11 @@ def main():
         params.params['save_freq'] = 10
         params.params['ckpt_freq'] = 100
 
-    git_rev = subprocess.check_output(['git', 'rev-parse', '--short',
-                                       'HEAD']).rstrip().decode()
+    if not osp.exists('.git'):
+        git_rev = "unkrev"
+    else:
+        git_rev = subprocess.check_output(['git', 'rev-parse', '--short',
+                                           'HEAD']).rstrip().decode()
     run_name = args.run_name + '_' + git_rev
     log_dir = osp.join('runs', run_name)
     if osp.exists(log_dir):
