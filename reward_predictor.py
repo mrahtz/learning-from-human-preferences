@@ -179,6 +179,7 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
         save_pref_db(pref_db_train, fname)
         fname = osp.join(log_dir, "val_postpretrain.pkl")
         save_pref_db(pref_db_val, fname)
+    if params.params['just_pretrain']:
         raise Exception("Pretraining completed")
 
     print("=== Starting RL training at", str(datetime.datetime.now()))
