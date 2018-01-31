@@ -67,7 +67,6 @@ class GridWorldEnv(gym.Env):
         else:
             episode_over = True
 
-        
         dist1 = np.linalg.norm(self.prev_pos - self.centre)
         dist2 = np.linalg.norm(self.pos - self.centre)
         if dist2 < dist1:
@@ -78,9 +77,6 @@ class GridWorldEnv(gym.Env):
             reward = -1
 
         return ob, reward, episode_over, {}
-
-    def get_action_meanings(self):
-        return ['NOOP', 'DOWN', 'RIGHT', 'UP', 'LEFT']
 
     def _reset(self):
         if self.random_start:
