@@ -9,7 +9,7 @@ import time
 from multiprocessing import Process, Queue
 
 import gym
-import gym_gridworld
+import gym_gridworld  # noqa: F401 (imported but unused)
 import params
 from baselines import bench, logger
 from baselines.a2c.a2c import learn
