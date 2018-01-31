@@ -76,17 +76,29 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     ps_proc = Process(target=ps)
     ps_proc.start()
 
+    def a2c():
+        learn(
+            policy_fn,
+            env,
+            seed,
+            seg_pipe,
+            go_pipe,
+            total_timesteps=num_timesteps,
+            lr=lr,
+            lrschedule=lrschedule,
+            log_dir=log_dir,
+            ent_coef=0.01,
+            log_interval=log_interval)
+
+    def rp():
+        train_reward_predictor(rp_lr, pref_pipe, go_pipe, load_prefs_dir,
+                               log_dir, db_max, rp_ckpt_dir)
+
     seg_pipe = Queue()
     pref_pipe = Queue()
     go_pipe = Queue(maxsize=1)
-    a2c_proc = Process(target=lambda: learn(policy_fn, env, seed, seg_pipe,
-        go_pipe, total_timesteps=num_timesteps, lr=lr, lrschedule=lrschedule,
-        log_dir=log_dir, ent_coef=0.01, log_interval=log_interval), daemon=True)
-    train_proc = Process(
-        target=train_reward_predictor,
-        args=(rp_lr, pref_pipe, go_pipe, load_prefs_dir, log_dir, db_max,
-              rp_ckpt_dir),
-        daemon=True)
+    a2c_proc = Process(target=a2c, daemon=True)
+    train_proc = Process(target=rp, daemon=True)
 
     a2c_proc.start()
     train_proc.start()
@@ -95,9 +107,12 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     def profile(name, pid):
         with open(osp.join(log_dir, name + '.log'), 'w') as f:
             memory_profiler.memory_usage(pid, stream=f, timeout=99999)
-    Process(target=profile, args=('a2c', a2c_proc.pid), daemon=True).start()
-    Process(target=profile, args=('train', train_proc.pid), daemon=True).start()
-    Process(target=profile, args=('interface', -1), daemon=True).start()
+    Process(target=profile,
+            args=('a2c', a2c_proc.pid), daemon=True).start()
+    Process(target=profile,
+            args=('train', train_proc.pid), daemon=True).start()
+    Process(target=profile,
+            args=('interface', -1), daemon=True).start()
     """
 
     pi.run(seg_pipe, pref_pipe, segs_max)
