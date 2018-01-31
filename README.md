@@ -17,6 +17,8 @@ In progress.
 * 17/11/2017: Rewrote using processes instead of threads after discovering TensorFlow thread locking
 * 23/11/2017: Implemented end-to-end tests for reward predictor
 
+Currently working on: training a simple 'moving dot' agent to move to the middle of a white square, and fixing bugs.
+
 Future targets:
 * Successfully train the 'moving dot' agent to move to the middle of a blank square
 * Implement the little details (human error-adjusted softmax, label rate decay, etc.)
