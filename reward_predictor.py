@@ -80,16 +80,22 @@ def dense_layer(x,
 def reward_pred_net(s, dropout, batchnorm, reuse, training):
     x = s
 
-    if params.params['network'] == 'cheat':
-        xmin1 = tf.cast(tf.reduce_max(tf.argmin(x[..., -2], 1), 1), tf.float32)
-        ymin1 = tf.cast(tf.reduce_max(tf.argmin(x[..., -2], 2), 1), tf.float32)
-        xmin2 = tf.cast(tf.reduce_max(tf.argmin(x[..., -1], 1), 1), tf.float32)
-        ymin2 = tf.cast(tf.reduce_max(tf.argmin(x[..., -1], 2), 1), tf.float32)
-        d1 = tf.sqrt((xmin1 - 24)**2 + (ymin1 - 24)**2)
-        d2 = tf.sqrt((xmin2 - 24)**2 + (ymin2 - 24)**2)
-        x = tf.sign(d2 - d1)
-        c = tf.Variable(0.0)
-        x = x + 1e-12*c
+    if params.params['network'] == 'handcrafted':
+        a = s[:, 0, 0, -1] - 100
+        xc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 1), 1), tf.float32)
+        yc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 2), 1), tf.float32)
+
+        c1 = tf.sign(41.5 - xc)  # a = 1
+        c2 = tf.sign(41.5 - yc)  # a = 2
+        c3 = tf.sign(xc - 42.5)  # a = 3
+        c4 = tf.sign(yc - 42.5)  # a = 4
+
+        x = tf.cast(tf.equal(a, 1), tf.float32) * c1 + \
+            tf.cast(tf.equal(a, 2), tf.float32) * c2 + \
+            tf.cast(tf.equal(a, 3), tf.float32) * c3 + \
+            tf.cast(tf.equal(a, 4), tf.float32) * c4
+
+        x += 0 * tf.Variable(0.0)  # so that we have something trainable
     elif params.params['network'] == 'conv':
         x = x[..., -1] - x[...,  -2]
         x = conv_layer(x, 8, 4, 4, batchnorm, training, "c1", reuse)
@@ -482,6 +488,7 @@ class RewardPredictorEnsemble:
 
         return rs
 
+    # TODO: shouldn't vote=True?
     def preferences(self, s1s, s2s, vote=False):
         feed_dict = {}
         for rp in self.rps:
