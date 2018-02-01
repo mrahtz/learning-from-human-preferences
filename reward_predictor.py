@@ -58,7 +58,7 @@ def dense_layer(x,
                 units,
                 name,
                 reuse,
-                activation,
+                activation=None,
                 batchnorm=False,
                 training=False):
     # Page 15:
@@ -72,8 +72,10 @@ def dense_layer(x,
     x = tf.layers.dense(x, units, activation=None, name=name, reuse=reuse)
     if batchnorm:
         x = tf.layers.batch_normalization(x, training=training)
-    if activation:
+    if activation == 'relu':
         x = tf.nn.leaky_relu(x, alpha=0.01)
+    elif activation == 'sigmoid':
+        x = tf.nn.sigmoid(x)
     return x
 
 
@@ -100,10 +102,10 @@ def reward_pred_net(s, dropout, batchnorm, reuse, training):
         a = s[:, 0, 0, -1] - 100
         xc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 1), 1), tf.float32)
         yc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 2), 1), tf.float32)
-        x = tf.stack([a, xc, yc])
+        x = tf.stack([a, xc, yc], 1)
 
-        x = dense_layer(x, 16, "d1", reuse, activation=True)
-        x = dense_layer(x, 1, "d2", reuse, activation=False)
+        x = dense_layer(x, 16, "d1", reuse, activation='relu')
+        x = dense_layer(x, 1, "d2", reuse, activation='sigmoid')
         x = x[:, 0]
     elif params.params['network'] == 'conv':
         x = x[..., -1] - x[...,  -2]
@@ -472,6 +474,7 @@ class RewardPredictorEnsemble:
         ensemble_rs = np.array(ensemble_rs).transpose()
         # now n_steps x n_preds
 
+        # TODO re-enable this!
         """
         for ensemble_rs_step in ensemble_rs:
             self.r_norm.push(ensemble_rs_step)
