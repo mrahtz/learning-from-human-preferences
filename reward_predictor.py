@@ -107,10 +107,10 @@ def reward_pred_net(s, dropout, batchnorm, reuse, training):
         l2 = tf.Variable(1.0)
         l3 = tf.Variable(1.0)
         l4 = tf.Variable(1.0)
-        c1 = tf.nn.sigmoid(l1 - xc)
-        c2 = tf.nn.sigmoid(l2 - yc)
-        c3 = tf.nn.sigmoid(xc - l3)
-        c4 = tf.nn.sigmoid(yc - l4)
+        c1 = l1 - xc
+        c2 = l2 - yc
+        c3 = xc - l3
+        c4 = yc - l4
 
         x = tf.cast(tf.equal(a, 1), tf.float32) * c1 + \
             tf.cast(tf.equal(a, 2), tf.float32) * c2 + \
