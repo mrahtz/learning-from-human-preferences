@@ -3,9 +3,8 @@
 import numpy as np
 
 import gym
-import gym_gridworld
-from baselines.common.atari_wrappers import wrap_deepmind
-from dot_utils import predict_action_rewards
+import gym_gridworld  # noqa: F401 (imported but unused)
+from baselines.common.atari_wrappers import wrap_deepmind_nomax
 
 
 def update_obs(obs, raw_obs, nc):
@@ -15,15 +14,14 @@ def update_obs(obs, raw_obs, nc):
 
 
 def main():
-    env = wrap_deepmind(gym.make("GridWorldNoFrameskip-v4"))
+    env = wrap_deepmind_nomax(gym.make("GridWorldNoFrameskip-v4"))
 
     for i in range(5):
         os = []
         o = env.reset()
         os.append(o)
         done = False
-        actual_rs = []
-        actions = []
+        rewards = []
         while not done:
             pos_pre = env.unwrapped.pos[:]
             steps_pre = env.unwrapped.steps
@@ -33,18 +31,12 @@ def main():
                 rs.append(r)
                 env.unwrapped.pos[:] = pos_pre
                 env.unwrapped.steps = steps_pre
-            # action = np.argmax(rs)
-            action = env.action_space.sample()
-            actions.append(env.unwrapped.get_action_meanings()[action])
+            action = np.argmax(rs)
             o, r, done, _ = env.step(action)
-            actual_rs.append(r)
+            rewards.append(r)
             os.append(o)
-            # env.render()
-        # Also test new synthetic rewards
-        predicted_rs = predict_action_rewards(os)
-        n_errors = sum([abs(a - b) for a, b in zip(predicted_rs, actual_rs)])
-        print("{}/{} wrong".format(n_errors, len(predicted_rs)))
-        print(sum(predict_action_rewards(os)))
+            env.render()
+        print(sum(rewards))
 
 
 if __name__ == '__main__':

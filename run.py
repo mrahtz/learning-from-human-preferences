@@ -13,7 +13,7 @@ import gym_gridworld  # noqa: F401 (imported but unused)
 import params
 from baselines import bench, logger
 from baselines.a2c.a2c import learn
-from baselines.a2c.policies import MlpPolicy
+from baselines.a2c.policies import MlpPolicy, CnnPolicy
 from baselines.common import set_global_seeds
 from baselines.common.atari_wrappers import wrap_deepmind_nomax
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
@@ -62,7 +62,12 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
 
     set_global_seeds(seed)
     env = SubprocVecEnv([make_env(i) for i in range(num_cpu)])
-    policy_fn = MlpPolicy
+    if params.params['policy'] == 'mlp':
+        policy_fn = MlpPolicy
+    elif params.params['policy'] == 'cnn':
+        policy_fn = CnnPolicy
+    else:
+        raise Exception("Unknown policy {}".format(params.params['policy']))
 
     # This has to be done here before any threads have been created by
     # TensorFlow, because it needs to spawn a GUI process (using fork()),
@@ -89,7 +94,8 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
             log_dir=log_dir,
             ent_coef=0.01,
             log_interval=log_interval,
-            load_path=policy_ckpt_dir)
+            load_path=policy_ckpt_dir,
+            orig_rewards=params.params['orig_rewards'])
 
     def rp():
         train_reward_predictor(rp_lr, pref_pipe, go_pipe, load_prefs_dir,
@@ -102,7 +108,11 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     train_proc = Process(target=rp, daemon=True)
 
     a2c_proc.start()
-    train_proc.start()
+
+    if not params.params['orig_rewards']:
+        train_proc.start()
+    else:
+        go_pipe.put(True)
     """
     import memory_profiler
     def profile(name, pid):
@@ -161,13 +171,15 @@ def main():
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--no_pretrain', action='store_true')
     parser.add_argument('--save_prefs', action='store_true')
-    parser.add_argument('--network', default='onelayer')
+    parser.add_argument('--network', default='16')
     parser.add_argument('--just_prefs', action='store_true')
     parser.add_argument('--save_pretrain', action='store_true')
     parser.add_argument('--print_lr', action='store_true')
     parser.add_argument('--n_initial_epochs', type=int, default=20)
     parser.add_argument('--policy_ckpt_dir')
     parser.add_argument('--log_dir')
+    parser.add_argument('--orig_rewards', action='store_true')
+    parser.add_argument('--skip_prefs', action='store_true')
     args = parser.parse_args()
 
     params.init_params()
@@ -181,6 +193,8 @@ def main():
     params.params['save_pretrain'] = args.save_pretrain
     params.params['print_lr'] = args.print_lr
     params.params['env'] = args.env
+    params.params['orig_rewards'] = args.orig_rewards
+    params.params['skip_prefs'] = args.skip_prefs
 
     if args.test_mode:
         print("=== WARNING: running in test mode", file=sys.stderr)
@@ -194,6 +208,13 @@ def main():
         params.params['save_freq'] = 10
         params.params['ckpt_freq'] = 100
 
+    if args.env == 'GridWorldNoFrameskip-v4':
+        params.params['policy'] = 'mlp'
+    elif args.env == 'PongNoFrameskip-v4':
+        params.params['policy'] = 'cnn'
+    else:
+        raise Exception("Policy unknown for env {}".format(args.env))
+
     if not osp.exists('.git'):
         git_rev = "unkrev"
     else:
@@ -203,7 +224,7 @@ def main():
     if args.log_dir is not None:
         log_dir = args.log_dir
     else:
-        log_dir = osp.join(args.output_dir, run_name)
+        log_dir = osp.join('runs', run_name)
         if osp.exists(log_dir):
             raise Exception("Log directory '%s' already exists" % log_dir)
         os.makedirs(log_dir)
