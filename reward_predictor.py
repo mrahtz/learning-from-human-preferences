@@ -198,10 +198,15 @@ def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
             pref_db_train.del_first()
         assert len(pref_db_train) <= db_max * (1 - VAL_FRACTION)
         print("pref_db_train len:", len(pref_db_train))
-    print("%d preferences received" % n_recvd)
+    if params.params['debug']:
+        print("%d preferences received" % n_recvd)
 
 
-recv_prefs.n_prefs = 0
+def save_prefs(log_dir, name, pref_db_train, pref_db_val):
+    fname = osp.join(log_dir, "train_{}.pkl".format(name))
+    save_pref_db(pref_db_train, fname)
+    fname = osp.join(log_dir, "val_{}.pkl".format(name))
+    save_pref_db(pref_db_val, fname)
 
 
 def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
@@ -234,18 +239,17 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
                 break
             print("Waiting for preferences; %d so far" % len(pref_db_train))
             recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
-            time.sleep(1.0)
+            if params.params['save_prefs']:
+                save_prefs(log_dir, 'initial', pref_db_train, pref_db_val)
+            time.sleep(10.0)
 
     print("Finished accumulating initial preferences at",
           str(datetime.datetime.now()))
     print("({} preferences over {} segments)".format(
         len(pref_db_train.prefs), len(pref_db_train.segments)))
 
-    if params.params['just_prefs'] or params.params['save_prefs']:
-        fname = osp.join(log_dir, "train_initial.pkl")
-        save_pref_db(pref_db_train, fname)
-        fname = osp.join(log_dir, "val_initial.pkl")
-        save_pref_db(pref_db_val, fname)
+    if params.params['just_prefs']:
+        save_prefs(log_dir, 'initial', pref_db_train, pref_db_val)
 
     if params.params['just_prefs']:
         raise Exception("Preference generation completed")
@@ -693,7 +697,11 @@ class RewardPredictor:
         preds_correct = tf.equal(tf.argmax(mu, 1), tf.argmax(pred, 1))
         accuracy = tf.reduce_mean(tf.cast(preds_correct, tf.float32))
 
-        _loss = tf.nn.softmax_cross_entropy_with_logits(labels=mu, logits=rs)
+        # Prevent tf.nn.softmax_cross_entropy_with_logits_v2 from propagating
+        # gradients into labels
+        mu = tf.stop_gradient(mu)
+        _loss = tf.nn.softmax_cross_entropy_with_logits_v2(
+            labels=mu, logits=rs)
         # Shape should be 'batch size'
         c1 = tf.assert_rank(_loss, 1)
         with tf.control_dependencies([c1]):
