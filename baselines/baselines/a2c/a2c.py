@@ -239,6 +239,23 @@ class Runner(object):
         if self.gen_segs:
             self.gen_segments(mb_obs, mb_dones)
 
+        # Log true rewards
+        for env_n, (rs, dones) in enumerate(zip(mb_rewards, mb_dones)):
+            assert_equal(rs.shape, (self.nsteps, ))
+            assert_equal(dones.shape, (self.nsteps, ))
+            for step_n in range(self.nsteps):
+                self.true_reward[env_n] += rs[step_n]
+                if dones[step_n]:
+                    if run_params.params['debug']:
+                        print("Env %d: episode finished, true reward %d" %
+                              (env_n, self.true_reward[env_n]))
+                    a = self.tr_ops[env_n].assign(self.true_reward[env_n])
+                    self.sess.run(a)
+                    summ = self.sess.run(self.summ_ops[env_n])
+                    self.writer.add_summary(summ, self.n_episodes[env_n])
+                    self.true_reward[env_n] = 0
+                    self.n_episodes[env_n] += 1
+
         # Replace rewards with those from reward predictor
         print("Original rewards:\n", mb_rewards)
         if not self.orig_rewards:
@@ -255,23 +272,6 @@ class Runner(object):
                           [self.env.action_meanings[i]
                            for i in mb_actions[env_n]])
             print("Modified rewards:\n", mb_rewards)
-
-        # Log true rewards
-        for env_n, (rs, dones) in enumerate(zip(mb_rewards, mb_dones)):
-            assert_equal(rs.shape, (self.nsteps, ))
-            assert_equal(dones.shape, (self.nsteps, ))
-            for step_n in range(self.nsteps):
-                self.true_reward[env_n] += rs[step_n]
-                if dones[step_n]:
-                    if run_params.params['debug']:
-                        print("Env %d: episode finished, true reward %d" %
-                              (env_n, self.true_reward[env_n]))
-                    self.sess.run(self.tr_ops[env_n].assign(
-                        self.true_reward[env_n]))
-                    summ = self.sess.run(self.summ_ops[env_n])
-                    self.writer.add_summary(summ, self.n_episodes[env_n])
-                    self.true_reward[env_n] = 0
-                    self.n_episodes[env_n] += 1
 
         # Discount rewards
         mb_obs = mb_obs.reshape(self.batch_ob_shape)
@@ -393,8 +393,7 @@ def learn(policy,
             try:
                 go_pipe.get(block=False)
             except queue.Empty:
-                if run_params.params['debug']:
-                    print("Training signal not yet given; skipping training")
+                print("Go for training not yet received; skipping training")
                 continue
             else:
                 train = True

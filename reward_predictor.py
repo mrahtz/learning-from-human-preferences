@@ -85,10 +85,10 @@ def reward_pred_net(s, dropout, batchnorm, reuse, training):
         xc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 1), 1), tf.float32)
         yc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 2), 1), tf.float32)
 
-        c1 = tf.sign(41.5 - xc)  # a = 1
-        c2 = tf.sign(41.5 - yc)  # a = 2
-        c3 = tf.sign(xc - 42.5)  # a = 3
-        c4 = tf.sign(yc - 42.5)  # a = 4
+        c1 = tf.sign(42 - xc)  # a = 1
+        c2 = tf.sign(42 - yc)  # a = 2
+        c3 = tf.sign(xc - 42)  # a = 3
+        c4 = tf.sign(yc - 42)  # a = 4
 
         x = tf.cast(tf.equal(a, 1), tf.float32) * c1 + \
             tf.cast(tf.equal(a, 2), tf.float32) * c2 + \
@@ -96,6 +96,15 @@ def reward_pred_net(s, dropout, batchnorm, reuse, training):
             tf.cast(tf.equal(a, 4), tf.float32) * c4
 
         x += 0 * tf.Variable(0.0)  # so that we have something trainable
+    if params.params['network'] == 'easyfeatures':
+        a = s[:, 0, 0, -1] - 100
+        xc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 1), 1), tf.float32)
+        yc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 2), 1), tf.float32)
+        x = tf.stack([a, xc, yc])
+
+        x = dense_layer(x, 16, "d1", reuse, activation=True)
+        x = dense_layer(x, 1, "d2", reuse, activation=False)
+        x = x[:, 0]
     elif params.params['network'] == 'conv':
         x = x[..., -1] - x[...,  -2]
         x = conv_layer(x, 8, 4, 4, batchnorm, training, "c1", reuse)
@@ -183,12 +192,13 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
 
     # Page 15: "We collect 500 comparisons from a randomly initialized policy
     # network at the beginning of training"
-    while True:
-        if len(pref_db_train) >= params.params['n_initial_prefs']:
-            break
-        print("Waiting for preferences; %d so far" % len(pref_db_train))
-        recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
-        time.sleep(1.0)
+    if not params.params['skip_prefs']:
+        while True:
+            if len(pref_db_train) >= params.params['n_initial_prefs']:
+                break
+            print("Waiting for preferences; %d so far" % len(pref_db_train))
+            recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
+            time.sleep(1.0)
 
     print("Finished accumulating initial preferences at",
           str(datetime.datetime.now()))

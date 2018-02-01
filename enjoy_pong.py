@@ -8,8 +8,7 @@ import numpy as np
 
 import gym_gridworld
 from baselines.a2c.a2c import Model
-from baselines.a2c.policies import CnnPolicy
-from baselines.common.atari_wrappers import wrap_deepmind
+from baselines.common.atari_wrappers import wrap_deepmind_nomax
 
 
 def update_obs(obs, raw_obs, nc):
@@ -24,7 +23,7 @@ def main():
     parser.add_argument("checkpoint", help="e.g. LOG_DIR/checkpoint100000")
     args = parser.parse_args()
 
-    env = wrap_deepmind(gym.make("GridWorldNoFrameskip-v4"))
+    env = wrap_deepmind_nomax(gym.make("GridWorldNoFrameskip-v4"))
 
     with open(args.model, 'rb') as fh:
         make_model = cloudpickle.loads(fh.read())
