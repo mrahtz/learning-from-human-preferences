@@ -233,6 +233,8 @@ class Runner(object):
         if self.gen_segs:
             self.gen_segments(mb_obs, mb_dones)
 
+        print("Original rewards")
+        print(mb_rewards)
         if self.orig_rewards:
             for env_n, obs in enumerate(mb_obs):
                 assert_equal(obs.shape, (self.nsteps, 84, 84, 4))
@@ -257,6 +259,8 @@ class Runner(object):
                 rewards = self.reward_model.reward(obs)
                 assert_equal(rewards.shape, (self.nsteps, ))
                 mb_rewards[env_n] = rewards
+        print("Modified rewards:")
+        print(mb_rewards)
 
         for env_n, (rs, dones) in enumerate(zip(mb_rewards, mb_dones)):
             assert_equal(rs.shape, (self.nsteps, ))
