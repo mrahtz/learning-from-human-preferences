@@ -1,3 +1,4 @@
+import glob
 import os.path as osp
 import queue
 import time
@@ -12,6 +13,8 @@ from baselines import logger
 from baselines.a2c.utils import (Scheduler, cat_entropy, discount_with_dones,
                                  find_trainable_variables, make_path, mse)
 from baselines.common import explained_variance, set_global_seeds
+
+
 """
 - states: model state (e.g. LSTM state)
 - masks: is only used for stateful models
@@ -195,6 +198,9 @@ class Runner(object):
         for n in range(self.nsteps):
             actions, values, states = self.model.step(self.obs, self.states,
                                                       self.dones)
+            # TODO remove later
+            # Offset of 100 so it doesn't interfere with dot finding
+            self.obs[:, 0, 0, -1] = 100 + actions[:]
             mb_obs.append(np.copy(self.obs))
             mb_actions.append(actions)
             mb_values.append(values)
@@ -227,6 +233,8 @@ class Runner(object):
         if self.gen_segs:
             self.gen_segments(mb_obs, mb_dones)
 
+        print("Original rewards")
+        print(mb_rewards)
         if self.orig_rewards:
             for env_n, obs in enumerate(mb_obs):
                 assert_equal(obs.shape, (self.nsteps, 84, 84, 4))
@@ -251,6 +259,8 @@ class Runner(object):
                 rewards = self.reward_model.reward(obs)
                 assert_equal(rewards.shape, (self.nsteps, ))
                 mb_rewards[env_n] = rewards
+        print("Modified rewards:")
+        print(mb_rewards)
 
         for env_n, (rs, dones) in enumerate(zip(mb_rewards, mb_dones)):
             assert_equal(rs.shape, (self.nsteps, ))
@@ -312,7 +322,7 @@ def learn(policy,
           alpha=0.99,
           gamma=0.99,
           log_interval=100,
-          load=False,
+          load_path=None,
           save_interval=10000,
           orig_rewards=False,
           gen_segs=True):
@@ -349,7 +359,16 @@ def learn(policy,
             fh.write(cloudpickle.dumps(make_model))
 
     print("Initialising model...")
-    model = make_model()
+    if load_path is None:
+        model = make_model()
+    else:
+        with open(osp.join(load_path, 'make_model.pkl'), 'rb') as fh:
+            make_model = cloudpickle.loads(fh.read())
+        model = make_model()
+        ckpt_file = glob.glob(osp.join(load_path, 'checkpoint*'))[0]
+        print("Loading policy checkpoint from {}...".format(ckpt_file))
+        model.load(ckpt_file)
+
     runner = Runner(
         env,
         model,

@@ -40,7 +40,7 @@ def configure_logger(log_dir):
 
 def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
           rp_ckpt_dir, load_prefs_dir, headless, log_dir, ent_coef,
-          db_max, segs_max, log_interval):
+          db_max, segs_max, log_interval, policy_ckpt_dir):
     configure_logger(log_dir)
 
     num_timesteps = int(num_frames / 4 * 1.1)
@@ -88,7 +88,8 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
             lrschedule=lrschedule,
             log_dir=log_dir,
             ent_coef=0.01,
-            log_interval=log_interval)
+            log_interval=log_interval,
+            load_path=policy_ckpt_dir)
 
     def rp():
         train_reward_predictor(rp_lr, pref_pipe, go_pipe, load_prefs_dir,
@@ -164,6 +165,8 @@ def main():
     parser.add_argument('--just_prefs', action='store_true')
     parser.add_argument('--save_pretrain', action='store_true')
     parser.add_argument('--print_lr', action='store_true')
+    parser.add_argument('--n_initial_epochs', type=int, default=20)
+    parser.add_argument('--policy_ckpt_dir')
     args = parser.parse_args()
 
     params.init_params()
@@ -185,7 +188,7 @@ def main():
         params.params['ckpt_freq'] = 1
     else:
         params.params['n_initial_prefs'] = 500
-        params.params['n_initial_epochs'] = 20
+        params.params['n_initial_epochs'] = args.n_initial_epochs
         params.params['save_freq'] = 10
         params.params['ckpt_freq'] = 100
 
@@ -219,7 +222,8 @@ def main():
         ent_coef=args.ent_coef,
         db_max=args.db_max,
         segs_max=args.segs_max,
-        log_interval=args.log_interval)
+        log_interval=args.log_interval,
+        policy_ckpt_dir=args.policy_ckpt_dir)
 
 
 if __name__ == '__main__':
