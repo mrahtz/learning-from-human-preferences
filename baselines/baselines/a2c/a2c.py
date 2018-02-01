@@ -257,7 +257,7 @@ class Runner(object):
                     self.n_episodes[env_n] += 1
 
         # Replace rewards with those from reward predictor
-        if params.params['debug']:
+        if run_params.params['debug']:
             print("Original rewards:\n", mb_rewards)
         if not self.orig_rewards:
             # for the data from each environment
@@ -272,7 +272,7 @@ class Runner(object):
                     print("Env %d actions:\n" % env_n,
                           [self.env.action_meanings[i]
                            for i in mb_actions[env_n]])
-            if params.params['debug']:
+            if run_params.params['debug']:
                 print("Modified rewards:\n", mb_rewards)
 
         # Discount rewards
