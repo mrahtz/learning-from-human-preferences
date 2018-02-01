@@ -16,12 +16,13 @@ In progress.
 * 11/11/2017: Rewrote reward predictor network to take larger batches
 * 17/11/2017: Rewrote using processes instead of threads after discovering TensorFlow thread locking
 * 23/11/2017: Implemented end-to-end tests for reward predictor
+* ...a while spent fixing bugs...
+* 01/02/2018: Partial success with training dot agent to move to the centre of a square (though he hasn't got the hang of moving horizontally yet?)
 
-Currently working on: training a simple 'moving dot' agent to move to the middle of a white square, and fixing bugs.
+![](images/dot.gif)
 
 Future targets:
-* Successfully train the 'moving dot' agent to move to the middle of a blank square
-* Implement the little details (human error-adjusted softmax, label rate decay, etc.)
+* Implement remaining details (human error-adjusted softmax, label rate decay, etc.)
 * Final goal: reproduce Enduro behaviour from <https://blog.openai.com/deep-reinforcement-learning-from-human-preferences/>
 
 ![](https://blog.openai.com/content/images/2017/06/enduro.gif)
