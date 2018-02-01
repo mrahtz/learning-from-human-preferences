@@ -141,7 +141,7 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
-        '--env', help='environment ID', default='GridWorldNoFrameskip-v4')
+        '--env', help='environment ID', default='EnduroNoFrameskip-v4')
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument(
         '--lrschedule',
@@ -156,7 +156,7 @@ def main():
         'This number gets divided by 4 due to frameskip',
         type=int,
         default=80)
-    parser.add_argument('--n_envs', type=int, default=2)
+    parser.add_argument('--n_envs', type=int, default=1)
     parser.add_argument('--rp_ckpt_dir')
     parser.add_argument('--load_prefs_dir')
     parser.add_argument('--headless', action='store_true', default=True)
@@ -211,6 +211,8 @@ def main():
     if args.env == 'GridWorldNoFrameskip-v4':
         params.params['policy'] = 'mlp'
     elif args.env == 'PongNoFrameskip-v4':
+        params.params['policy'] = 'cnn'
+    elif args.env == 'EnduroNoFrameskip-v4':
         params.params['policy'] = 'cnn'
     else:
         raise Exception("Policy unknown for env {}".format(args.env))
