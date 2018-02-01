@@ -164,6 +164,7 @@ def main():
     parser.add_argument('--just_prefs', action='store_true')
     parser.add_argument('--save_pretrain', action='store_true')
     parser.add_argument('--print_lr', action='store_true')
+    parser.add_argument('--n_initial_epochs', type=int, default=20)
     args = parser.parse_args()
 
     params.init_params()
@@ -185,7 +186,7 @@ def main():
         params.params['ckpt_freq'] = 1
     else:
         params.params['n_initial_prefs'] = 500
-        params.params['n_initial_epochs'] = 20
+        params.params['n_initial_epochs'] = args.n_initial_epochs
         params.params['save_freq'] = 10
         params.params['ckpt_freq'] = 100
 
