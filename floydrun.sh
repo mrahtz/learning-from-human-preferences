@@ -7,4 +7,4 @@ git clone https://github.com/openai/gym \
     && cd ../baselines \
     && pip install --upgrade cython cloudpickle && pip install -e . \
     && cd .. \
-    && python run.py $*
+    && $*
