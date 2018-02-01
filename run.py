@@ -167,7 +167,7 @@ def main():
     parser.add_argument('--print_lr', action='store_true')
     parser.add_argument('--n_initial_epochs', type=int, default=20)
     parser.add_argument('--policy_ckpt_dir')
-    parser.add_argument('--output_dir', default='runs')
+    parser.add_argument('--log_dir')
     args = parser.parse_args()
 
     params.init_params()
@@ -180,6 +180,7 @@ def main():
     params.params['just_prefs'] = args.just_prefs
     params.params['save_pretrain'] = args.save_pretrain
     params.params['print_lr'] = args.print_lr
+    params.params['env'] = args.env
 
     if args.test_mode:
         print("=== WARNING: running in test mode", file=sys.stderr)
@@ -199,10 +200,13 @@ def main():
         git_rev = subprocess.check_output(['git', 'rev-parse', '--short',
                                            'HEAD']).rstrip().decode()
     run_name = args.run_name + '_' + git_rev
-    log_dir = osp.join(args.output_dir, run_name)
-    if osp.exists(log_dir):
-        raise Exception("Log directory '%s' already exists" % log_dir)
-    os.makedirs(log_dir)
+    if args.log_dir is not None:
+        log_dir = args.log_dir
+    else:
+        log_dir = osp.join(args.output_dir, run_name)
+        if osp.exists(log_dir):
+            raise Exception("Log directory '%s' already exists" % log_dir)
+        os.makedirs(log_dir)
 
     with open(osp.join(log_dir, 'args.txt'), 'w') as args_file:
         print(args, file=args_file)
