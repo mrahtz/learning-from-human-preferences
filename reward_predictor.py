@@ -99,7 +99,7 @@ def reward_pred_net(s, dropout, batchnorm, reuse, training):
 
         x += 0 * tf.Variable(0.0)  # so that we have something trainable
     if params.params['network'] == 'easyfeatures':
-        a = s[:, 0, 0, -1] - 100
+        a = 5 * (s[:, 0, 0, -1] - 100)
         xc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 1), 1), tf.float32)
         yc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 2), 1), tf.float32)
         x = tf.stack([a, xc, yc], 1)
