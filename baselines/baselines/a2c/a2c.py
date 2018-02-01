@@ -196,7 +196,8 @@ class Runner(object):
             actions, values, states = self.model.step(self.obs, self.states,
                                                       self.dones)
             # TODO remove later
-            self.obs[:, 0, 0, -1] = actions[:]
+            # Offset of 100 so it doesn't interfere with dot finding
+            self.obs[:, 0, 0, -1] = 100 + actions[:]
             mb_obs.append(np.copy(self.obs))
             mb_actions.append(actions)
             mb_values.append(values)
