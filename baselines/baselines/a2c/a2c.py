@@ -195,12 +195,17 @@ class Runner(object):
         mb_obs, mb_rewards, mb_actions, mb_values, mb_dones = \
             [], [], [], [], []
         mb_states = self.states
+
+        # Run for nsteps steps in the environment
         for n in range(self.nsteps):
             actions, values, states = self.model.step(self.obs, self.states,
                                                       self.dones)
-            # TODO remove later
-            # Offset of 100 so it doesn't interfere with dot finding
-            self.obs[:, 0, 0, -1] = 100 + actions[:]
+            if run_params.params['env'] == 'GridWorldNoFrameskip-v4':
+                # For GridWorld, reward depends on both current observation and
+                # action, so encode action in the observations
+                # Offset of 100 so it doesn't interfere with oracle position
+                # finding
+                self.obs[:, 0, 0, -1] = 100 + actions[:]
             mb_obs.append(np.copy(self.obs))
             mb_actions.append(actions)
             mb_values.append(values)
@@ -230,38 +235,28 @@ class Runner(object):
         # before we'd actually run any steps, so drop it.
         mb_dones = mb_dones[:, 1:]
 
+        # Generate segments
         if self.gen_segs:
             self.gen_segments(mb_obs, mb_dones)
 
-        print("Original rewards")
-        print(mb_rewards)
-        if self.orig_rewards:
-            for env_n, obs in enumerate(mb_obs):
-                assert_equal(obs.shape, (self.nsteps, 84, 84, 4))
-                if run_params.params['debug']:
-                    print("Env %d" % env_n)
-                    print(mb_actions[env_n])
-                    print([
-                        self.env.action_meanings[i] for i in mb_actions[env_n]
-                    ])
-                    print(mb_rewards[env_n])
-        else:
+        # Replace rewards with those from reward predictor
+        print("Original rewards:\n", mb_rewards)
+        if not self.orig_rewards:
             # for the data from each environment
             assert_equal(mb_obs.shape, (nenvs, self.nsteps, 84, 84, 4))
             for env_n, obs in enumerate(mb_obs):
                 assert_equal(obs.shape, (self.nsteps, 84, 84, 4))
-                if run_params.params['debug']:
-                    print("Env %d" % env_n)
-                    print(mb_actions[env_n])
-                    print([
-                        self.env.action_meanings[i] for i in mb_actions[env_n]
-                    ])
                 rewards = self.reward_model.reward(obs)
                 assert_equal(rewards.shape, (self.nsteps, ))
                 mb_rewards[env_n] = rewards
-        print("Modified rewards:")
-        print(mb_rewards)
 
+                if run_params.params['debug']:
+                    print("Env %d actions:\n" % env_n,
+                          [self.env.action_meanings[i]
+                           for i in mb_actions[env_n]])
+            print("Modified rewards:\n", mb_rewards)
+
+        # Log true rewards
         for env_n, (rs, dones) in enumerate(zip(mb_rewards, mb_dones)):
             assert_equal(rs.shape, (self.nsteps, ))
             assert_equal(dones.shape, (self.nsteps, ))
@@ -275,12 +270,11 @@ class Runner(object):
                         self.true_reward[env_n]))
                     summ = self.sess.run(self.summ_ops[env_n])
                     self.writer.add_summary(summ, self.n_episodes[env_n])
-
                     self.true_reward[env_n] = 0
                     self.n_episodes[env_n] += 1
 
+        # Discount rewards
         mb_obs = mb_obs.reshape(self.batch_ob_shape)
-
         last_values = self.model.value(self.obs, self.states,
                                        self.dones).tolist()
         # discount/bootstrap off value fn
@@ -292,11 +286,13 @@ class Runner(object):
                 # Make sure that the first iteration of the loop inside
                 # discount_with_dones picks up 'value' as the initial
                 # value of r
-                rewards = discount_with_dones(rewards + [value], dones + [0],
+                rewards = discount_with_dones(rewards + [value],
+                                              dones + [0],
                                               self.gamma)[:-1]
             else:
                 rewards = discount_with_dones(rewards, dones, self.gamma)
             mb_rewards[n] = rewards
+
         mb_rewards = mb_rewards.flatten()
         mb_actions = mb_actions.flatten()
         mb_values = mb_values.flatten()
