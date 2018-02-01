@@ -167,6 +167,7 @@ def main():
     parser.add_argument('--print_lr', action='store_true')
     parser.add_argument('--n_initial_epochs', type=int, default=20)
     parser.add_argument('--policy_ckpt_dir')
+    parser.add_argument('--output_dir', default='runs')
     args = parser.parse_args()
 
     params.init_params()
@@ -198,7 +199,7 @@ def main():
         git_rev = subprocess.check_output(['git', 'rev-parse', '--short',
                                            'HEAD']).rstrip().decode()
     run_name = args.run_name + '_' + git_rev
-    log_dir = osp.join('runs', run_name)
+    log_dir = osp.join(args.output_dir, run_name)
     if osp.exists(log_dir):
         raise Exception("Log directory '%s' already exists" % log_dir)
     os.makedirs(log_dir)
