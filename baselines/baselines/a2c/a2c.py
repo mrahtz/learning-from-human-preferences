@@ -1,3 +1,4 @@
+import glob
 import os.path as osp
 import queue
 import time
@@ -12,6 +13,8 @@ from baselines import logger
 from baselines.a2c.utils import (Scheduler, cat_entropy, discount_with_dones,
                                  find_trainable_variables, make_path, mse)
 from baselines.common import explained_variance, set_global_seeds
+
+
 """
 - states: model state (e.g. LSTM state)
 - masks: is only used for stateful models
@@ -315,7 +318,7 @@ def learn(policy,
           alpha=0.99,
           gamma=0.99,
           log_interval=100,
-          load=False,
+          load_path=None,
           save_interval=10000,
           orig_rewards=False,
           gen_segs=True):
@@ -352,7 +355,16 @@ def learn(policy,
             fh.write(cloudpickle.dumps(make_model))
 
     print("Initialising model...")
-    model = make_model()
+    if load_path is None:
+        model = make_model()
+    else:
+        with open(osp.join(load_path, 'make_model.pkl'), 'rb') as fh:
+            make_model = cloudpickle.loads(fh.read())
+        model = make_model()
+        ckpt_file = glob.glob(osp.join(load_path, 'checkpoint*'))[0]
+        print("Loading policy checkpoint from {}...".format(ckpt_file))
+        model.load(ckpt_file)
+
     runner = Runner(
         env,
         model,
