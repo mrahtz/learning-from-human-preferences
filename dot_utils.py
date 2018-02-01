@@ -23,20 +23,24 @@ def predict_reward(segment):
 
 
 def predict_action_rewards(segment):
-    middle = [84/2, 84/2]
-    old_coords = get_coords(segment[0][:, :, 0])
-    old_d = np.linalg.norm(old_coords - middle)
     rewards = []
-    for frame in segment[1:]:
-        new_coords = get_coords(frame[:, :, 0])
-        new_d = np.linalg.norm(new_coords - middle)
-        if new_d < old_d:
-            rewards.append(1.)
-        elif new_d > old_d:
-            rewards.append(-1.)
+    for frame in segment:
+        coords = get_coords(frame[:, :, -1])
+        a = frame[0, 0, -1] - 100
+        if a == 0:
+            r = 0.0
+        elif a == 1:
+            r = np.sign(41.5 - coords[0])
+        elif a == 2:
+            r = np.sign(41.5 - coords[1])
+        elif a == 3:
+            r = np.sign(coords[0] - 41.5)
+        elif a == 4:
+            r = np.sign(coords[1] - 41.5)
         else:
-            rewards.append(0.)
-        old_d = new_d
+            raise Exception("Unknown action {}".format(a))
+
+        rewards.append(r)
     return rewards
 
 
