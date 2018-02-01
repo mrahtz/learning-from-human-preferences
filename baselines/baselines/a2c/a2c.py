@@ -195,6 +195,8 @@ class Runner(object):
         for n in range(self.nsteps):
             actions, values, states = self.model.step(self.obs, self.states,
                                                       self.dones)
+            # TODO remove later
+            self.obs[:, 0, 0, -1] = actions[:]
             mb_obs.append(np.copy(self.obs))
             mb_actions.append(actions)
             mb_values.append(values)
