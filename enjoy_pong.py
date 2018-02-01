@@ -6,8 +6,7 @@ import cloudpickle
 import gym
 import numpy as np
 
-import gym_gridworld
-from baselines.a2c.a2c import Model
+import gym_gridworld  # noqa: F401 (imported but unused)
 from baselines.common.atari_wrappers import wrap_deepmind_nomax
 
 
@@ -46,7 +45,7 @@ def main():
         _obs = np.vstack([obs] * model_nenvs)
         episode_rew = 0
         actions, values, states = model.step(_obs, states, dones)
-        action, value = actions[0], values[0]
+        action = actions[0]
 
         while not dones[0]:
             env.render()
@@ -54,7 +53,7 @@ def main():
             obs = update_obs(obs, raw_obs, nc)
             _obs = np.vstack([obs] * model_nenvs)
             actions, values, states = model.step(_obs, states, dones)
-            action, value = actions[0], values[0]
+            action = actions[0]
             episode_rew += rew
         print("Episode reward", episode_rew)
 
