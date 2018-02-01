@@ -107,6 +107,7 @@ def main():
     params.init_params()
     params.params['debug'] = True
     params.params['print_lr'] = False
+    params.params['env'] = args.env
 
     git_rev = subprocess.check_output(['git', 'rev-parse', '--short',
                                        'HEAD']).rstrip().decode()
