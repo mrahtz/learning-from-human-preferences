@@ -38,7 +38,7 @@ def batch_iter(data, batch_size, shuffle=False):
 
 
 def conv_layer(x, filters, kernel_size, strides, batchnorm, training, name,
-               reuse):
+               reuse, activation='relu'):
     # TODO: L2 loss
     x = tf.layers.conv2d(
         x,
@@ -48,9 +48,15 @@ def conv_layer(x, filters, kernel_size, strides, batchnorm, training, name,
         activation=None,
         name=name,
         reuse=reuse)
+
     if batchnorm:
         x = tf.layers.batch_normalization(x, training=training)
-    x = tf.nn.leaky_relu(x, alpha=0.01)
+
+    if activation == 'relu':
+        x = tf.nn.leaky_relu(x, alpha=0.01)
+    else:
+        raise Exception("Unkown activation for conv_layer", activation)
+
     return x
 
 
@@ -58,24 +64,92 @@ def dense_layer(x,
                 units,
                 name,
                 reuse,
-                activation=None,
-                batchnorm=False,
-                training=False):
-    # Page 15:
-    # "This input is fed through 4 convolutional layers...with leaky ReLU
-    # nonlinearities (α = 0.01). This is followed by a fully connected layer of
-    # size 64 and then a scalar output. All convolutional layers use batch norm
-    # and dropout with α = 0.5 to prevent predictor overfitting."
-    # => fully connected layers don't use batch norm or dropout
-    # => fully-connected layers have no activation function?
+                batchnorm,
+                training=False,
+                activation=None):
     # TODO: L2 loss
+
     x = tf.layers.dense(x, units, activation=None, name=name, reuse=reuse)
+
     if batchnorm:
         x = tf.layers.batch_normalization(x, training=training)
+
     if activation == 'relu':
         x = tf.nn.leaky_relu(x, alpha=0.01)
-    elif activation == 'sigmoid':
-        x = tf.nn.sigmoid(x)
+    else:
+        raise Exception("Unknown activation for dense_layer", activation)
+
+    return x
+
+
+def net_handcrafted(s):
+    a = s[:, 0, 0, -1] - 100
+    xc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 1), 1), tf.float32)
+    yc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 2), 1), tf.float32)
+
+    c1 = tf.sign(42 - xc)  # a = 1
+    c2 = tf.sign(42 - yc)  # a = 2
+    c3 = tf.sign(xc - 42)  # a = 3
+    c4 = tf.sign(yc - 42)  # a = 4
+
+    x = tf.cast(tf.equal(a, 1), tf.float32) * c1 + \
+        tf.cast(tf.equal(a, 2), tf.float32) * c2 + \
+        tf.cast(tf.equal(a, 3), tf.float32) * c3 + \
+        tf.cast(tf.equal(a, 4), tf.float32) * c4
+
+    x += 0 * tf.Variable(0.0)  # so that we have something trainable
+
+    return x
+
+
+def net_easyfeatures(s):
+    # I couldn't get this to work. It might be because I forgot to take care of
+    # variable reuse.
+    a = s[:, 0, 0, -1] - 100
+    xc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 1), 1), tf.float32)
+    yc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 2), 1), tf.float32)
+
+    l1 = tf.Variable(1.0)
+    l2 = tf.Variable(1.0)
+    l3 = tf.Variable(1.0)
+    l4 = tf.Variable(1.0)
+    c1 = l1 - xc
+    c2 = l2 - yc
+    c3 = xc - l3
+    c4 = yc - l4
+
+    x = tf.cast(tf.equal(a, 1), tf.float32) * c1 + \
+        tf.cast(tf.equal(a, 2), tf.float32) * c2 + \
+        tf.cast(tf.equal(a, 3), tf.float32) * c3 + \
+        tf.cast(tf.equal(a, 4), tf.float32) * c4
+
+    return x
+
+
+def net_conv(s, batchnorm, dropout, training, reuse):
+    # Page 15:
+    # "[The] input is fed through 4 convolutional layers of size 7x7, 5x5, 3x3,
+    # and 3x3 with strides 3, 2, 1, 1, each having 16 filters, with leaky ReLU
+    # nonlinearities (α = 0.01). This is followed by a fully connected layer of
+    # size 64 and then a scalar output. All convolutional layers use batch norm
+    # and dropout with α = 0.5 to prevent predictor overfitting"
+    x = s
+
+    x = conv_layer(x, 16, 7, 3, batchnorm, training, "c1", reuse, 'relu')
+    x = tf.layers.dropout(x, dropout, training=training)
+    x = conv_layer(x, 16, 5, 2, batchnorm, training, "c2", reuse, 'relu')
+    x = tf.layers.dropout(x, dropout, training=training)
+    x = conv_layer(x, 16, 3, 1, batchnorm, training, "c3", reuse, 'relu')
+    x = tf.layers.dropout(x, dropout, training=training)
+    x = conv_layer(x, 16, 3, 1, batchnorm, training, "c4", reuse, 'relu')
+
+    w, h, c = x.get_shape()[1:]
+    x = tf.reshape(x, [-1, int(w * h * c)])
+
+    x = dense_layer(x, 64, "d1", reuse, batchnorm=False, activation='relu')
+    x = dense_layer(x, 1,  "d2", reuse, batchnorm=False, activation='relu')
+    x = x[:, 0]
+
     return x
 
 
@@ -83,63 +157,14 @@ def reward_pred_net(s, dropout, batchnorm, reuse, training):
     x = s
 
     if params.params['network'] == 'handcrafted':
-        a = s[:, 0, 0, -1] - 100
-        xc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 1), 1), tf.float32)
-        yc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 2), 1), tf.float32)
-
-        c1 = tf.sign(42 - xc)  # a = 1
-        c2 = tf.sign(42 - yc)  # a = 2
-        c3 = tf.sign(xc - 42)  # a = 3
-        c4 = tf.sign(yc - 42)  # a = 4
-
-        x = tf.cast(tf.equal(a, 1), tf.float32) * c1 + \
-            tf.cast(tf.equal(a, 2), tf.float32) * c2 + \
-            tf.cast(tf.equal(a, 3), tf.float32) * c3 + \
-            tf.cast(tf.equal(a, 4), tf.float32) * c4
-
-        x += 0 * tf.Variable(0.0)  # so that we have something trainable
+        return net_handcrafted(s)
     elif params.params['network'] == 'easyfeatures':
-        a = s[:, 0, 0, -1] - 100
-        xc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 1), 1), tf.float32)
-        yc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 2), 1), tf.float32)
-
-        l1 = tf.Variable(1.0)
-        l2 = tf.Variable(1.0)
-        l3 = tf.Variable(1.0)
-        l4 = tf.Variable(1.0)
-        c1 = l1 - xc
-        c2 = l2 - yc
-        c3 = xc - l3
-        c4 = yc - l4
-
-        x = tf.cast(tf.equal(a, 1), tf.float32) * c1 + \
-            tf.cast(tf.equal(a, 2), tf.float32) * c2 + \
-            tf.cast(tf.equal(a, 3), tf.float32) * c3 + \
-            tf.cast(tf.equal(a, 4), tf.float32) * c4
+        return net_easyfeatures(s)
     elif params.params['network'] == 'conv':
-        x = x[..., -1] - x[...,  -2]
-        x = conv_layer(x, 8, 4, 4, batchnorm, training, "c1", reuse)
-
-        w, h, c = x.get_shape()[1:]
-        x = tf.reshape(x, [-1, int(w * h * c)])
-
-        x = dense_layer(x, 4, "d1", reuse, activation=True)
-        x = dense_layer(x, 1, "d2", reuse, activation=False)
-        x = x[:, 0]
+        return net_conv(s, batchnorm, dropout, training, reuse)
     else:
-        layers = [int(n) for n in params.params['network'].split('-')]
-
-        # Difference between last two frames
-        x = x[:, :, :, -1] - x[:, :, :, -2]
-        w, h = x.get_shape()[1:]
-        x = tf.reshape(x, [-1, int(w * h)])
-        i = 1
-        for l in layers:
-            x = dense_layer(x, l, 'd{}'.format(i), reuse, activation=True)
-            x = tf.layers.dropout(x, dropout, training=training)
-            i += 1
-        x = dense_layer(x, 1, 'd{}'.format(i), reuse, activation=False)
-        x = x[:, 0]
+        raise Exception("Unknown reward predictor network architecture",
+                        params.params['network'])
 
     return x
 
@@ -335,17 +360,17 @@ class RewardPredictorEnsemble:
         server = tf.train.Server(cluster, job_name=name, config=config)
         sess = tf.Session(server.target, graph)
 
+        device_setter = tf.train.replica_device_setter(
+            cluster=cluster_dict,
+            ps_device="/job:ps/task:0",
+            worker_device="/job:{}/task:0".format(name))
+
         with graph.as_default():
             for i in range(n_preds):
-                with tf.device(
-                        tf.train.replica_device_setter(
-                            cluster=cluster_dict,
-                            ps_device="/job:ps/task:0",
-                            worker_device="/job:{}/task:0".format(name))):
+                with tf.device(device_setter):
                     with tf.variable_scope("pred_%d" % i):
-                        # TODO: enable batchnorm later on
                         rp = RewardPredictor(
-                            dropout=dropout, batchnorm=False, lr=lr)
+                            dropout=dropout, batchnorm=True, lr=lr)
                 reward_ops.append(rp.r1)
                 pred_ops.append(rp.pred)
                 train_ops.append(rp.train)
@@ -373,13 +398,10 @@ class RewardPredictorEnsemble:
             else:
                 if load_network:
                     # TODO fix
-                    ckpt_file = rp_ckpt_dir
-                    print(
-                        "Loading reward predictor checkpoint from {}...".format(
-                            ckpt_file),
-                        end="")
-                    self.saver.restore(sess, ckpt_file)
-                    print("done!")
+                    ckpt_f = rp_ckpt_dir
+                    print("Loading reward predictor checkpoint from", ckpt_f)
+                    self.saver.restore(sess, ckpt_f)
+                    print("Reard predictor checkpoint loaded!")
                 else:
                     sess.run(tf.global_variables_initializer())
 
@@ -510,43 +532,17 @@ class RewardPredictorEnsemble:
 
         return rs
 
-    # TODO: shouldn't vote=True?
-    def preferences(self, s1s, s2s, vote=False):
+    def preferences(self, s1s, s2s):
+        """
+        Predict probability of human preferring one segment over another
+        for each segment in the supplied segment pairs.
+        """
         feed_dict = {}
         for rp in self.rps:
             feed_dict[rp.s1] = s1s
             feed_dict[rp.s2] = s2s
             feed_dict[rp.training] = False
         preds = self.sess.run(self.pred_ops, feed_dict)
-
-        if vote and self.n_preds == 1:
-            preds = preds[0]
-        elif vote:
-            assert self.n_preds == 3
-            preds_vote = []
-            for seg_n in range(len(s1s)):
-                n_votes_l = 0
-                n_votes_r = 0
-                n_votes_equal = 0
-                for pred in preds:
-                    if pred[seg_n][0] > pred[seg_n][1]:
-                        n_votes_l += 1
-                    elif pred[seg_n][1] > pred[seg_n][0]:
-                        n_votes_r += 1
-                    else:
-                        n_votes_equal += 1
-                if n_votes_l >= 2:
-                    pred_vote = [1.0, 0.0]
-                elif n_votes_r >= 2:
-                    pred_vote = [0.0, 1.0]
-                elif n_votes_equal >= 2:
-                    pred_vote = [0.5, 0.5]
-                else:
-                    # No preference has a majority
-                    pred_vote = [0.5, 0.5]
-                preds_vote.append(pred_vote)
-            preds = preds_vote
-
         return preds
 
     def save(self):
