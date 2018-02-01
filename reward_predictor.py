@@ -102,11 +102,20 @@ def reward_pred_net(s, dropout, batchnorm, reuse, training):
         a = s[:, 0, 0, -1] - 100
         xc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 1), 1), tf.float32)
         yc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 2), 1), tf.float32)
-        x = tf.stack([a, xc, yc], 1)
 
-        x = dense_layer(x, 16, "d1", reuse, activation='relu')
-        x = dense_layer(x, 1, "d2", reuse, activation='sigmoid')
-        x = x[:, 0]
+        l1 = tf.Variable(1.0)
+        l2 = tf.Variable(1.0)
+        l3 = tf.Variable(1.0)
+        l4 = tf.Variable(1.0)
+        c1 = l1 - xc
+        c2 = l2 - yc
+        c3 = xc - l3
+        c4 = yc - l4
+
+        x = tf.cast(tf.equal(a, 1), tf.float32) * c1 + \
+            tf.cast(tf.equal(a, 2), tf.float32) * c2 + \
+            tf.cast(tf.equal(a, 3), tf.float32) * c3 + \
+            tf.cast(tf.equal(a, 4), tf.float32) * c4
     elif params.params['network'] == 'conv':
         x = x[..., -1] - x[...,  -2]
         x = conv_layer(x, 8, 4, 4, batchnorm, training, "c1", reuse)
