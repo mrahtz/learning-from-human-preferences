@@ -395,10 +395,10 @@ def learn(policy,
             try:
                 go_pipe.get(block=False)
             except queue.Empty:
-                print("Go for training not yet received; skipping training")
                 continue
             else:
                 train = True
+                print("Starting RL training")
 
         policy_loss, value_loss, policy_entropy = model.train(
             obs, states, rewards, masks, actions, values)

@@ -7,8 +7,10 @@ from multiprocessing import Process, Queue
 
 import numpy as np
 import pyglet
-from dot_utils import predict_action_preference
 from numpy.testing import assert_equal
+from scipy.ndimage import zoom
+
+from dot_utils import predict_action_preference
 from reward_predictor import RewardPredictorEnsemble
 
 
@@ -118,6 +120,41 @@ class PrefInterface:
                                     size=10, replace=False)
         return idxs
 
+    def ask_user(self, s1, s2):
+        border = np.zeros((84, 10), dtype=np.uint8)
+
+        seg_len = len(s1)
+        vid = []
+        for t in range(seg_len):
+            # Show only the most recent frame of the 4-frame stack
+            frame = np.hstack((s1[t][:, :, -1], border, s2[t][:, :, -1]))
+            frame = zoom(frame, 2)
+            vid.append(frame)
+        n_pause_frames = 7
+        vid.extend([vid[-1]] * n_pause_frames)
+        self.vid_q.put(vid)
+
+        while True:
+            print("Choice: ")
+            choice = input()
+            if choice == "L" or choice == "R" or choice == "E" or choice == "":
+                break
+            else:
+                print("Invalid choice '{}'".format(choice))
+
+        if choice == "L":
+            pref = (1., 0.)
+        elif choice == "R":
+            pref = (0., 1.)
+        elif choice == "E":
+            pref = (0.5, 0.5)
+        elif choice == "":
+            pref = None
+
+        self.vid_q.put("Pause")
+
+        return pref
+
     def run(self, seg_pipe, pref_pipe, segs_max):
         tested_idxs = set()
         segments = []
@@ -140,7 +177,7 @@ class PrefInterface:
                 pair_idxs = list(pair_idxs)
             (n1, n2), s1, s2 = self.get_seg_pair(segments, pair_idxs)
 
-            pref = predict_action_preference(s1, s2)
+            pref = self.ask_user(s1, s2)
             pref_pipe.put((s1, s2, pref))
             tested_idxs.add((n1, n2))
 
