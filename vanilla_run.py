@@ -102,6 +102,7 @@ def main():
         default=40)
     seconds_since_epoch = str(int(time.time()))
     parser.add_argument('--run_name', default=seconds_since_epoch)
+    parser.add_argument('--log_dir')
     args = parser.parse_args()
 
     params.init_params()
@@ -109,13 +110,16 @@ def main():
     params.params['print_lr'] = False
     params.params['env'] = args.env
 
-    git_rev = subprocess.check_output(['git', 'rev-parse', '--short',
-                                       'HEAD']).rstrip().decode()
-    run_name = args.run_name + '_' + git_rev
-    log_dir = osp.join('runs', run_name)
-    if osp.exists(log_dir):
-        raise Exception("Log directory '%s' already exists" % log_dir)
-    os.makedirs(log_dir)
+    if args.log_dir is not None:
+        log_dir = args.log_dir
+    else:
+        git_rev = subprocess.check_output(['git', 'rev-parse', '--short',
+                                           'HEAD']).rstrip().decode()
+        run_name = args.run_name + '_' + git_rev
+        log_dir = osp.join('runs', run_name)
+        if osp.exists(log_dir):
+            raise Exception("Log directory '%s' already exists" % log_dir)
+        os.makedirs(log_dir)
 
     train(
         args.env,
