@@ -107,16 +107,15 @@ def reward_pred_net(s, dropout, batchnorm, reuse, training):
         l2 = tf.Variable(1.0)
         l3 = tf.Variable(1.0)
         l4 = tf.Variable(1.0)
-        c1 = tf.nn.sigmoid(42 - xc)
-        c2 = tf.nn.sigmoid(42 - yc)
-        c3 = tf.nn.sigmoid(xc - 42)
-        c4 = tf.nn.sigmoid(yc - 42)
+        c1 = tf.nn.sigmoid(l1 - xc)
+        c2 = tf.nn.sigmoid(l2 - yc)
+        c3 = tf.nn.sigmoid(xc - l3)
+        c4 = tf.nn.sigmoid(yc - l4)
 
         x = tf.cast(tf.equal(a, 1), tf.float32) * c1 + \
             tf.cast(tf.equal(a, 2), tf.float32) * c2 + \
             tf.cast(tf.equal(a, 3), tf.float32) * c3 + \
             tf.cast(tf.equal(a, 4), tf.float32) * c4
-        x += 0 * tf.Variable(0.0)  # so that we have something trainable
     elif params.params['network'] == 'conv':
         x = x[..., -1] - x[...,  -2]
         x = conv_layer(x, 8, 4, 4, batchnorm, training, "c1", reuse)
