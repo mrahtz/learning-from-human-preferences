@@ -99,13 +99,17 @@ def reward_pred_net(s, dropout, batchnorm, reuse, training):
 
         x += 0 * tf.Variable(0.0)  # so that we have something trainable
     if params.params['network'] == 'easyfeatures':
-        a = 5 * (s[:, 0, 0, -1] - 100)
+        a = (s[:, 0, 0, -1] - 100) / 4.0
         xc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 1), 1), tf.float32)
         yc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 2), 1), tf.float32)
-        x = tf.stack([a, xc, yc], 1)
 
-        x = dense_layer(x, 16, "d1", reuse, activation='relu')
-        x = dense_layer(x, 1, "d2", reuse, activation='sigmoid')
+        c1 = tf.sign(42 - xc)  # a = 1
+        c2 = tf.sign(42 - yc)  # a = 2
+        c3 = tf.sign(xc - 42)  # a = 3
+        c4 = tf.sign(yc - 42)  # a = 4
+
+        x = tf.stack([a, c1, c2, c3, c4], 1)
+        x = dense_layer(x, 1, "d1", reuse, activation='sigmoid')
         x = x[:, 0]
     elif params.params['network'] == 'conv':
         x = x[..., -1] - x[...,  -2]
