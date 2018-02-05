@@ -182,8 +182,8 @@ class MlpPolicy(object):
         with tf.variable_scope("model", reuse=reuse):
             x = tf.cast(X, tf.float32)/255.
 
-            # take difference between most recent frames
-            x = x[:, :, :, -1] - x[:, :, :, -2]
+            # Only look at the most recent frame
+            x = x[:, :, :, -1]
 
             w, h = x.get_shape()[1:]
             x = tf.reshape(x, [-1, int(w * h)])
