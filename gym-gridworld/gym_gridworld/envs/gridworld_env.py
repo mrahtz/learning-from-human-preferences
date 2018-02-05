@@ -67,12 +67,13 @@ class GridWorldEnv(gym.Env):
         else:
             episode_over = True
 
+        
         dist1 = np.linalg.norm(self.prev_pos - self.centre)
         dist2 = np.linalg.norm(self.pos - self.centre)
-        if action == 0:
-            reward = 0
-        elif dist2 < dist1:
+        if dist2 < dist1:
             reward = 1
+        elif dist2 == dist1:
+            reward = 0
         else:
             reward = -1
 
