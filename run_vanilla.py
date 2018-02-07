@@ -107,7 +107,7 @@ def main():
     args = parser.parse_args()
 
     params.init_params()
-    params.params['debug'] = True
+    params.params['debug'] = False
     params.params['print_lr'] = False
     params.params['env'] = args.env
 
