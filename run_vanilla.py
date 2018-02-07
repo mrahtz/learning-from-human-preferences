@@ -72,8 +72,7 @@ def train(env_id, num_frames, seed, policy, lrschedule, num_cpu, log_dir):
         orig_rewards=True,
         gen_segs=False,
         log_dir=log_dir,
-        log_interval=10,
-        lr=3e-4)
+        log_interval=10)
     env.close()
 
 
