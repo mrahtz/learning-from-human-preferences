@@ -32,12 +32,12 @@ class GridWorldEnv(gym.Env):
         return ['NOOP', 'DOWN', 'RIGHT', 'UP', 'LEFT']
 
     def _get_ob(self):
-        ob = np.ones((210, 160, 3), dtype=np.uint8) * 255
+        ob = np.zeros((210, 160, 3), dtype=np.uint8)
         x = self.pos[0]
         y = self.pos[1]
         w = self.size[0]
         h = self.size[1]
-        ob[y:y+h-1, x:x+w-1, :] = 0
+        ob[y:y+h-1, x:x+w-1, :] = 255
         return ob
 
     def _step(self, action):
