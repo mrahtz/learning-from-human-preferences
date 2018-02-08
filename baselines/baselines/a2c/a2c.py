@@ -3,16 +3,17 @@ import os.path as osp
 import queue
 import time
 
-import joblib
 import numpy as np
-import tensorflow as tf
 from numpy.testing import assert_equal
 
+import joblib
 import params as run_params
+import tensorflow as tf
 from baselines import logger
 from baselines.a2c.utils import (Scheduler, cat_entropy, discount_with_dones,
                                  find_trainable_variables, make_path, mse)
 from baselines.common import explained_variance, set_global_seeds
+from utils import Segment
 
 
 """
@@ -143,7 +144,7 @@ class Runner(object):
         self.nsteps = nsteps
         self.states = model.initial_state
         self.dones = [False for _ in range(nenv)]
-        self.segment = []
+        self.segment = Segment()
         self.seg_pipe = seg_pipe
         if not orig_rewards:
             from reward_predictor import RewardPredictorEnsemble
@@ -169,26 +170,28 @@ class Runner(object):
         self.obs = np.roll(self.obs, shift=-1, axis=3)
         self.obs[:, :, :, -1] = obs[:, :, :, 0]
 
-    def gen_segments(self, mb_obs, mb_dones):
+    def gen_segments(self, mb_obs, mb_rewards, mb_dones):
         # Only generate segments from the first environment
         # TODO: is this the right choice...?
         e0_obs = mb_obs[0]
+        e0_rew = mb_rewards[0]
         e0_dones = mb_dones[0]
         assert_equal(e0_obs.shape, (self.nsteps, 84, 84, 4))
+        assert_equal(e0_rew.shape, (self.nsteps, ))
         assert_equal(e0_dones.shape, (self.nsteps, ))
 
         for step in range(self.nsteps):
             if len(self.segment) == 25:
                 self.seg_pipe.put(self.segment)
-                self.segment = []
+                self.segment = Segment()
                 continue
             elif e0_dones[step]:
                 # The last segment will probably not be 25 steps long;
                 # drop it, so that all segments in the batch are the same
                 # length
-                self.segment = []
+                self.segment = Segment()
                 continue
-            self.segment.append(e0_obs[step])
+            self.segment.append(e0_obs[step], e0_rew[step])
 
     def run(self):
         nenvs = len(self.env.remotes)
@@ -237,7 +240,7 @@ class Runner(object):
 
         # Generate segments
         if self.gen_segs:
-            self.gen_segments(mb_obs, mb_dones)
+            self.gen_segments(mb_obs, mb_rewards, mb_dones)
 
         # Log true rewards
         for env_n, (rs, dones) in enumerate(zip(mb_rewards, mb_dones)):

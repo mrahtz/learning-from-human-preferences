@@ -9,7 +9,6 @@ import numpy as np
 import pyglet
 from numpy.testing import assert_equal
 
-from dot_utils import predict_action_preference
 from reward_predictor import RewardPredictorEnsemble
 from scipy.ndimage import zoom
 
@@ -67,8 +66,8 @@ class PrefInterface:
         s1s = []
         s2s = []
         for i1, i2 in pair_idxs:
-            s1s.append(segments[i1])
-            s2s.append(segments[i2])
+            s1s.append(segments[i1].frames)
+            s2s.append(segments[i2].frames)
         pair_preds = self.reward_model.preferences(s1s, s2s)
         pair_preds = np.array(pair_preds)
         n_preds = self.reward_model.n_preds
@@ -178,10 +177,20 @@ class PrefInterface:
                 pair_idxs = list(pair_idxs)
             (n1, n2), s1, s2 = self.get_seg_pair(segments, pair_idxs)
 
-            if self.synthetic_prefs:
-                pref = predict_action_preference(s1, s2)
+            if not self.synthetic_prefs:
+                pref = self.ask_user(s1.frames, s2.frames)
             else:
-                pref = self.ask_user(s1, s2)
+                if sum(s1.rewards) > sum(s2.rewards):
+                    pref = (1.0, 0.0)
+                elif sum(s1.rewards) < sum(s2.rewards):
+                    pref = (0.0, 1.0)
+                else:
+                    pref = (0.5, 0.5)
+
+            # We don't need the rewards from this point on
+            s1 = s1.frames
+            s2 = s2.frames
+
             pref_pipe.put((s1, s2, pref))
             tested_idxs.add((n1, n2))
 

@@ -35,7 +35,20 @@ class RunningStat(object):
     @property
     def shape(self):
         return self._M.shape
-    
+
+
+class Segment:
+    def __init__(self):
+        self.frames = []
+        self.rewards = []
+
+    def append(self, frame, reward):
+        self.frames.append(frame)
+        self.rewards.append(reward)
+
+    def __len__(self):
+        return len(self.frames)
+
 
 class PrefDB:
     def __init__(self):
