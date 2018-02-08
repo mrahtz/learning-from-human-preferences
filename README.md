@@ -21,7 +21,14 @@ In progress.
 
 ![](images/dot.gif)
 
+* 08/02/2018: Discovered what a difference normalisation of observations makes.
+  Consistent success training the dot agent using regular A2C.
+
+![](images/inverted_success.gif)
+
 Future targets:
+* Successfully train dot agent to move to center using human-generated
+  preferences
 * Implement remaining details (human error-adjusted softmax, label rate decay, etc.)
 * Final goal: reproduce Enduro behaviour from <https://blog.openai.com/deep-reinforcement-learning-from-human-preferences/>
 
