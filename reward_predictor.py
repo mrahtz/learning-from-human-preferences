@@ -373,8 +373,9 @@ class RewardPredictorEnsemble:
             for i in range(n_preds):
                 with tf.device(device_setter):
                     with tf.variable_scope("pred_%d" % i):
+                        batchnorm = params.params['batchnorm']
                         rp = RewardPredictor(
-                            dropout=dropout, batchnorm=True, lr=lr)
+                            dropout=dropout, batchnorm=batchnorm, lr=lr)
                 reward_ops.append(rp.r1)
                 pred_ops.append(rp.pred)
                 train_ops.append(rp.train)

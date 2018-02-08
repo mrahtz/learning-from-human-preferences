@@ -73,7 +73,8 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     # TensorFlow, because it needs to spawn a GUI process (using fork()),
     # and the Objective C APIs (invoked when dealing with GUI stuff) aren't
     # happy if running in a processed forked from a multithreaded parent.
-    pi = PrefInterface(headless)
+    synthetic_prefs = headless
+    pi = PrefInterface(headless, synthetic_prefs)
 
     def ps():
         RewardPredictorEnsemble('ps')
@@ -180,6 +181,7 @@ def main():
     parser.add_argument('--log_dir')
     parser.add_argument('--orig_rewards', action='store_true')
     parser.add_argument('--skip_prefs', action='store_true')
+    parser.add_argument('--batchnorm', action='store_true')
     args = parser.parse_args()
 
     params.init_params()
@@ -195,6 +197,7 @@ def main():
     params.params['env'] = args.env
     params.params['orig_rewards'] = args.orig_rewards
     params.params['skip_prefs'] = args.skip_prefs
+    params.params['batchnorm'] = args.batchnorm
 
     if args.test_mode:
         print("=== WARNING: running in test mode", file=sys.stderr)

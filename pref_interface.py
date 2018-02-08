@@ -8,10 +8,10 @@ from multiprocessing import Process, Queue
 import numpy as np
 import pyglet
 from numpy.testing import assert_equal
-from scipy.ndimage import zoom
 
 from dot_utils import predict_action_preference
 from reward_predictor import RewardPredictorEnsemble
+from scipy.ndimage import zoom
 
 
 class Im(object):
@@ -50,10 +50,11 @@ class Im(object):
 
 class PrefInterface:
 
-    def __init__(self, headless):
+    def __init__(self, headless, synthetic_prefs=False):
         self.vid_q = Queue()
         if not headless:
             Process(target=vid_proc, args=(self.vid_q,), daemon=True).start()
+        self.synthetic_prefs = synthetic_prefs
 
     def get_seg_pair(self, segments, pair_idxs):
         """
@@ -177,7 +178,10 @@ class PrefInterface:
                 pair_idxs = list(pair_idxs)
             (n1, n2), s1, s2 = self.get_seg_pair(segments, pair_idxs)
 
-            pref = self.ask_user(s1, s2)
+            if self.synthetic_prefs:
+                pref = predict_action_preference(s1, s2)
+            else:
+                pref = self.ask_user(s1, s2)
             pref_pipe.put((s1, s2, pref))
             tested_idxs.add((n1, n2))
 
