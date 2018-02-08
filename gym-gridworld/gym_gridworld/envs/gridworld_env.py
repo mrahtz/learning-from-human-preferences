@@ -25,6 +25,7 @@ class GridWorldEnv(gym.Env):
         seed = None
         self.np_random, seed1 = seeding.np_random(seed)
         self.random_start = True
+        self.maxsteps = 1000
 
         self._reset()
 
@@ -62,7 +63,7 @@ class GridWorldEnv(gym.Env):
         ob = self._get_ob()
 
         self.steps += 1
-        if self.steps < 1000:
+        if self.steps < self.maxsteps:
             episode_over = False
         else:
             episode_over = True
