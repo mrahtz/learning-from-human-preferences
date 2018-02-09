@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
+"""
+Display examples of the specified preference database
+(with the less-preferred segment on the left,
+and the more-preferred segment on the right)
+(skipping over equally-preferred segments)
+"""
 
 import argparse
 import pickle
-from functools import cmp_to_key
 from multiprocessing import Process, Queue
 
 import numpy as np
@@ -22,52 +27,29 @@ with open(args.prefs, 'rb') as pkl_file:
     prefs = pickle.load(pkl_file)
     print("done!")
 
-prefs.prefs_dict = {}
 for k1, k2, mu in prefs.prefs:
-    prefs.prefs_dict[(k1, k2)] = mu
+    if mu == (0.5, 0.5):
+        continue
 
-
-def cmpf(k1, k2):
-    try:
-        pref = prefs.get_pref(k1, k2)
-    except KeyError:
-        return 0
-
-    if pref == (0.0, 1.0):
-        return -1
-    elif pref == (1.0, 0.0):
-        return +1
+    if mu == (0.0, 1.0):
+        s1 = np.array(prefs.segments[k1])
+        s2 = np.array(prefs.segments[k2])
+    elif mu == (1.0, 0.0):
+        s1 = np.array(prefs.segments[k2])
+        s2 = np.array(prefs.segments[k1])
     else:
-        return 0
+        raise Exception("Unexpected preference", mu)
 
-
-keys = list(prefs.segments.keys())
-keys.sort(key=cmp_to_key(cmpf))
-for k1, k2 in zip(keys[:-1], keys[1:]):
-    try:
-        prefs.get_pref(k1, k2)
-        print(prefs.prefs_dict[(k1, k2)])
-    except KeyError:
-        print("?")
-
-segments = [
-    prefs.segments[keys[i]]
-    for i in np.linspace(0, len(keys), endpoint=False, num=5, dtype=int)
-]
-segments = np.array(segments)
-
-vid = []
-border = np.ones((84, 10), dtype=np.uint8) * 128
-for t in range(len(segments[0])):
-    # Start with a frame of the leftmost video
-    frame = segments[0, t, :, :, 0]
-    for n in range(1, len(segments)):
-        # Stack frames from other videos to the right
-        f2 = segments[n, t, :, :, 0]
-        frame = np.hstack((frame, border, f2))
-    frame = zoom(frame, 2)
-    vid.append(frame)
-n_pause_frames = 10
-vid.extend([vid[-1]] * n_pause_frames)
-q.put(vid)
-input()
+    vid = []
+    border = np.ones((84, 10), dtype=np.uint8) * 128
+    for t in range(len(s1)):
+        # -1 => select the last frame in the 4-frame stack
+        f1 = s1[t, :, :, -1]
+        f2 = s2[t, :, :, -1]
+        frame = np.hstack((f1, border, f2))
+        frame = zoom(frame, 2)
+        vid.append(frame)
+    n_pause_frames = 10
+    vid.extend([vid[-1]] * n_pause_frames)
+    q.put(vid)
+    input()
