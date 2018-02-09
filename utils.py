@@ -55,7 +55,6 @@ class PrefDB:
         self.segments = {}
         self.seg_refs = {}
         self.prefs = []
-        self.prefs_dict = {}
 
     def append(self, s1, s2, mu):
         k1 = hash(np.array(s1).tostring())
@@ -71,8 +70,6 @@ class PrefDB:
         tup = (k1, k2, mu)
         self.prefs.append(tup)
 
-        self.prefs_dict[(k1, k2)] = mu
-
     def del_first(self):
         k1, k2, _ = self.prefs[0]
         for k in [k1, k2]:
@@ -82,16 +79,6 @@ class PrefDB:
             else:
                 self.seg_refs[k] -= 1
         del self.prefs[0]
-
-    def get_pref(self, k1, k2):
-        if (k1, k2) in self.prefs_dict:
-            return self.prefs_dict[(k1, k2)]
-        elif (k2, k1) in self.prefs_dict:
-            pref = self.prefs_dict[(k2, k1)]
-            pref = (pref[1], pref[0])
-            return pref
-        else:
-            raise KeyError((k1, k2))
 
     def __len__(self):
         return len(self.prefs)
