@@ -64,15 +64,10 @@ def dense_layer(x,
                 units,
                 name,
                 reuse,
-                batchnorm,
-                training=False,
                 activation=None):
     # TODO: L2 loss
 
     x = tf.layers.dense(x, units, activation=None, name=name, reuse=reuse)
-
-    if batchnorm:
-        x = tf.layers.batch_normalization(x, training=training)
 
     if activation == 'relu':
         x = tf.nn.leaky_relu(x, alpha=0.01)
@@ -146,8 +141,8 @@ def net_conv(s, batchnorm, dropout, training, reuse):
     w, h, c = x.get_shape()[1:]
     x = tf.reshape(x, [-1, int(w * h * c)])
 
-    x = dense_layer(x, 64, "d1", reuse, batchnorm=False, activation='relu')
-    x = dense_layer(x, 1,  "d2", reuse, batchnorm=False, activation='relu')
+    x = dense_layer(x, 64, "d1", reuse, activation='relu')
+    x = dense_layer(x, 1,  "d2", reuse, activation='relu')
     x = x[:, 0]
 
     return x
