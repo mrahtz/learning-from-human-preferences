@@ -76,11 +76,22 @@ def dense_layer(x,
 
     return x
 
+def get_position(s):
+    # s is (?, 84, 84, 4)
+    s = s[..., -1]  # select last frame; now (?, 84, 84)
+
+    x = tf.reduce_sum(s, axis=1)  # now (?, 84)
+    x = tf.argmax(x, axis=1)
+
+    y = tf.reduce_sum(s, axis=2)
+    y = tf.argmax(y, axis=1)
+    
+    return x, y
+
 
 def net_handcrafted(s):
+    xc, yc = get_position(s)
     a = s[:, 0, 0, -1] - 100
-    xc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 1), 1), tf.float32)
-    yc = tf.cast(tf.reduce_max(tf.argmin(s[..., -1], 2), 1), tf.float32)
 
     c1 = tf.sign(42 - xc)  # a = 1
     c2 = tf.sign(42 - yc)  # a = 2
