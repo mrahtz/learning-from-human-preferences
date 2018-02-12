@@ -98,10 +98,10 @@ def net_handcrafted(s):
     a3 = tf.cast(tf.equal(a, 3), tf.int64)
     a4 = tf.cast(tf.equal(a, 4), tf.int64)
 
-    c1 = tf.sign(42 - yc)  # a = 1 (down)
-    c2 = tf.sign(42 - xc)  # a = 2 (right)
-    c3 = tf.sign(yc - 42)  # a = 3 (up)
-    c4 = tf.sign(xc - 42)  # a = 4 (left)
+    c1 = tf.sign(41 - yc)  # a = 1 (down)
+    c2 = tf.sign(41 - xc)  # a = 2 (right)
+    c3 = tf.sign(yc - 43)  # a = 3 (up)
+    c4 = tf.sign(xc - 43)  # a = 4 (left)
 
     r = a1 * c1 + \
         a2 * c2 + \
