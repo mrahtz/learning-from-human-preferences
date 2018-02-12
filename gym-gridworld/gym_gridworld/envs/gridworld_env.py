@@ -13,7 +13,7 @@ class GridWorldEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self):
-        self.size = [5, 5]
+        self.size = [2, 2]
         self.observation_space = spaces.Box(low=0,
                                             high=255,
                                             shape=(210, 160, 3))
@@ -38,7 +38,7 @@ class GridWorldEnv(gym.Env):
         y = self.pos[1]
         w = self.size[0]
         h = self.size[1]
-        ob[y:y+h-1, x:x+w-1, :] = 255
+        ob[y-h:y+h, x-h:x+h, :] = 255
         return ob
 
     def _step(self, action):
@@ -57,8 +57,8 @@ class GridWorldEnv(gym.Env):
             self.pos[1] -= 1
         elif action == 4:
             self.pos[0] -= 1
-        self.pos[0] = np.clip(self.pos[0], 0, 160 - self.size[0])
-        self.pos[1] = np.clip(self.pos[1], 0, 210 - self.size[1])
+        self.pos[0] = np.clip(self.pos[0], self.size[0], 159 - self.size[0])
+        self.pos[1] = np.clip(self.pos[1], self.size[1], 209 - self.size[1])
 
         ob = self._get_ob()
 
