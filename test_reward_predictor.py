@@ -7,9 +7,9 @@ from multiprocessing import Process
 import numpy as np
 
 import gym
-import gym_gridworld
+import gym_gridworld  # noqa: F401 (imported but unused)
 import params
-from baselines.common.atari_wrappers import wrap_deepmind
+from baselines.common.atari_wrappers import wrap_deepmind_nomax
 from reward_predictor import RewardPredictorEnsemble
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
@@ -21,22 +21,16 @@ def update_obs(obs, raw_obs, nc):
     return obs
 
 
-def rew(env):
-    middle = np.array([160/2, 210/2])
-    d = np.linalg.norm(env.unwrapped.pos - middle)
-    return -d
-
-
 def f(cluster_dict, rp_ckpt_dir):
     RewardPredictorEnsemble(
         name='ps',
         cluster_dict=cluster_dict,
-        load_network=True,
+        load_network=False,
         rp_ckpt_dir=rp_ckpt_dir)
 
 
 def test(rp):
-    env = wrap_deepmind(gym.make("GridWorldNoFrameskip-v4"))
+    env = wrap_deepmind_nomax(gym.make("GridWorldNoFrameskip-v4"))
     nh, nw, nc = env.observation_space.shape
     nenvs = 1
     nstack = 4
@@ -56,6 +50,7 @@ def test(rp):
             raw_obs, r, done, _ = env.step(action)
             rs.append(r)
             obs = update_obs(obs, raw_obs, nc)
+            obs[:, 0, 0, -1] = 100 + action
             obss.append(np.copy(obs[0]))
             n_steps += 1
 
@@ -76,7 +71,8 @@ def main():
 
     params.init_params()
     params.params['debug'] = False
-    params.params['network'] = 'onelayer'
+    params.params['network'] = 'handcrafted'
+    params.params['batchnorm'] = False
 
     cluster_dict = {
             'ps': ['localhost:2200'],
@@ -86,7 +82,7 @@ def main():
     rp = RewardPredictorEnsemble(
         name='train_reward',
         cluster_dict=cluster_dict,
-        load_network=True,
+        load_network=False,
         rp_ckpt_dir=args.ckpt)
     print(test(rp))
 

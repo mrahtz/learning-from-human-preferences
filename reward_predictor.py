@@ -93,19 +93,38 @@ def net_handcrafted(s):
     xc, yc = get_position(s)
     a = s[:, 0, 0, -1] - 100
 
-    c1 = tf.sign(42 - xc)  # a = 1
-    c2 = tf.sign(42 - yc)  # a = 2
-    c3 = tf.sign(xc - 42)  # a = 3
-    c4 = tf.sign(yc - 42)  # a = 4
+    a1 = tf.cast(tf.equal(a, 1), tf.int64)
+    a2 = tf.cast(tf.equal(a, 2), tf.int64)
+    a3 = tf.cast(tf.equal(a, 3), tf.int64)
+    a4 = tf.cast(tf.equal(a, 4), tf.int64)
 
-    x = tf.cast(tf.equal(a, 1), tf.float32) * c1 + \
-        tf.cast(tf.equal(a, 2), tf.float32) * c2 + \
-        tf.cast(tf.equal(a, 3), tf.float32) * c3 + \
-        tf.cast(tf.equal(a, 4), tf.float32) * c4
+    c1 = tf.sign(42 - yc)  # a = 1 (down)
+    c2 = tf.sign(42 - xc)  # a = 2 (right)
+    c3 = tf.sign(yc - 42)  # a = 3 (up)
+    c4 = tf.sign(xc - 42)  # a = 4 (left)
 
-    x += 0 * tf.Variable(0.0)  # so that we have something trainable
+    r = a1 * c1 + \
+        a2 * c2 + \
+        a3 * c3 + \
+        a4 * c4
 
-    return x
+    c5 = tf.cast(tf.equal(xc, 0), tf.int64)
+    c7 = tf.cast(tf.equal(yc, 0), tf.int64)
+    # When the dot is right at the edge, it registers as about 82
+    c6 = tf.cast(xc >= 82, tf.int64)
+    c8 = tf.cast(yc >= 82, tf.int64)
+
+    against_wall = a1 * c8 + \
+                   a2 * c6 + \
+                   a3 * c7 + \
+                   a4 * c5
+
+    r *= 1 - against_wall
+
+    # so that we have something trainable
+    r = tf.cast(r, tf.float32) + 0.0 * tf.Variable(0.0)  
+
+    return r
 
 
 def net_easyfeatures(s):
