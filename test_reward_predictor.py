@@ -44,7 +44,7 @@ def test(rp):
     for i in range(10):
         print("Run {}:".format(i))
         obs = np.zeros((nenvs, nh, nw, nc*nstack), dtype=np.uint8)
-        raw_obs = env.reset()[0]
+        raw_obs = env.reset()
         obs = update_obs(obs, raw_obs, nc)
         done = False
         n_steps = 0
