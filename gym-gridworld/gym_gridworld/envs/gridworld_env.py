@@ -68,7 +68,6 @@ class GridWorldEnv(gym.Env):
         else:
             episode_over = True
 
-        
         dist1 = np.linalg.norm(self.prev_pos - self.centre)
         dist2 = np.linalg.norm(self.pos - self.centre)
         if dist2 < dist1:
