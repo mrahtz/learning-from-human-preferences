@@ -531,14 +531,11 @@ class RewardPredictorEnsemble:
         ensemble_rs = np.array(ensemble_rs).transpose()
         # now n_steps x n_preds
 
-        # TODO re-enable this!
-        """
         for ensemble_rs_step in ensemble_rs:
             self.r_norm.push(ensemble_rs_step)
         ensemble_rs -= self.r_norm.mean
         ensemble_rs /= (self.r_norm.std + 1e-12)
         ensemble_rs *= 0.05
-        """
 
         ensemble_rs = ensemble_rs.transpose()
         # now n_preds x n_steps again
