@@ -252,6 +252,10 @@ class TestRewardPredictor(unittest.TestCase):
         assert_approx_equal(accuracy_actual, accuracy_expected)
 
     def test_handcrafted(self):
+        """
+        Test whether the handcrafted reward function can extract the position
+        of the dot correctly
+        """
         env = wrap_deepmind_nomax(gym.make('GridWorldNoFrameskip-v4'))
 
         nh, nw, nc = env.observation_space.shape
