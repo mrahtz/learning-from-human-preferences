@@ -720,7 +720,7 @@ class RewardPredictor:
         # Prevent tf.nn.softmax_cross_entropy_with_logits_v2 from propagating
         # gradients into labels
         _mu = tf.stop_gradient(mu)
-        _loss = tf.nn.softmax_cross_entropy_with_logits_v2(
+        _loss = tf.nn.softmax_cross_entropy_with_logits(
             labels=_mu, logits=rs)
         # Shape should be 'batch size'
         c1 = tf.assert_rank(_loss, 1)
