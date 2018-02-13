@@ -131,9 +131,15 @@ def net_handcrafted(s):
 
 def net_easyfeatures(s, reuse):
     a = s[:, 0, 0, -1] - 100
+    a = tf.cast(a, tf.float32) / 4.0
+
     xc, yc = get_position(s)
+    xc = tf.cast(xc, tf.float32) / 83.0
+    yc = tf.cast(yc, tf.float32) / 83.0
 
     features = [a, xc, yc]
+    x = tf.stack(features, axis=1)
+
     x = dense_layer(x, 64, "d1", reuse, activation='relu')
     x = dense_layer(x, 1, "d2", reuse, activation=None)
     x = x[:, 0]
