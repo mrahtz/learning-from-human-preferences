@@ -69,7 +69,9 @@ def dense_layer(x,
 
     x = tf.layers.dense(x, units, activation=None, name=name, reuse=reuse)
 
-    if activation == 'relu':
+    if activation is None:
+        pass
+    elif activation == 'relu':
         x = tf.nn.leaky_relu(x, alpha=0.01)
     else:
         raise Exception("Unknown activation for dense_layer", activation)
@@ -172,7 +174,7 @@ def net_conv(s, batchnorm, dropout, training, reuse):
     x = tf.reshape(x, [-1, int(w * h * c)])
 
     x = dense_layer(x, 64, "d1", reuse, activation='relu')
-    x = dense_layer(x, 1,  "d2", reuse, activation='relu')
+    x = dense_layer(x, 1,  "d2", reuse, activation=None)
     x = x[:, 0]
 
     return x
