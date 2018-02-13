@@ -26,9 +26,14 @@ In progress.
 
 ![](images/inverted_success.gif)
 
-* 13/02/2018: Successful training of the dot agent using a synthetic reward signal.
+* 12/02/2018: Successful training of the dot agent using a synthetic reward signal.
 
 ![](images/inverted_trained.gif)
+
+* 13/02/2018: Successful training of the dat agaent using synthetic
+
+![](images/dot_success.gif)
+  preferences!
 
 Future targets:
 * Successfully train dot agent to move to center using human-generated
