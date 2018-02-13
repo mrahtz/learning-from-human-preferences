@@ -30,10 +30,9 @@ In progress.
 
 ![](images/inverted_trained.gif)
 
-* 13/02/2018: Successful training of the dat agaent using synthetic
+* 13/02/2018: Successful training of the dat agaent using synthetic preferences!
 
 ![](images/dot_success.gif)
-  preferences!
 
 Future targets:
 * Successfully train dot agent to move to center using human-generated
