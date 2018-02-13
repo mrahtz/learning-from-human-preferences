@@ -22,9 +22,13 @@ In progress.
 ![](images/dot.gif)
 
 * 08/02/2018: Discovered what a difference normalisation of observations makes.
-  Consistent success training the dot agent using regular A2C.
+  Consistent success training the dot agent using regular A2C and original reward signal.
 
 ![](images/inverted_success.gif)
+
+* 13/02/2018: Successful training of the dot agent using a synthetic reward signal.
+
+![](images/inverted_trained.gif)
 
 Future targets:
 * Successfully train dot agent to move to center using human-generated
