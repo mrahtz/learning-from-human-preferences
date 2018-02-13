@@ -30,13 +30,11 @@ In progress.
 
 ![](images/inverted_trained.gif)
 
-* 13/02/2018: Successful training of the dat agaent using synthetic preferences!
+* 13/02/2018: Successful training of the dot agent using synthetic preferences!
 
 ![](images/dot_success.gif)
 
 Future targets:
-* Successfully train dot agent to move to center using human-generated
-  preferences
 * Implement remaining details (human error-adjusted softmax, label rate decay, etc.)
 * Final goal: reproduce Enduro behaviour from <https://blog.openai.com/deep-reinforcement-learning-from-human-preferences/>
 
