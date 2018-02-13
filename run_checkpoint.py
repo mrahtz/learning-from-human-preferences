@@ -23,7 +23,7 @@ def main():
     args = parser.parse_args()
 
     env = wrap_deepmind_nomax(gym.make("GridWorldNoFrameskip-v4"))
-    env.unwrapped.maxsteps = 300
+    env.unwrapped.maxsteps = 500
 
     with open(args.model, 'rb') as fh:
         make_model = cloudpickle.loads(fh.read())
