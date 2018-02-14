@@ -404,10 +404,6 @@ class RewardPredictorEnsemble:
                 rps.append(rp)
 
             self.mean_loss = tf.reduce_mean(loss_ops)
-            # TODO: this probably isn't representative of the accuracy of the
-            # ensemble as a whole; the ensemble's predictions are arrived at
-            # by voting, whereas this just takes the mean of the accuracies
-            # of each ensemble member individually
             self.mean_accuracy = tf.reduce_mean(acc_ops)
 
             self.saver = tf.train.Saver(max_to_keep=1)
