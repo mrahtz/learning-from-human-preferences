@@ -418,7 +418,7 @@ class RewardPredictorEnsemble:
                     time.sleep(1.0)
             else:
                 if load_network:
-                    # TODO fix
+                    # TODO change the name of this to be clear we expect a file
                     ckpt_f = rp_ckpt_dir
                     print("Loading reward predictor checkpoint from", ckpt_f)
                     self.saver.restore(sess, ckpt_f)
@@ -453,8 +453,8 @@ class RewardPredictorEnsemble:
 
     def raw_rewards(self, obs):
         """
-        Return reward for each frame, returned directly from each member
-        of the ensemble (before any normalization or averaging has taken place)
+        Return (unnormalized) reward for each frame from each member of the
+        ensemble.
         """
         n_steps = obs.shape[0]
         assert_equal(obs.shape, (n_steps, 84, 84, 4))
@@ -462,55 +462,48 @@ class RewardPredictorEnsemble:
         feed_dict = {}
         for rp in self.rps:
             feed_dict[rp.training] = False
+            # reward_ops corresponds to the rewards calculated from the
+            # s1 input
             feed_dict[rp.s1] = [obs]
         # This will return nested lists of sizes n_preds x 1 x nsteps
         # (x 1 because of the batch size of 1)
         rs = self.sess.run(self.reward_ops, feed_dict)
+        rs = np.array(rs)
         # Get rid of the extra x 1 dimension
-        for i in range(len(rs)):
-            rs[i] = rs[i][0]
-
-        # Final shape should be 'n_preds x n_steps'
-        assert_equal(len(rs), len(self.rps))
-        assert_equal(len(rs[0]), n_steps)
-
-        return rs
-
-    def reward_unnormalized(self, obs):
-        """
-        Return reward for each frame, averaged over all ensemble members.
-        """
-        n_steps = obs.shape[0]
-        assert_equal(obs.shape, (n_steps, 84, 84, 4))
-        rs = self.raw_rewards(obs)
-        # Shape should be 'n_preds x n_steps'
-        assert_equal(len(rs), len(self.rps))
-        assert_equal(len(rs[0]), n_steps)
-
-        rs = np.mean(rs, axis=0)
-        assert_equal(rs.shape, (n_steps, ))
+        rs = rs[:, 0, :]
+        assert_equal(rs.shape, (self.n_preds, n_steps))
 
         return rs
 
     def reward(self, obs):
         """
-        Return reward for each frame, normalized to have zero mean and constant
-        standard deviation separately for each member of the ensemble, then
-        averaged across all members of the ensemble.
+        Return (normalized) reward for each frame.
+
+        (Normalization involves normalizing the rewards from each member of the
+        ensemble separately (zero mean and constant standard deviation), then
+        averaging the resulting rewards across all ensemble members.)
         """
         n_steps = obs.shape[0]
         assert_equal(obs.shape, (n_steps, 84, 84, 4))
+
+        # Get unnormalized rewards
 
         ensemble_rs = self.raw_rewards(obs)
         # Shape should be 'n_preds x n_steps'
         assert_equal(len(ensemble_rs), len(self.rps))
         assert_equal(len(ensemble_rs[0]), n_steps)
-
         if params.params['debug']:
-            print("Raw rewards:", ensemble_rs)
+            print("Unnormalized rewards:", ensemble_rs)
 
-        # TODO: I'm assuming that normalization is only applied
-        # to the rewards fed to the policy network
+        # Normalize rewards
+
+        # Note that we don't just implement reward normalization in the network
+        # graph itself because:
+        # * It's simpler not to do it in TensorFlow
+        # * Preference calculation doesn't need normalized rewards. Only
+        #   rewards sent to the the RL algorithm need to be normalized.
+        #   So we can save on computation.
+
         # Page 4:
         # "We normalized the rewards produced by r^ to have zero mean and
         #  constant standard deviation."
@@ -522,31 +515,27 @@ class RewardPredictorEnsemble:
         # "The estimate r^ is defined by independently normalizing each of
         #  these predictors..."
 
-        # ensemble_rs is n_preds x n_steps
-        ensemble_rs = np.array(ensemble_rs).transpose()
-        # now n_steps x n_preds
-
+        # We want to keep track of running mean/stddev for each member of the
+        # ensemble separately, so we have to be a little careful here.
+        assert_equal(ensemble_rs.shape, (self.n_preds, n_steps))
+        ensemble_rs = ensemble_rs.transpose()
+        assert_equal(ensemble_rs.shape, (n_steps, self.n_preds))
         for ensemble_rs_step in ensemble_rs:
             self.r_norm.push(ensemble_rs_step)
         ensemble_rs -= self.r_norm.mean
         ensemble_rs /= (self.r_norm.std + 1e-12)
         ensemble_rs *= 0.05
-
         ensemble_rs = ensemble_rs.transpose()
-        # now n_preds x n_steps again
-
+        assert_equal(ensemble_rs.shape, (self.n_preds, n_steps))
         if params.params['debug']:
             print("Reward mean/stddev:", self.r_norm.mean, self.r_norm.std)
-            print("Ensemble rewards post-normalisation:", ensemble_rs)
-
-        assert_equal(len(ensemble_rs), len(self.rps))
-        assert_equal(len(ensemble_rs[0]), n_steps)
+            print("Normalized rewards:", ensemble_rs)
 
         # "...and then averaging the results."
         rs = np.mean(ensemble_rs, axis=0)
         assert_equal(rs.shape, (n_steps, ))
         if params.params['debug']:
-            print("Sending back rewards", rs)
+            print("After ensemble averaging:", rs)
 
         return rs
 
@@ -726,7 +715,7 @@ class RewardPredictor:
         with tf.control_dependencies(update_ops):
             train = tf.train.AdamOptimizer(learning_rate=lr).minimize(loss)
 
-        # TODO
+        # TODO (L2 loss)
         """
         reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
         reg_loss = tf.add_n(reg_losses)
