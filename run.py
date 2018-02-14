@@ -182,6 +182,7 @@ def main():
     parser.add_argument('--orig_rewards', action='store_true')
     parser.add_argument('--skip_prefs', action='store_true')
     parser.add_argument('--batchnorm', action='store_true')
+    parser.add_argument('--dropout', type=float, default=0.5)
     args = parser.parse_args()
 
     params.init_params()
@@ -198,6 +199,7 @@ def main():
     params.params['orig_rewards'] = args.orig_rewards
     params.params['skip_prefs'] = args.skip_prefs
     params.params['batchnorm'] = args.batchnorm
+    params.params['dropout'] = args.dropout
 
     if args.test_mode:
         print("=== WARNING: running in test mode", file=sys.stderr)

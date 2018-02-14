@@ -156,6 +156,11 @@ def net_conv(s, batchnorm, dropout, training, reuse):
     # nonlinearities (α = 0.01). This is followed by a fully connected layer of
     # size 64 and then a scalar output. All convolutional layers use batch norm
     # and dropout with α = 0.5 to prevent predictor overfitting"
+    if params.params['debug']:
+        print("Creating reward predictor network with parameters:")
+        print("Dropout: {}".format(dropout))
+        print("Batchnorm: '{}'".format(batchnorm))
+
     x = tf.cast(s, tf.float32) / 255.0
 
     x = conv_layer(x, 16, 7, 3, batchnorm, training, "c1", reuse, 'relu')
@@ -390,11 +395,13 @@ class RewardPredictorEnsemble:
             ps_device="/job:ps/task:0",
             worker_device="/job:{}/task:0".format(name))
 
+        # TODO pass these instead of getting them from global params
+        batchnorm = params.params['batchnorm']
+        dropout = params.params['dropout']
         with graph.as_default():
             for i in range(n_preds):
                 with tf.device(device_setter):
                     with tf.variable_scope("pred_%d" % i):
-                        batchnorm = params.params['batchnorm']
                         rp = RewardPredictor(
                             dropout=dropout, batchnorm=batchnorm, lr=lr)
                 reward_ops.append(rp.r1)
