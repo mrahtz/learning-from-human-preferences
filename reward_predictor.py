@@ -205,27 +205,19 @@ def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
             break
 
         if np.random.rand() < VAL_FRACTION:
-            print("Sending pref to val")
             pref_db_val.append(s1, s2, mu)
-            print("Val len is now {}".format(len(pref_db_val)))
         else:
-            print("Sending pref to train")
             pref_db_train.append(s1, s2, mu)
-            print("Train len is now {}".format(len(pref_db_train)))
 
         if len(pref_db_val) > db_max * VAL_FRACTION:
-            print("Val database limit reached; dropping first preference")
             pref_db_val.del_first()
         assert len(pref_db_val) <= db_max * VAL_FRACTION
-        print("pref_db_val len:", len(pref_db_val))
 
         if len(pref_db_train) > db_max * (1 - VAL_FRACTION):
-            print("Train database limit reached; dropping first preference")
             pref_db_train.del_first()
         assert len(pref_db_train) <= db_max * (1 - VAL_FRACTION)
-        print("pref_db_train len:", len(pref_db_train))
     if params.params['debug']:
-        print("%d preferences received" % n_recvd)
+        print("{} preferences received".format(n_recvd))
 
 
 def save_prefs(log_dir, name, pref_db_train, pref_db_val):
