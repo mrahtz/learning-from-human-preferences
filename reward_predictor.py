@@ -357,7 +357,6 @@ class RewardPredictorEnsemble:
                  lr=1e-4,
                  log_dir='/tmp',
                  cluster_dict=None,
-                 n_preds=1,
                  load_network=False,
                  rp_ckpt_dir=None,
                  dropout=0.5):
@@ -390,6 +389,7 @@ class RewardPredictorEnsemble:
         # TODO pass these instead of getting them from global params
         batchnorm = params.params['batchnorm']
         dropout = params.params['dropout']
+        n_preds = params.params['n_preds']
         with graph.as_default():
             for i in range(n_preds):
                 with tf.device(device_setter):
