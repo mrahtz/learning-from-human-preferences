@@ -112,6 +112,7 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
 
     if not params.params['orig_rewards']:
         train_proc.start()
+        pi.run(seg_pipe, pref_pipe, segs_max)
     else:
         go_pipe.put(True)
     """
@@ -126,8 +127,6 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     Process(target=profile,
             args=('interface', -1), daemon=True).start()
     """
-
-    pi.run(seg_pipe, pref_pipe, segs_max)
 
     while True:
         import time
