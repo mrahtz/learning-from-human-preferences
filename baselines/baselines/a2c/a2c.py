@@ -128,8 +128,7 @@ class Runner(object):
                  nsteps=5,
                  nstack=4,
                  gamma=0.99,
-                 orig_rewards=False,
-                 gen_segs=True):
+                 orig_rewards=False):
         self.env = env
         self.model = model
         nh, nw, nc = env.observation_space.shape
@@ -150,7 +149,6 @@ class Runner(object):
             from reward_predictor import RewardPredictorEnsemble
             self.reward_model = RewardPredictorEnsemble('a2c')
         self.orig_rewards = orig_rewards
-        self.gen_segs = gen_segs
 
         self.n_episodes = [0 for _ in range(nenv)]
         self.true_reward = [0 for _ in range(nenv)]
@@ -238,10 +236,6 @@ class Runner(object):
         # before we'd actually run any steps, so drop it.
         mb_dones = mb_dones[:, 1:]
 
-        # Generate segments
-        if self.gen_segs:
-            self.gen_segments(mb_obs, mb_rewards, mb_dones)
-
         # Log true rewards
         for env_n, (rs, dones) in enumerate(zip(mb_rewards, mb_dones)):
             assert_equal(rs.shape, (self.nsteps, ))
@@ -258,6 +252,10 @@ class Runner(object):
                     self.writer.add_summary(summ, self.n_episodes[env_n])
                     self.true_reward[env_n] = 0
                     self.n_episodes[env_n] += 1
+
+        # Generate segments
+        if not self.orig_rewards:
+            self.gen_segments(mb_obs, mb_rewards, mb_dones)
 
         # Replace rewards with those from reward predictor
         if run_params.params['debug']:
@@ -325,8 +323,7 @@ def learn(policy,
           log_interval=100,
           load_path=None,
           save_interval=10000,
-          orig_rewards=False,
-          gen_segs=True):
+          orig_rewards=False):
 
     tf.reset_default_graph()
     set_global_seeds(seed)
@@ -378,8 +375,7 @@ def learn(policy,
         nsteps=nsteps,
         nstack=nstack,
         gamma=gamma,
-        orig_rewards=orig_rewards,
-        gen_segs=gen_segs)
+        orig_rewards=orig_rewards)
 
     print("Running...")
 
