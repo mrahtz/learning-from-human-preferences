@@ -147,7 +147,7 @@ def main():
         '--lrschedule',
         help='Learning rate schedule',
         choices=['constant', 'linear'],
-        default='linear')
+        default='constant')
     parser.add_argument('--lr', type=float, default=7e-4)
     parser.add_argument('--rp_lr', type=float, default=2e-4)
     parser.add_argument(
@@ -155,7 +155,7 @@ def main():
         help='How many frames to train (/ 1e6). '
         'This number gets divided by 4 due to frameskip',
         type=int,
-        default=80)
+        default=40)
     parser.add_argument('--n_envs', type=int, default=1)
     parser.add_argument('--rp_ckpt_dir')
     parser.add_argument('--load_prefs_dir')
