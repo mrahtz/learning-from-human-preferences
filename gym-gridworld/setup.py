@@ -1,6 +1,7 @@
 from setuptools import setup
 
 setup(name='gym_gridworld',
-      version='0.0.1',
+      version='1.0',
+      packages=['gym_gridworld'],
       install_requires=['gym', 'numpy']
 )
