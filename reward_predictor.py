@@ -156,10 +156,6 @@ def net_conv(s, batchnorm, dropout, training, reuse):
     # nonlinearities (α = 0.01). This is followed by a fully connected layer of
     # size 64 and then a scalar output. All convolutional layers use batch norm
     # and dropout with α = 0.5 to prevent predictor overfitting"
-    if params.params['debug']:
-        print("Creating reward predictor network with parameters:")
-        print("Dropout: {}".format(dropout))
-        print("Batchnorm: '{}'".format(batchnorm))
 
     x = tf.cast(s, tf.float32) / 255.0
 

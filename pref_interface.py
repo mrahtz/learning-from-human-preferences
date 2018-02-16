@@ -9,6 +9,7 @@ import numpy as np
 import pyglet
 from numpy.testing import assert_equal
 
+import params
 from reward_predictor import RewardPredictorEnsemble
 from scipy.ndimage import zoom
 
@@ -55,7 +56,7 @@ class PrefInterface:
             Process(target=vid_proc, args=(self.vid_q,), daemon=True).start()
         self.synthetic_prefs = synthetic_prefs
 
-    def get_seg_pair(self, segments, pair_idxs):
+    def least_certain_seg_pair(self, segments, pair_idxs):
         """
         - Calculate predicted preferences for every possible pair of segments
         - Calculate the pair with the highest uncertainty
@@ -169,13 +170,17 @@ class PrefInterface:
 
         while True:
             pair_idxs = []
+            # Get a list of all possible pairs of segments, then filter out the
+            # pairs we've already tested
             while len(pair_idxs) == 0:
                 self.recv_segments(segments, seg_pipe, segs_max)
                 idxs = self.sample_segments(segments)
                 pair_idxs = set(combinations(idxs, 2))
                 pair_idxs = pair_idxs - tested_idxs
                 pair_idxs = list(pair_idxs)
-            (n1, n2), s1, s2 = self.get_seg_pair(segments, pair_idxs)
+            (n1, n2), s1, s2 = self.least_certain_seg_pair(segments, pair_idxs)
+            if params.params['debug']:
+                print("Querying preference for segments", n1, "and", n2)
 
             if not self.synthetic_prefs:
                 pref = self.ask_user(s1.frames, s2.frames)
