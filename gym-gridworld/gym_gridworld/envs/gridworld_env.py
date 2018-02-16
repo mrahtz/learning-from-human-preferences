@@ -38,7 +38,7 @@ class GridWorldEnv(gym.Env):
         y = self.pos[1]
         w = self.size[0]
         h = self.size[1]
-        ob[y-h:y+h, x-h:x+h, :] = 255
+        ob[y-h:y+h, x-w:x+w, :] = 255
         return ob
 
     def _step(self, action):
