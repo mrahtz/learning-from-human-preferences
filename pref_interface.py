@@ -198,6 +198,7 @@ class PrefInterface:
 
             pref_pipe.put((s1, s2, pref))
             tested_idxs.add((n1, n2))
+            tested_idxs.add((n2, n1))
 
 
 def vid_proc(q):
