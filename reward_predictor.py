@@ -87,7 +87,7 @@ def get_position(s):
 
     y = tf.reduce_sum(s, axis=2)
     y = tf.argmax(y, axis=1)
-    
+
     return x, y
 
 
@@ -124,7 +124,7 @@ def net_handcrafted(s):
     r *= 1 - against_wall
 
     # so that we have something trainable
-    r = tf.cast(r, tf.float32) + 0.0 * tf.Variable(0.0)  
+    r = tf.cast(r, tf.float32) + 0.0 * tf.Variable(0.0)
 
     return r
 
@@ -399,8 +399,8 @@ class RewardPredictorEnsemble:
                 acc_ops.append(rp.accuracy)
                 rps.append(rp)
 
-            self.mean_loss = tf.reduce_mean(loss_ops)
-            self.mean_accuracy = tf.reduce_mean(acc_ops)
+            mean_loss = tf.reduce_mean(loss_ops)
+            mean_accuracy = tf.reduce_mean(acc_ops)
 
             self.saver = tf.train.Saver(max_to_keep=1)
             self.checkpoint_file = osp.join(log_dir, 'checkpoints',
@@ -425,11 +425,19 @@ class RewardPredictorEnsemble:
         if name == 'ps':
             server.join()
 
-        self.acc_summ = tf.summary.scalar('reward predictor accuracy',
-                                          self.mean_accuracy)
-        self.loss_summ = tf.summary.scalar('reward predictor loss',
-                                           self.mean_loss)
-        self.summaries = tf.summary.merge([self.acc_summ, self.loss_summ])
+        summary_ops = []
+        op = tf.summary.scalar('reward_predictor_accuracy_mean', mean_accuracy)
+        summary_ops.append(op)
+        op = tf.summary.scalar('reward_predictor_loss_mean', mean_loss)
+        summary_ops.append(op)
+        for i in range(n_preds):
+            name = 'reward_predictor_accuracy_{}'.format(i)
+            op = tf.summary.scalar(name, acc_ops[i])
+            summary_ops.append(op)
+            name = 'reward_predictor_loss_{}'.format(i)
+            op = tf.summary.scalar(name, loss_ops[i])
+            summary_ops.append(op)
+        self.summaries = tf.summary.merge(summary_ops)
 
         self.train_writer = tf.summary.FileWriter(
             osp.join(log_dir, 'reward_pred', 'train'), flush_secs=5)
@@ -553,7 +561,7 @@ class RewardPredictorEnsemble:
                                     self.n_steps)
         return ckpt_name
 
-    def train(self, prefs_train, prefs_val, test_interval=10):
+    def train(self, prefs_train, prefs_val, test_interval=2):
         """
         Train the ensemble for one full epoch
         """
@@ -562,8 +570,6 @@ class RewardPredictorEnsemble:
 
         for batch_n, batch in enumerate(
                 batch_iter(prefs_train.prefs, batch_size=32, shuffle=True)):
-            n_prefs = len(batch)
-            print("Batch %d: %d preferences" % (batch_n, n_prefs))
             # TODO: refactor this so that each can be taken directly from
             # pref_db
             s1s = []
@@ -583,13 +589,15 @@ class RewardPredictorEnsemble:
             summaries, _ = self.sess.run([self.summaries, self.train_ops],
                                          feed_dict)
             self.train_writer.add_summary(summaries, self.n_steps)
+            self.n_steps += 1
+            print("Trained reward predictor %d steps" % self.n_steps)
 
             if self.n_steps and self.n_steps % test_interval == 0:
                 if len(prefs_val) <= 32:
                     val_batch = prefs_val.prefs
                 else:
                     idxs = np.random.choice(
-                        len(prefs_val.prefs), 32, replace=True)
+                        len(prefs_val.prefs), 32, replace=False)
                     val_batch = []
                     for idx in idxs:
                         val_batch.append(prefs_val.prefs[idx])
@@ -607,16 +615,8 @@ class RewardPredictorEnsemble:
                     feed_dict[rp.mu] = mus
                     feed_dict[rp.training] = False
 
-                acc_summ, accuracies, losses = self.sess.run(
-                    [self.acc_summ, self.acc_ops, self.loss_ops], feed_dict)
-                if params.params['debug']:
-                    print("Accuracies:", accuracies)
-                    print("Losses:", losses)
-                self.test_writer.add_summary(acc_summ, self.n_steps)
-
-            print("Trained %d steps" % self.n_steps)
-
-            self.n_steps += 1
+                summaries = self.sess.run(self.summaries, feed_dict)
+                self.test_writer.add_summary(summaries, self.n_steps)
 
             if self.n_steps % params.params['ckpt_freq'] == 0:
                 print("=== Saving reward predictor checkpoint...")
