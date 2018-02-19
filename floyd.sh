@@ -14,9 +14,6 @@ cd gym-gridworld
 pip install .
 cd ..
 
-cd baselines
 pip install --upgrade cython cloudpickle
-pip install .
-cd ..
 
 $*
