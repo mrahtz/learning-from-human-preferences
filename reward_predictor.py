@@ -262,7 +262,7 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
     print("({} preferences over {} segments)".format(
         len(pref_db_train.prefs), len(pref_db_train.segments)))
 
-    if params.params['just_prefs']:
+    if params.params['just_prefs'] or params.params['save_initial_prefs']:
         save_prefs(log_dir, 'initial', pref_db_train, pref_db_val)
 
     if params.params['just_prefs']:

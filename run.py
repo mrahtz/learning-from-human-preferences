@@ -183,6 +183,7 @@ def main():
     parser.add_argument('--batchnorm', action='store_true')
     parser.add_argument('--dropout', type=float, default=0.5)
     parser.add_argument('--n_preds', type=int, default=1)
+    parser.add_argument('--save_initial_prefs', action='store_true')
     args = parser.parse_args()
 
     params.init_params()
@@ -201,6 +202,7 @@ def main():
     params.params['batchnorm'] = args.batchnorm
     params.params['dropout'] = args.dropout
     params.params['n_preds'] = args.n_preds
+    params.params['save_initial_prefs'] = args.save_initial_prefs
 
     if args.test_mode:
         print("=== WARNING: running in test mode", file=sys.stderr)
