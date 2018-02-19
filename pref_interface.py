@@ -112,14 +112,21 @@ class PrefInterface:
             if len(segments) > segs_max:
                 del segments[0]
 
-    def sample_segments(self, segments):
-        if len(segments) <= 10:
-            idxs = range(len(segments))
+    def sample_pair_idxs(self, segments, exclude_pairs):
+        # Page 14: "[We] draw a factor 10 more clip pair candidates than we
+        # ultimately present to the human."
+        possible_pairs = combinations(range(len(segments)), 2)
+        possible_pairs = list(set(possible_pairs) - set(exclude_pairs))
+
+        if len(possible_pairs) <= 10:
+            return possible_pairs
         else:
-            n_segs = len(segments)
-            idxs = np.random.choice(range(n_segs),
+            idxs = np.random.choice(range(len(possible_pairs)),
                                     size=10, replace=False)
-        return idxs
+            pairs = []
+            for i in idxs:
+                pairs.append(possible_pairs[i])
+            return pairs
 
     def ask_user(self, s1, s2):
         border = np.zeros((84, 10), dtype=np.uint8)
@@ -157,7 +164,7 @@ class PrefInterface:
         return pref
 
     def run(self, seg_pipe, pref_pipe, segs_max):
-        tested_idxs = set()
+        tested_pairs = []
         segments = []
         self.reward_model = RewardPredictorEnsemble('pref_interface')
 
@@ -169,16 +176,15 @@ class PrefInterface:
             time.sleep(1.0)
 
         while True:
-            pair_idxs = []
-            # Get a list of all possible pairs of segments, then filter out the
-            # pairs we've already tested
-            while len(pair_idxs) == 0:
-                self.recv_segments(segments, seg_pipe, segs_max)
-                idxs = self.sample_segments(segments)
-                pair_idxs = set(combinations(idxs, 2))
-                pair_idxs = pair_idxs - tested_idxs
-                pair_idxs = list(pair_idxs)
+            self.recv_segments(segments, seg_pipe, segs_max)
+            pair_idxs = self.sample_pair_idxs(segments,
+                                              exclude_pairs=tested_pairs)
+            if params.params['debug']:
+                print("Sampled segment pairs:")
+                print(pair_idxs)
+
             (n1, n2), s1, s2 = self.least_certain_seg_pair(segments, pair_idxs)
+
             if params.params['debug']:
                 print("Querying preference for segments", n1, "and", n2)
 
@@ -197,8 +203,8 @@ class PrefInterface:
             s2 = s2.frames
 
             pref_pipe.put((s1, s2, pref))
-            tested_idxs.add((n1, n2))
-            tested_idxs.add((n2, n1))
+            tested_pairs.append((n1, n2))
+            tested_pairs.append((n2, n1))
 
 
 def vid_proc(q):
