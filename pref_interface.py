@@ -176,9 +176,13 @@ class PrefInterface:
             time.sleep(1.0)
 
         while True:
-            self.recv_segments(segments, seg_pipe, segs_max)
-            pair_idxs = self.sample_pair_idxs(segments,
-                                              exclude_pairs=tested_pairs)
+            pair_idxs = []
+            # If we've tested all the possible pairs of segments so far,
+            # we might have to wait
+            while len(pair_idxs) == 0:
+                self.recv_segments(segments, seg_pipe, segs_max)
+                pair_idxs = self.sample_pair_idxs(segments,
+                                                  exclude_pairs=tested_pairs)
             if params.params['debug']:
                 print("Sampled segment pairs:")
                 print(pair_idxs)
