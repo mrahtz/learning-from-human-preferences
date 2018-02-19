@@ -363,7 +363,10 @@ def learn(policy,
         with open(osp.join(load_path, 'make_model.pkl'), 'rb') as fh:
             make_model = cloudpickle.loads(fh.read())
         model = make_model()
-        ckpt_file = glob.glob(osp.join(load_path, 'checkpoint*'))[0]
+        ckpts = glob.glob(osp.join(load_path, 'checkpoint*'))
+        last_ckpt_n = sorted([int(c.split('checkpoint')[1])
+                              for c in ckpts])[-1]
+        ckpt_file = osp.join(load_path, 'checkpoint{}'.format(last_ckpt_n))
         print("Loading policy checkpoint from {}...".format(ckpt_file))
         model.load(ckpt_file)
 
