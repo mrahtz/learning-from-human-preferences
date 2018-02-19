@@ -21,7 +21,7 @@ from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble, train_reward_predictor
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
-sys.path.insert(1, 'baselines')
+sys.path.insert(0, 'baselines')
 
 
 def configure_logger(log_dir):
