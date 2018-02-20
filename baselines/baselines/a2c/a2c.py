@@ -261,20 +261,16 @@ class Runner(object):
         if run_params.params['debug']:
             print("Original rewards:\n", mb_rewards)
         if not self.orig_rewards:
-            # for the data from each environment
             assert_equal(mb_obs.shape, (nenvs, self.nsteps, 84, 84, 4))
-            for env_n, obs in enumerate(mb_obs):
-                assert_equal(obs.shape, (self.nsteps, 84, 84, 4))
-                rewards = self.reward_model.reward(obs)
-                assert_equal(rewards.shape, (self.nsteps, ))
-                mb_rewards[env_n] = rewards
+            mb_obs_allenvs = mb_obs.reshape(nenvs * self.nsteps, 84, 84, 4)
 
-                if run_params.params['debug']:
-                    print("Env %d actions:\n" % env_n,
-                          [self.env.action_meanings[i]
-                           for i in mb_actions[env_n]])
+            rewards_allenvs = self.reward_model.reward(mb_obs_allenvs)
+            assert_equal(rewards_allenvs.shape, (nenvs * self.nsteps, ))
+            mb_rewards = rewards_allenvs.reshape(nenvs, self.nsteps)
+            assert_equal(mb_rewards.shape, (nenvs, self.nsteps))
+
             if run_params.params['debug']:
-                print("Modified rewards:\n", mb_rewards)
+                print("Predicted rewards:\n", mb_rewards)
 
         # Discount rewards
         mb_obs = mb_obs.reshape(self.batch_ob_shape)
