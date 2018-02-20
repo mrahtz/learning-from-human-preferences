@@ -14,6 +14,6 @@ cd gym-gridworld
 pip install .
 cd ..
 
-pip install --upgrade cython cloudpickle
+pip install --upgrade cython cloudpickle joblib azure==1.0.3 mpi4py
 
 $*
