@@ -175,7 +175,7 @@ def main():
     parser.add_argument('--just_prefs', action='store_true')
     parser.add_argument('--save_pretrain', action='store_true')
     parser.add_argument('--print_lr', action='store_true')
-    parser.add_argument('--n_initial_epochs', type=int, default=20)
+    parser.add_argument('--n_initial_epochs', type=int, default=200)
     parser.add_argument('--policy_ckpt_dir')
     parser.add_argument('--log_dir')
     parser.add_argument('--orig_rewards', action='store_true')
