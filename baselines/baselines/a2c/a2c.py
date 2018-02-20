@@ -360,6 +360,9 @@ def learn(policy,
     if load_path is None:
         model = make_model()
     else:
+        # TODO: this still doesn't seem to be loading the most recent
+        # checkpoint in FloydHub runs (e.g. 193). Not sure whether it's this code that's
+        # broken, or the way that baselines is loaded.
         with open(osp.join(load_path, 'make_model.pkl'), 'rb') as fh:
             make_model = cloudpickle.loads(fh.read())
         model = make_model()
