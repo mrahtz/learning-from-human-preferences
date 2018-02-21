@@ -20,9 +20,10 @@ def main():
     parser = argparse.ArgumentParser(description="Run a trained model.")
     parser.add_argument("model", help="e.g. LOG_DIR/make_model.pkl")
     parser.add_argument("checkpoint", help="e.g. LOG_DIR/checkpoint100000")
+    parser.add_argument("--env", default='GridWorldNoFrameskip-v4')
     args = parser.parse_args()
 
-    env = wrap_deepmind_nomax(gym.make("GridWorldNoFrameskip-v4"))
+    env = wrap_deepmind_nomax(gym.make(args.env))
     env.unwrapped.maxsteps = 500
 
     with open(args.model, 'rb') as fh:
