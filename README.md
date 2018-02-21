@@ -34,6 +34,10 @@ In progress.
 
 ![](images/dot_success.gif)
 
+* 21/02/2018: Successful training of Pong using synthetic preferences
+
+![](images/pong.gif)
+
 Future targets:
 * Implement remaining details (human error-adjusted softmax, label rate decay, etc.)
 * Final goal: reproduce Enduro behaviour from <https://blog.openai.com/deep-reinforcement-learning-from-human-preferences/>
