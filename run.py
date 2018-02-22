@@ -72,20 +72,35 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     else:
         raise Exception("Unknown policy {}".format(params.params['policy']))
 
-    # This has to be done here before any threads have been created by
-    # TensorFlow, because it needs to spawn a GUI process (using fork()),
-    # and the Objective C APIs (invoked when dealing with GUI stuff) aren't
-    # happy if running in a processed forked from a multithreaded parent.
-    synthetic_prefs = headless
-    pi = PrefInterface(headless, synthetic_prefs)
+    seg_pipe = Queue()
+    pref_pipe = Queue()
+    go_pipe = Queue(maxsize=1)
+
+    parts_to_run = ['a2c', 'pref_interface', 'train_reward']
+
+    if params.params['no_gather_prefs'] or params.params['orig_rewards']:
+        parts_to_run.remove('pref_interface')
+    if params.params['orig_rewards']:
+        parts_to_run.remove('train_reward')
+    if params.params['no_a2c']:
+        parts_to_run.remove('a2c')
+
+    port = 2200
+    cluster_dict = {'ps': ['localhost:{}'.format(port)]}
+    for part in parts_to_run:
+        port += 1
+        cluster_dict[part] = ['localhost:{}'.format(port)]
 
     def ps():
-        RewardPredictorEnsemble('ps')
-
-    ps_proc = Process(target=ps)
-    ps_proc.start()
+        RewardPredictorEnsemble(name='ps', cluster_dict=cluster_dict)
 
     def a2c():
+        if params.params['orig_rewards']:
+            reward_predictor = None
+        else:
+            reward_predictor = RewardPredictorEnsemble(
+                    name='a2c',
+                    cluster_dict=cluster_dict)
         learn(
             policy_fn,
             env,
@@ -99,44 +114,57 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
             ent_coef=0.01,
             log_interval=log_interval,
             load_path=policy_ckpt_dir,
-            orig_rewards=params.params['orig_rewards'])
+            reward_predictor=reward_predictor)
 
-    def rp():
-        train_reward_predictor(rp_lr, pref_pipe, go_pipe, load_prefs_dir,
-                               log_dir, db_max, rp_ckpt_dir)
+    def trp():
+        reward_predictor = RewardPredictorEnsemble(
+                name='train_reward',
+                cluster_dict=cluster_dict)
+        train_reward_predictor(
+            reward_predictor=reward_predictor,
+            lr=rp_lr,
+            pref_pipe=pref_pipe,
+            go_pipe=go_pipe,
+            load_prefs_dir=load_prefs_dir,
+            log_dir=log_dir,
+            db_max=db_max,
+            rp_ckpt_dir=rp_ckpt_dir)
 
-    seg_pipe = Queue()
-    pref_pipe = Queue()
-    go_pipe = Queue(maxsize=1)
-    a2c_proc = Process(target=a2c, daemon=True)
-    train_proc = Process(target=rp, daemon=True)
+    ps_proc = Process(target=ps)
+    ps_proc.start()
 
-    a2c_proc.start()
-
-    if not params.params['orig_rewards']:
+    train_proc = None
+    if 'train_reward' in parts_to_run:
+        train_proc = Process(target=trp, daemon=True)
         train_proc.start()
+
+    a2c_proc = None
+    if 'a2c' in parts_to_run:
+        a2c_proc = Process(target=a2c, daemon=True)
+        a2c_proc.start()
+
+    if 'pref_interface' in parts_to_run:
+        synthetic_prefs = headless
+        pi = PrefInterface(headless, synthetic_prefs)
+
+        # We have to give PrefInterface the reward predictor /after/ init,
+        # because init needs to spawn a GUI process (using fork()),
+        # and the Objective C APIs (invoked when dealing with GUI stuff) aren't
+        # happy if running in a processed forked from a multithreaded parent.
+        reward_predictor = RewardPredictorEnsemble(
+                name='pref_interface',
+                cluster_dict=cluster_dict)
+        pi.init_reward_predictor(reward_predictor)
+
         pi.run(seg_pipe, pref_pipe, segs_max)
-    else:
+
+    if 'train_reward' not in parts_to_run:
         go_pipe.put(True)
-    """
-    import memory_profiler
-    def profile(name, pid):
-        with open(osp.join(log_dir, name + '.log'), 'w') as f:
-            memory_profiler.memory_usage(pid, stream=f, timeout=99999)
-    Process(target=profile,
-            args=('a2c', a2c_proc.pid), daemon=True).start()
-    Process(target=profile,
-            args=('train', train_proc.pid), daemon=True).start()
-    Process(target=profile,
-            args=('interface', -1), daemon=True).start()
-    """
 
-    while True:
-        import time
-        time.sleep(1.0)
-
-    # TODO: this is never reached
-    env.close()
+    if a2c_proc:
+        a2c_proc.join()
+    else:
+        train_proc.join()
 
 
 def main():
@@ -188,6 +216,8 @@ def main():
     parser.add_argument('--n_preds', type=int, default=1)
     parser.add_argument('--save_initial_prefs', action='store_true')
     parser.add_argument('--random_queries', action='store_true')
+    parser.add_argument('--no_gather_prefs', action='store_true')
+    parser.add_argument('--no_a2c', action='store_true')
     args = parser.parse_args()
 
     params.init_params()
@@ -208,6 +238,8 @@ def main():
     params.params['n_preds'] = args.n_preds
     params.params['save_initial_prefs'] = args.save_initial_prefs
     params.params['random_query'] = args.random_queries
+    params.params['no_gather_prefs'] = args.no_gather_prefs
+    params.params['no_a2c'] = args.no_a2c
 
     if args.test_mode:
         print("=== WARNING: running in test mode", file=sys.stderr)

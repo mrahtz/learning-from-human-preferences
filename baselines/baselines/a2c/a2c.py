@@ -128,7 +128,7 @@ class Runner(object):
                  nsteps=5,
                  nstack=4,
                  gamma=0.99,
-                 orig_rewards=False):
+                 reward_predictor=None):
         self.env = env
         self.model = model
         nh, nw, nc = env.observation_space.shape
@@ -145,10 +145,7 @@ class Runner(object):
         self.dones = [False for _ in range(nenv)]
         self.segment = Segment()
         self.seg_pipe = seg_pipe
-        if not orig_rewards:
-            from reward_predictor import RewardPredictorEnsemble
-            self.reward_model = RewardPredictorEnsemble('a2c')
-        self.orig_rewards = orig_rewards
+        self.reward_predictor = reward_predictor
 
         self.n_episodes = [0 for _ in range(nenv)]
         self.true_reward = [0 for _ in range(nenv)]
@@ -255,17 +252,17 @@ class Runner(object):
                     self.n_episodes[env_n] += 1
 
         # Generate segments
-        if not self.orig_rewards:
+        if self.reward_predictor:
             self.gen_segments(mb_obs, mb_rewards, mb_dones)
 
         # Replace rewards with those from reward predictor
         if run_params.params['debug']:
             print("Original rewards:\n", mb_rewards)
-        if not self.orig_rewards:
+        if self.reward_predictor:
             assert_equal(mb_obs.shape, (nenvs, self.nsteps, 84, 84, 4))
             mb_obs_allenvs = mb_obs.reshape(nenvs * self.nsteps, 84, 84, 4)
 
-            rewards_allenvs = self.reward_model.reward(mb_obs_allenvs)
+            rewards_allenvs = self.reward_predictor.reward(mb_obs_allenvs)
             assert_equal(rewards_allenvs.shape, (nenvs * self.nsteps, ))
             mb_rewards = rewards_allenvs.reshape(nenvs, self.nsteps)
             assert_equal(mb_rewards.shape, (nenvs, self.nsteps))
@@ -320,7 +317,7 @@ def learn(policy,
           log_interval=100,
           load_path=None,
           save_interval=10000,
-          orig_rewards=False):
+          reward_predictor=None):
 
     tf.reset_default_graph()
     set_global_seeds(seed)
@@ -378,7 +375,7 @@ def learn(policy,
         nsteps=nsteps,
         nstack=nstack,
         gamma=gamma,
-        orig_rewards=orig_rewards)
+        reward_predictor=reward_predictor)
 
     print("Running...")
 

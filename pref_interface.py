@@ -10,7 +10,6 @@ import pyglet
 from numpy.testing import assert_equal
 
 import params
-from reward_predictor import RewardPredictorEnsemble
 from scipy.ndimage import zoom
 
 
@@ -69,9 +68,9 @@ class PrefInterface:
         for i1, i2 in pair_idxs:
             s1s.append(segments[i1].frames)
             s2s.append(segments[i2].frames)
-        pair_preds = self.reward_model.preferences(s1s, s2s)
+        pair_preds = self.reward_predictor.preferences(s1s, s2s)
         pair_preds = np.array(pair_preds)
-        n_preds = self.reward_model.n_preds
+        n_preds = self.reward_predictor.n_preds
         assert_equal(pair_preds.shape, (n_preds, len(pair_idxs), 2))
 
         # Each predictor gives two outputs:
@@ -163,10 +162,12 @@ class PrefInterface:
 
         return pref
 
+    def init_reward_predictor(self, reward_predictor):
+        self.reward_predictor = reward_predictor
+
     def run(self, seg_pipe, pref_pipe, segs_max):
         tested_pairs = []
         segments = []
-        self.reward_model = RewardPredictorEnsemble('pref_interface')
 
         while True:
             self.recv_segments(segments, seg_pipe, segs_max)

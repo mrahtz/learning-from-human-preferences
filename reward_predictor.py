@@ -223,19 +223,13 @@ def save_prefs(log_dir, name, pref_db_train, pref_db_val):
     save_pref_db(pref_db_val, fname)
 
 
-def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
-                           db_max, rp_ckpt_dir):
+def train_reward_predictor(reward_predictor, lr, pref_pipe, go_pipe,
+                           load_prefs_dir, log_dir, db_max, rp_ckpt_dir):
     # TODO clean up the checkpoint passing around
     if rp_ckpt_dir is not None:
         load_network = True
     else:
         load_network = False
-    reward_model = RewardPredictorEnsemble(
-        'train_reward',
-        lr,
-        log_dir=log_dir,
-        load_network=load_network,
-        rp_ckpt_dir=rp_ckpt_dir)
 
     if load_prefs_dir:
         print("Loading preferences...")
@@ -276,9 +270,9 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
         # predictor."
         for i in range(params.params['n_initial_epochs']):
             print("Epoch %d" % i)
-            reward_model.train(pref_db_train, pref_db_val)
+            reward_predictor.train(pref_db_train, pref_db_val)
             recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
-        reward_model.save()
+        reward_predictor.save()
         print("=== Finished initial training at", str(datetime.datetime.now()))
 
     if params.params['save_pretrain'] or params.params['just_pretrain']:
@@ -296,7 +290,7 @@ def train_reward_predictor(lr, pref_pipe, go_pipe, load_prefs_dir, log_dir,
     step = 0
     prev_save_step = None
     while True:
-        reward_model.train(pref_db_train, pref_db_val)
+        reward_predictor.train(pref_db_train, pref_db_val)
         recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
 
         if params.params['save_prefs'] and \
@@ -364,13 +358,6 @@ class RewardPredictorEnsemble:
         acc_ops = []
         graph = tf.Graph()
 
-        if cluster_dict is None:
-            cluster_dict = {
-                'a2c': ['localhost:2200'],
-                'pref_interface': ['localhost:2201'],
-                'train_reward': ['localhost:2202'],
-                'ps': ['localhost:2203']
-            }
         cluster = tf.train.ClusterSpec(cluster_dict)
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
@@ -570,6 +557,7 @@ class RewardPredictorEnsemble:
 
         for batch_n, batch in enumerate(
                 batch_iter(prefs_train.prefs, batch_size=32, shuffle=True)):
+            print("Batch {}: {} preferences".format(batch_n, len(batch)))
             # TODO: refactor this so that each can be taken directly from
             # pref_db
             s1s = []
@@ -586,11 +574,14 @@ class RewardPredictorEnsemble:
                 feed_dict[rp.s2] = s2s
                 feed_dict[rp.mu] = mus
                 feed_dict[rp.training] = True
+            print(len(feed_dict[rp.s1]))
+            print(len(feed_dict[rp.s2]))
+            print(len(feed_dict[rp.mu]))
             summaries, _ = self.sess.run([self.summaries, self.train_ops],
                                          feed_dict)
             self.train_writer.add_summary(summaries, self.n_steps)
             self.n_steps += 1
-            print("Trained reward predictor %d steps" % self.n_steps)
+            print("Trained reward predictor for %d steps" % self.n_steps)
 
             if self.n_steps and self.n_steps % test_interval == 0:
                 if len(prefs_val) <= 32:
