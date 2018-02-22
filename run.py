@@ -253,11 +253,13 @@ def main():
         params.params['n_initial_epochs'] = 1
         params.params['save_freq'] = 1
         params.params['ckpt_freq'] = 1
+        params.params['reward_predictor_val_interval'] = 1
     else:
         params.params['n_initial_prefs'] = 500
         params.params['n_initial_epochs'] = args.n_initial_epochs
         params.params['save_freq'] = 10
         params.params['ckpt_freq'] = 100
+        params.params['reward_predictor_val_interval'] = 50
 
     if args.env == 'GridWorldNoFrameskip-v4':
         params.params['policy'] = 'mlp'
