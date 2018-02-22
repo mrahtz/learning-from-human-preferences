@@ -240,13 +240,6 @@ def train_reward_predictor(reward_predictor, lr, pref_pipe, go_pipe,
         pref_db_val = PrefDB()
         pref_db_train = PrefDB()
 
-    for pref_n, pref in enumerate(pref_db_train.prefs):
-        if pref[2] is None:
-            pref_db_train.del_pref(pref_n)
-    for pref_n, pref in enumerate(pref_db_val.prefs):
-        if pref[2] is None:
-            pref_db_val.del_pref(pref_n)
-
     # Page 15: "We collect 500 comparisons from a randomly initialized policy
     # network at the beginning of training"
     if not params.params['skip_prefs']:
