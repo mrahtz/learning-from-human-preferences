@@ -71,14 +71,19 @@ class PrefDB:
         self.prefs.append(tup)
 
     def del_first(self):
-        k1, k2, _ = self.prefs[0]
+        self.del_pref(0)
+
+    def del_pref(self, n):
+        if n >= len(self.prefs):
+            raise IndexError("Preference {} doesn't exist".format(n))
+        k1, k2, _ = self.prefs[n]
         for k in [k1, k2]:
             if self.seg_refs[k] == 1:
                 del self.segments[k]
                 del self.seg_refs[k]
             else:
                 self.seg_refs[k] -= 1
-        del self.prefs[0]
+        del self.prefs[n]
 
     def __len__(self):
         return len(self.prefs)
