@@ -261,7 +261,7 @@ def train_reward_predictor(reward_predictor, lr, pref_pipe, go_pipe,
         save_prefs(log_dir, 'initial', pref_db_train, pref_db_val)
 
     if params.params['just_prefs']:
-        raise Exception("Preference generation completed")
+        return
 
     if not params.params['no_pretrain']:
         print("Training for %d epochs..." % params.params['n_initial_epochs'])
@@ -276,13 +276,14 @@ def train_reward_predictor(reward_predictor, lr, pref_pipe, go_pipe,
         reward_predictor.save()
         print("=== Finished initial training at", str(datetime.datetime.now()))
 
-    if params.params['save_pretrain'] or params.params['just_pretrain']:
+    if params.params['save_pretrain']:
+        print("Saving preferences...")
         fname = osp.join(log_dir, "train_postpretrain.pkl")
         save_pref_db(pref_db_train, fname)
         fname = osp.join(log_dir, "val_postpretrain.pkl")
         save_pref_db(pref_db_val, fname)
     if params.params['just_pretrain']:
-        raise Exception("Pretraining completed")
+        return
 
     print("=== Starting RL training at", str(datetime.datetime.now()))
     # Start RL training
@@ -346,11 +347,11 @@ class RewardPredictorEnsemble:
     def __init__(self,
                  name,
                  lr=1e-4,
-                 log_dir='/tmp',
                  cluster_dict=None,
                  load_network=False,
                  rp_ckpt_dir=None,
-                 dropout=0.5):
+                 dropout=0.5,
+                 log_dir=None):
         rps = []
         reward_ops = []
         pred_ops = []
@@ -390,17 +391,16 @@ class RewardPredictorEnsemble:
             mean_loss = tf.reduce_mean(loss_ops)
             mean_accuracy = tf.reduce_mean(acc_ops)
 
-            self.saver = tf.train.Saver(max_to_keep=1)
-            self.checkpoint_file = osp.join(log_dir, 'checkpoints',
-                                            'reward_network.ckpt')
-
-            # Only the reward predictor training process should initialize the
-            # network
+            # Only the reward predictor training process should initialize/save
+            # the network
             if name != 'train_reward':
                 while len(sess.run(tf.report_uninitialized_variables())) > 0:
                     print("%s waiting for variable initialization..." % name)
                     time.sleep(1.0)
             else:
+                self.saver = tf.train.Saver(max_to_keep=1)
+                self.checkpoint_file = osp.join(log_dir, 'checkpoints',
+                                                'reward_network.ckpt')
                 if load_network:
                     # TODO change the name of this to be clear we expect a file
                     ckpt_f = rp_ckpt_dir
@@ -547,6 +547,7 @@ class RewardPredictorEnsemble:
     def save(self):
         ckpt_name = self.saver.save(self.sess, self.checkpoint_file,
                                     self.n_steps)
+        print("Saved reward predictor checkpoint to '{}'".format(ckpt_name))
         return ckpt_name
 
     def train(self, prefs_train, prefs_val, test_interval=2):
@@ -575,9 +576,6 @@ class RewardPredictorEnsemble:
                 feed_dict[rp.s2] = s2s
                 feed_dict[rp.mu] = mus
                 feed_dict[rp.training] = True
-            print(len(feed_dict[rp.s1]))
-            print(len(feed_dict[rp.s2]))
-            print(len(feed_dict[rp.mu]))
             summaries, _ = self.sess.run([self.summaries, self.train_ops],
                                          feed_dict)
             self.train_writer.add_summary(summaries, self.n_steps)

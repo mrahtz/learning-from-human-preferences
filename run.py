@@ -119,7 +119,8 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     def trp():
         reward_predictor = RewardPredictorEnsemble(
                 name='train_reward',
-                cluster_dict=cluster_dict)
+                cluster_dict=cluster_dict,
+                log_dir=log_dir)
         train_reward_predictor(
             reward_predictor=reward_predictor,
             lr=rp_lr,
@@ -161,10 +162,15 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     if 'train_reward' not in parts_to_run:
         go_pipe.put(True)
 
-    if a2c_proc:
+    if params.params['just_prefs'] or params.params['just_pretrain']:
+        train_proc.join()
+    elif a2c_proc:
         a2c_proc.join()
     else:
-        train_proc.join()
+        raise Exception("Error: no parts to wait for?")
+
+    env.close()  # Kill the SubprocVecEnv processes
+    ps_proc.terminate()
 
 
 def main():
