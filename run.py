@@ -20,6 +20,7 @@ from baselines.common.atari_wrappers import wrap_deepmind_nomax
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble, train_reward_predictor
+from enduro_wrapper import EnduroWrapper
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
 
@@ -51,6 +52,8 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
         def _thunk():
             env = gym.make(env_id)
             env.seed(seed + rank)
+            if params.params['env'] == 'EnduroNoFrameskip-v4':
+                env = EnduroWrapper(env)
             env = bench.Monitor(
                 env,
                 logger.get_dir()
