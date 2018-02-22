@@ -201,6 +201,7 @@ class Runner(object):
         for n in range(self.nsteps):
             actions, values, states = self.model.step(self.obs, self.states,
                                                       self.dones)
+            # TODO: move this down below
             if run_params.params['env'] == 'GridWorldNoFrameskip-v4':
                 # For GridWorld, reward depends on both current observation and
                 # action, so encode action in the observations
