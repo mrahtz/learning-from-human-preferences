@@ -213,7 +213,8 @@ class PrefInterface:
             s1 = s1.frames
             s2 = s2.frames
 
-            pref_pipe.put((s1, s2, pref))
+            if pref is not None:
+                pref_pipe.put((s1, s2, pref))
             tested_pairs.append((n1, n2))
             tested_pairs.append((n2, n1))
 
