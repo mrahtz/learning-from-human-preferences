@@ -11,7 +11,7 @@ class TestUtils(unittest.TestCase):
 
     # https://github.com/joschu/modular_rl/blob/master/modular_rl/running_stat.py
     def test_running_stat(self):
-        for shp in ((), (3,), (3,4)):
+        for shp in ((), (3, ), (3, 4)):
             li = []
             rs = RunningStat(shp)
             for i in range(5):
@@ -20,7 +20,8 @@ class TestUtils(unittest.TestCase):
                 li.append(val)
                 m = np.mean(li, axis=0)
                 assert np.allclose(rs.mean, m)
-                if i == 0: continue
+                if i == 0:
+                    continue
                 # ddof=1 => calculate unbiased sample variance
                 v = np.var(li, ddof=1, axis=0)
                 assert np.allclose(rs.var, v)
@@ -93,6 +94,7 @@ class TestUtils(unittest.TestCase):
         p.del_first()
         self.assertEquals(len(p.prefs), 0)
         self.assertEquals(len(p.segments), 0)
+
 
 if __name__ == '__main__':
     unittest.main()
