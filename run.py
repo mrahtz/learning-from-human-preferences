@@ -130,7 +130,7 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
             db_max=db_max,
             rp_ckpt_dir=rp_ckpt_dir)
 
-    ps_proc = Process(target=ps)
+    ps_proc = Process(target=ps, daemon=True)
     ps_proc.start()
 
     train_proc = None
