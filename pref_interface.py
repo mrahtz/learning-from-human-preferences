@@ -136,7 +136,7 @@ class PrefInterface:
         for t in range(seg_len):
             # Show only the most recent frame of the 4-frame stack
             frame = np.hstack((s1[t][:, :, -1], border, s2[t][:, :, -1]))
-            frame = zoom(frame, 2)
+            frame = zoom(frame, 6)
             vid.append(frame)
         n_pause_frames = 7
         vid.extend([vid[-1]] * n_pause_frames)
@@ -230,4 +230,4 @@ def vid_proc(q):
             t = 0
         except queue.Empty:
             t = (t + 1) % len(segment)
-            time.sleep(1/15)
+            time.sleep(1/60)
