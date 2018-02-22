@@ -128,7 +128,7 @@ class PrefInterface:
                 pairs.append(possible_pairs[i])
             return pairs
 
-    def ask_user(self, s1, s2):
+    def ask_user(self, n1, n2, s1, s2):
         border = np.zeros((84, 10), dtype=np.uint8)
 
         seg_len = len(s1)
@@ -143,7 +143,7 @@ class PrefInterface:
         self.vid_q.put(vid)
 
         while True:
-            print("Choice: ")
+            print("Segments {} and {}: ".format(n1, n2))
             choice = input()
             if choice == "L" or choice == "R" or choice == "E" or choice == "":
                 break
@@ -187,13 +187,19 @@ class PrefInterface:
                 print("Sampled segment pairs:")
                 print(pair_idxs)
 
-            (n1, n2), s1, s2 = self.least_certain_seg_pair(segments, pair_idxs)
+            if not params.params['random_query']:
+                (n1, n2), s1, s2 = self.least_certain_seg_pair(segments, pair_idxs)
+            else:
+                i = np.random.choice(len(pair_idxs))
+                (n1, n2) = pair_idxs[i]
+                s1 = segments[n1]
+                s2 = segments[n2]
 
             if params.params['debug']:
                 print("Querying preference for segments", n1, "and", n2)
 
             if not self.synthetic_prefs:
-                pref = self.ask_user(s1.frames, s2.frames)
+                pref = self.ask_user(n1, n2, s1.frames, s2.frames)
             else:
                 if sum(s1.rewards) > sum(s2.rewards):
                     pref = (1.0, 0.0)
