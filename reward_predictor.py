@@ -550,16 +550,17 @@ class RewardPredictorEnsemble:
         print("Saved reward predictor checkpoint to '{}'".format(ckpt_name))
         return ckpt_name
 
-    def train(self, prefs_train, prefs_val, test_interval=2):
+    def train(self, prefs_train, prefs_val):
         """
         Train the ensemble for one full epoch
         """
         print("Training/testing with %d/%d preferences" % (len(prefs_train),
                                                            len(prefs_val)))
 
+        val_interval = params.params['reward_predictor_val_interval']
         for batch_n, batch in enumerate(
                 batch_iter(prefs_train.prefs, batch_size=32, shuffle=True)):
-            print("Batch {}: {} preferences".format(batch_n, len(batch)))
+            print("Training batch {}".format(batch_n))
             # TODO: refactor this so that each can be taken directly from
             # pref_db
             s1s = []
@@ -582,7 +583,8 @@ class RewardPredictorEnsemble:
             self.n_steps += 1
             print("Trained reward predictor for %d steps" % self.n_steps)
 
-            if self.n_steps and self.n_steps % test_interval == 0:
+            if self.n_steps and self.n_steps % val_interval == 0:
+                print("Running a validation batch")
                 if len(prefs_val) <= 32:
                     val_batch = prefs_val.prefs
                 else:
@@ -609,7 +611,6 @@ class RewardPredictorEnsemble:
                 self.test_writer.add_summary(summaries, self.n_steps)
 
             if self.n_steps % params.params['ckpt_freq'] == 0:
-                print("=== Saving reward predictor checkpoint...")
                 self.save()
 
 
