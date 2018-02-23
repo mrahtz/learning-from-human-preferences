@@ -398,6 +398,8 @@ class RewardPredictorEnsemble:
                     print("%s waiting for variable initialization..." % name)
                     time.sleep(1.0)
             else:
+                if log_dir is None:
+                    raise ValueError("Must supply log_dir for train_reward")
                 self.saver = tf.train.Saver(max_to_keep=1)
                 self.checkpoint_file = osp.join(log_dir, 'checkpoints',
                                                 'reward_network.ckpt')
