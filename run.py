@@ -11,16 +11,19 @@ from multiprocessing import Process, Queue
 import gym
 import gym_gridworld  # noqa: F401 (imported but unused)
 import params
-sys.path.insert(0, 'baselines')
-from baselines import bench, logger
-from baselines.a2c.a2c import learn
-from baselines.a2c.policies import MlpPolicy, CnnPolicy
-from baselines.common import set_global_seeds
-from baselines.common.atari_wrappers import wrap_deepmind_nomax
-from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
+
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble, train_reward_predictor
 from enduro_wrapper import EnduroWrapper
+from utils import vid_proc
+
+sys.path.insert(0, 'baselines')
+from baselines import bench, logger  # noqa: E402 (import not at top of file)
+from baselines.a2c.a2c import learn  # noqa: E402
+from baselines.a2c.policies import MlpPolicy, CnnPolicy  # noqa: E402
+from baselines.common import set_global_seeds  # noqa: E402
+from baselines.common.atari_wrappers import wrap_deepmind_nomax  # noqa: E402
+from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv  # noqa: E402, E501
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
 
@@ -76,6 +79,21 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
     pref_pipe = Queue()
     go_pipe = Queue(maxsize=1)
 
+    def episode_vid_proc():
+        vid_proc(
+            episode_vid_queue,
+            playback_speed=2,
+            zoom_factor=4,
+            mode='play_through')
+
+    if params.params['render_episodes']:
+        episode_vid_queue = Queue()
+        Process(
+            target=episode_vid_proc,
+            daemon=True).start()
+    else:
+        episode_vid_queue = None
+
     parts_to_run = ['a2c', 'pref_interface', 'train_reward']
 
     if params.params['no_gather_prefs'] or params.params['orig_rewards']:
@@ -114,7 +132,8 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
             ent_coef=0.01,
             log_interval=log_interval,
             load_path=policy_ckpt_dir,
-            reward_predictor=reward_predictor)
+            reward_predictor=reward_predictor,
+            episode_vid_queue=episode_vid_queue)
 
     def trp():
         reward_predictor = RewardPredictorEnsemble(
@@ -224,6 +243,7 @@ def main():
     parser.add_argument('--random_queries', action='store_true')
     parser.add_argument('--no_gather_prefs', action='store_true')
     parser.add_argument('--no_a2c', action='store_true')
+    parser.add_argument('--render_episodes', action='store_true')
     args = parser.parse_args()
 
     params.init_params()
@@ -246,6 +266,7 @@ def main():
     params.params['random_query'] = args.random_queries
     params.params['no_gather_prefs'] = args.no_gather_prefs
     params.params['no_a2c'] = args.no_a2c
+    params.params['render_episodes'] = args.render_episodes
 
     if args.test_mode:
         print("=== WARNING: running in test mode", file=sys.stderr)

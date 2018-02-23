@@ -6,45 +6,11 @@ from itertools import combinations
 from multiprocessing import Process, Queue
 
 import numpy as np
-import pyglet
 from numpy.testing import assert_equal
 
 import params
 from scipy.ndimage import zoom
-
-
-class Im(object):
-    def __init__(self, display=None):
-        self.window = None
-        self.isopen = False
-        self.display = display
-
-    def imshow(self, arr):
-        if self.window is None:
-            height, width = arr.shape
-            self.window = pyglet.window.Window(
-                width=width, height=height, display=self.display)
-            self.width = width
-            self.height = height
-            self.isopen = True
-        assert arr.shape == (
-            self.height,
-            self.width), "You passed in an image with the wrong number shape"
-        image = pyglet.image.ImageData(
-            self.width, self.height, 'L', arr.tobytes(), pitch=-self.width)
-        self.window.clear()
-        self.window.switch_to()
-        self.window.dispatch_events()
-        image.blit(0, 0)
-        self.window.flip()
-
-    def close(self):
-        if self.isopen:
-            self.window.close()
-            self.isopen = False
-
-    def __del__(self):
-        self.close()
+from utils import vid_proc
 
 
 class PrefInterface:
@@ -217,19 +183,3 @@ class PrefInterface:
                 pref_pipe.put((s1, s2, pref))
             tested_pairs.append((n1, n2))
             tested_pairs.append((n2, n1))
-
-
-def vid_proc(q):
-    v = Im()
-    segment = q.get(block=True, timeout=None)
-    t = 0
-    while True:
-        v.imshow(segment[t])
-        try:
-            segment = q.get(block=False)
-            if segment == "Pause":
-                segment = q.get(block=True)
-            t = 0
-        except queue.Empty:
-            t = (t + 1) % len(segment)
-            time.sleep(1/60)

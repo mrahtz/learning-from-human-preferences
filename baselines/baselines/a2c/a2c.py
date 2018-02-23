@@ -128,7 +128,8 @@ class Runner(object):
                  nsteps=5,
                  nstack=4,
                  gamma=0.99,
-                 reward_predictor=None):
+                 reward_predictor=None,
+                 episode_vid_queue=None):
         self.env = env
         self.model = model
         nh, nw, nc = env.observation_space.shape
@@ -144,8 +145,10 @@ class Runner(object):
         self.states = model.initial_state
         self.dones = [False for _ in range(nenv)]
         self.segment = Segment()
+        self.episode_frames = []
         self.seg_pipe = seg_pipe
         self.reward_predictor = reward_predictor
+        self.episode_vid_queue = episode_vid_queue
 
         self.n_episodes = [0 for _ in range(nenv)]
         self.true_reward = [0 for _ in range(nenv)]
@@ -187,6 +190,18 @@ class Runner(object):
                 self.segment = Segment()
                 continue
             self.segment.append(e0_obs[step], e0_rew[step])
+
+    def save_episode_frames(self, mb_obs, mb_dones):
+        e0_obs = mb_obs[0]
+        e0_dones = mb_dones[0]
+
+        for step in range(self.nsteps):
+            # Append the last frame (the most recent one) from the 4-frame
+            # stack
+            self.episode_frames.append(e0_obs[step, :, :, -1])
+            if e0_dones[step]:
+                self.episode_vid_queue.put(self.episode_frames)
+                self.episode_frames = []
 
     def run(self):
         nenvs = len(self.env.remotes)
@@ -255,6 +270,10 @@ class Runner(object):
         if self.reward_predictor:
             self.gen_segments(mb_obs, mb_rewards, mb_dones)
 
+        # Save frames for episode rendering
+        if self.episode_vid_queue is not None:
+            self.save_episode_frames(mb_obs, mb_dones)
+
         # Replace rewards with those from reward predictor
         if run_params.params['debug']:
             print("Original rewards:\n", mb_rewards)
@@ -317,7 +336,8 @@ def learn(policy,
           log_interval=100,
           load_path=None,
           save_interval=10000,
-          reward_predictor=None):
+          reward_predictor=None,
+          episode_vid_queue=None):
 
     tf.reset_default_graph()
     set_global_seeds(seed)
@@ -355,8 +375,8 @@ def learn(policy,
         model = make_model()
     else:
         # TODO: this still doesn't seem to be loading the most recent
-        # checkpoint in FloydHub runs (e.g. 193). Not sure whether it's this code that's
-        # broken, or the way that baselines is loaded.
+        # checkpoint in FloydHub runs (e.g. 193). Not sure whether it's this
+        # code that's broken, or the way that baselines is loaded.
         with open(osp.join(load_path, 'make_model.pkl'), 'rb') as fh:
             make_model = cloudpickle.loads(fh.read())
         model = make_model()
@@ -375,7 +395,8 @@ def learn(policy,
         nsteps=nsteps,
         nstack=nstack,
         gamma=gamma,
-        reward_predictor=reward_predictor)
+        reward_predictor=reward_predictor,
+        episode_vid_queue=episode_vid_queue)
 
     print("Running...")
 

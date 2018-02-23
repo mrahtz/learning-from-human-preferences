@@ -412,6 +412,11 @@ class RewardPredictorEnsemble:
                 else:
                     sess.run(tf.global_variables_initializer())
 
+                self.train_writer = tf.summary.FileWriter(
+                    osp.join(log_dir, 'reward_pred', 'train'), flush_secs=5)
+                self.test_writer = tf.summary.FileWriter(
+                    osp.join(log_dir, 'reward_pred', 'test'), flush_secs=5)
+
         if name == 'ps':
             server.join()
 
@@ -428,11 +433,6 @@ class RewardPredictorEnsemble:
             op = tf.summary.scalar(name, loss_ops[i])
             summary_ops.append(op)
         self.summaries = tf.summary.merge(summary_ops)
-
-        self.train_writer = tf.summary.FileWriter(
-            osp.join(log_dir, 'reward_pred', 'train'), flush_secs=5)
-        self.test_writer = tf.summary.FileWriter(
-            osp.join(log_dir, 'reward_pred', 'test'), flush_secs=5)
 
         self.sess = sess
         self.rps = rps
