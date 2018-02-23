@@ -1,4 +1,11 @@
+import queue
+import time
+
 import numpy as np
+import pyglet
+
+from scipy.ndimage import zoom
+
 
 # https://github.com/joschu/modular_rl/blob/master/modular_rl/running_stat.py
 # http://www.johndcook.com/blog/standard_deviation/
@@ -7,6 +14,7 @@ class RunningStat(object):
         self._n = 0
         self._M = np.zeros(shape)
         self._S = np.zeros(shape)
+
     def push(self, x):
         x = np.asarray(x)
         assert x.shape == self._M.shape
@@ -17,21 +25,26 @@ class RunningStat(object):
             oldM = self._M.copy()
             self._M[...] = oldM + (x - oldM)/self._n
             self._S[...] = self._S + (x - oldM)*(x - self._M)
+
     @property
     def n(self):
         return self._n
+
     @property
     def mean(self):
         return self._M
+
     @property
     def var(self):
         if self._n >= 2:
             return self._S/(self._n - 1)
         else:
             return np.square(self._M)
+
     @property
     def std(self):
         return np.sqrt(self.var)
+
     @property
     def shape(self):
         return self._M.shape
@@ -87,3 +100,87 @@ class PrefDB:
 
     def __len__(self):
         return len(self.prefs)
+
+
+class Im(object):
+    def __init__(self, display=None):
+        self.window = None
+        self.isopen = False
+        self.display = display
+
+    def imshow(self, arr):
+        if self.window is None:
+            height, width = arr.shape
+            self.window = pyglet.window.Window(
+                width=width, height=height, display=self.display)
+            self.width = width
+            self.height = height
+            self.isopen = True
+        assert arr.shape == (
+            self.height,
+            self.width), "You passed in an image with the wrong number shape"
+        image = pyglet.image.ImageData(
+            self.width, self.height, 'L', arr.tobytes(), pitch=-self.width)
+        self.window.clear()
+        self.window.switch_to()
+        self.window.dispatch_events()
+        image.blit(0, 0)
+        self.window.flip()
+
+    def close(self):
+        if self.isopen:
+            self.window.close()
+            self.isopen = False
+
+    def __del__(self):
+        self.close()
+
+
+def get_most_recent_item(q):
+    # Make sure we at least get something
+    item = q.get(block=True)
+    n_skipped = 0
+    while True:
+        try:
+            item = q.get(block=True, timeout=0.1)
+            n_skipped += 1
+        except queue.Empty:
+            break
+    return item, n_skipped
+
+
+def vid_proc(q, playback_speed=1, zoom_factor=1, mode='restart_on_get'):
+    assert mode == 'restart_on_get' or mode == 'play_through'
+    v = Im()
+    frames = q.get(block=True)
+    t = 0
+    while True:
+        # Add a dot showing progress
+        width = frames[t].shape[1]
+        fraction_played = t / len(frames)
+        frames[t][-1][int(fraction_played * width)] = 255
+
+        v.imshow(zoom(frames[t], zoom_factor))
+
+        if mode == 'play_through':
+            # Wait until having finished playing the current
+            # set of frames. Then, stop, and get the most recent set of frames.
+            t += playback_speed
+            if t >= len(frames):
+                frames, n_skipped = get_most_recent_item(q)
+                t = 0
+            else:
+                time.sleep(1/60)
+        elif mode == 'restart_on_get':
+            # Always try and get a new set of frames to show.
+            # If there /is/ a new set of frames on the queue,
+            # restart playback with those frames immediately.
+            # Otherwise, just keep looping with the current frames.
+            try:
+                frames = q.get(block=False)
+                if frames == "Pause":
+                    frames = q.get(block=True)
+                t = 0
+            except queue.Empty:
+                t = (t + playback_speed) % len(frames)
+                time.sleep(1/60)
