@@ -83,7 +83,7 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
         vid_proc(
             episode_vid_queue,
             playback_speed=2,
-            zoom_factor=4,
+            zoom_factor=2,
             mode='play_through')
 
     if params.params['render_episodes']:
