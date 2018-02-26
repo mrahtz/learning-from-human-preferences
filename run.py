@@ -43,7 +43,7 @@ def configure_logger(log_dir):
 
 
 def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
-          rp_ckpt_dir, load_prefs_dir, headless, log_dir, ent_coef,
+          rp_ckpt_path, load_prefs_dir, headless, log_dir, ent_coef,
           db_max, segs_max, log_interval, policy_ckpt_dir):
     configure_logger(log_dir)
 
@@ -139,7 +139,8 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
         reward_predictor = RewardPredictorEnsemble(
                 name='train_reward',
                 cluster_dict=cluster_dict,
-                log_dir=log_dir)
+                log_dir=log_dir,
+                ckpt_path=rp_ckpt_path)
         train_reward_predictor(
             reward_predictor=reward_predictor,
             lr=rp_lr,
@@ -147,8 +148,7 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
             go_pipe=go_pipe,
             load_prefs_dir=load_prefs_dir,
             log_dir=log_dir,
-            db_max=db_max,
-            rp_ckpt_dir=rp_ckpt_dir)
+            db_max=db_max)
 
     ps_proc = Process(target=ps, daemon=True)
     ps_proc.start()
@@ -213,7 +213,7 @@ def main():
         type=int,
         default=40)
     parser.add_argument('--n_envs', type=int, default=1)
-    parser.add_argument('--rp_ckpt_dir')
+    parser.add_argument('--rp_ckpt_path')
     parser.add_argument('--load_prefs_dir')
     parser.add_argument('--headless', action='store_true')
     seconds_since_epoch = str(int(time.time()))
@@ -317,7 +317,7 @@ def main():
         rp_lr=args.rp_lr,
         lrschedule=args.lrschedule,
         num_cpu=args.n_envs,
-        rp_ckpt_dir=args.rp_ckpt_dir,
+        rp_ckpt_path=args.rp_ckpt_path,
         load_prefs_dir=args.load_prefs_dir,
         headless=args.headless,
         log_dir=log_dir,

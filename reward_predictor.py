@@ -224,14 +224,7 @@ def save_prefs(log_dir, name, pref_db_train, pref_db_val):
 
 
 def train_reward_predictor(reward_predictor, lr, pref_pipe, go_pipe,
-                           load_prefs_dir, log_dir, db_max, rp_ckpt_dir):
-    # TODO clean up the checkpoint passing around
-    if rp_ckpt_dir is not None:
-        load_network = True
-    else:
-        # TODO never used?!
-        load_network = False
-
+                           load_prefs_dir, log_dir, db_max):
     if load_prefs_dir:
         print("Loading preferences...")
         # TODO make this more flexible
@@ -348,8 +341,7 @@ class RewardPredictorEnsemble:
                  name,
                  lr=1e-4,
                  cluster_dict=None,
-                 load_network=False,
-                 rp_ckpt_dir=None,
+                 ckpt_path=None,
                  dropout=0.5,
                  log_dir=None):
         rps = []
@@ -403,14 +395,13 @@ class RewardPredictorEnsemble:
                 self.saver = tf.train.Saver(max_to_keep=1)
                 self.checkpoint_file = osp.join(log_dir, 'checkpoints',
                                                 'reward_network.ckpt')
-                if load_network:
-                    # TODO change the name of this to be clear we expect a file
-                    ckpt_f = rp_ckpt_dir
-                    print("Loading reward predictor checkpoint from", ckpt_f)
-                    self.saver.restore(sess, ckpt_f)
-                    print("Reard predictor checkpoint loaded!")
-                else:
+                if ckpt_path is None:
                     sess.run(tf.global_variables_initializer())
+                else:
+                    print("Loading reward predictor checkpoint from",
+                          ckpt_path)
+                    self.saver.restore(sess, ckpt_path)
+                    print("Reard predictor checkpoint loaded!")
 
                 self.train_writer = tf.summary.FileWriter(
                     osp.join(log_dir, 'reward_pred', 'train'), flush_secs=5)
