@@ -7,6 +7,7 @@ from collections import deque
 import numpy as np
 
 import cloudpickle
+from enduro_wrapper import EnduroWrapper
 import gym
 import gym_gridworld  # noqa: F401 (imported but unused)
 import params
@@ -65,7 +66,11 @@ def main():
 
     # Set up environment
 
-    env = wrap_deepmind_nomax(gym.make(args.env))
+    env = gym.make(args.env)
+    if args.env == 'EnduroNoFrameskip-v4':
+        print("Wrapping")
+        env = EnduroWrapper(env)
+    env = wrap_deepmind_nomax(env)
     env.unwrapped.maxsteps = 500
 
     with open(args.model, 'rb') as fh:
@@ -73,7 +78,9 @@ def main():
     print("Initialising...")
     model = make_model()
     print("Initialisation done!")
+    print("Loading checkpoint...")
     model.load(args.checkpoint)
+    print("Loading checkpoint done!")
 
     nenvs = 1
     nstack = int(model.step_model.X.shape[-1])
