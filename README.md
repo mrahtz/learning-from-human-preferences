@@ -38,6 +38,10 @@ In progress.
 
 ![](images/pong.gif)
 
+* 26/02/2018: Success reproduction of Enduro behaviour!
+
+![](images/enduro.gif)
+
 Future targets:
 * Implement remaining details (human error-adjusted softmax, label rate decay, etc.)
 * Final goal: reproduce Enduro behaviour from <https://blog.openai.com/deep-reinforcement-learning-from-human-preferences/>
