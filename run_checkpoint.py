@@ -9,7 +9,7 @@ import numpy as np
 import cloudpickle
 from enduro_wrapper import EnduroWrapper
 import gym
-import gym_gridworld  # noqa: F401 (imported but unused)
+import gym_moving_dot  # noqa: F401 (imported but unused)
 import params
 from baselines.common.atari_wrappers import wrap_deepmind_nomax
 from reward_predictor import RewardPredictorEnsemble
@@ -59,7 +59,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run a trained model.")
     parser.add_argument("model", help="e.g. LOG_DIR/make_model.pkl")
     parser.add_argument("checkpoint", help="e.g. LOG_DIR/checkpoint100000")
-    parser.add_argument("--env", default='GridWorldNoFrameskip-v4')
+    parser.add_argument("--env", default='MovingDotNoFrameskip-v0')
     parser.add_argument("--reward_predictor_checkpoint")
     parser.add_argument("--frame_interval_ms", type=float, default=0.)
     args = parser.parse_args()

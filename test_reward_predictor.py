@@ -7,7 +7,7 @@ from multiprocessing import Process
 import numpy as np
 
 import gym
-import gym_gridworld  # noqa: F401 (imported but unused)
+import gym_moving_dot  # noqa: F401 (imported but unused)
 import params
 from baselines.common.atari_wrappers import wrap_deepmind_nomax
 from reward_predictor import RewardPredictorEnsemble
@@ -30,7 +30,7 @@ def f(cluster_dict, rp_ckpt_dir):
 
 
 def test(rp):
-    env = wrap_deepmind_nomax(gym.make("GridWorldNoFrameskip-v4"))
+    env = wrap_deepmind_nomax(gym.make("MovingDotNoFrameskip-v0"))
     nh, nw, nc = env.observation_space.shape
     nenvs = 1
     nstack = 4

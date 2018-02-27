@@ -10,7 +10,8 @@ git reset --hard b5576dc23a5fcad0733042ab2ad440200ebb6209
 pip install .[atari]
 cd ..
 
-cd gym-gridworld
+git clone https://github.com/mrahtz/gym-moving-dot
+cd gym-moving-dot
 pip install .
 cd ..
 
