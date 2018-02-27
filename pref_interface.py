@@ -140,7 +140,7 @@ class PrefInterface:
             if len(segments) >= 2:
                 break
             print("Not enough segments yet; sleeping...")
-            time.sleep(1.0)
+            time.sleep(2.0)
 
         while True:
             pair_idxs = []
