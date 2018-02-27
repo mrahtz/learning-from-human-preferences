@@ -94,7 +94,7 @@ class Model(object):
                 td_map[train_model.M] = masks
             policy_loss, value_loss, policy_entropy, _ = sess.run(
                 [pg_loss, vf_loss, entropy, _train], td_map)
-            return policy_loss, value_loss, policy_entropy
+            return policy_loss, value_loss, policy_entropy, cur_lr
 
         def save(save_path):
             ps = sess.run(params)
@@ -420,7 +420,7 @@ def learn(policy,
                 train = True
                 print("Starting RL training")
 
-        policy_loss, value_loss, policy_entropy = model.train(
+        policy_loss, value_loss, policy_entropy, cur_lr = model.train(
             obs, states, rewards, masks, actions, values)
 
         fps_nsteps += nbatch
@@ -437,6 +437,7 @@ def learn(policy,
             logger.record_tabular("policy_entropy", float(policy_entropy))
             logger.record_tabular("value_loss", float(value_loss))
             logger.record_tabular("explained_variance", float(ev))
+            logger.record_tabular("learning_rate", cur_lr)
             logger.dump_tabular()
         if save_interval and (update % save_interval == 0
                               or update == 1) and logger.get_dir():
