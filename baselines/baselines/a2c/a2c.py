@@ -443,5 +443,3 @@ def learn(policy,
             savepath = osp.join(logger.get_dir(), 'checkpoint%.5i' % update)
             print('Saving to', savepath)
             model.save(savepath)
-
-    env.close()

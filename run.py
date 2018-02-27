@@ -176,7 +176,10 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
                 cluster_dict=cluster_dict)
         pi.init_reward_predictor(reward_predictor)
 
-        pi.run(seg_pipe, pref_pipe, segs_max)
+        def pi_procf():
+            pi.run(seg_pipe, pref_pipe, segs_max)
+        pi_proc = Process(target=pi_procf, daemon=True)
+        pi_proc.start()
 
     if 'train_reward' not in parts_to_run:
         go_pipe.put(True)
@@ -189,6 +192,10 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
         raise Exception("Error: no parts to wait for?")
 
     env.close()  # Kill the SubprocVecEnv processes
+    if 'train_proc' in parts_to_run:
+        train_proc.terminate()
+    if 'pref_interface' in parts_to_run:
+        pi_proc.terminate()
     ps_proc.terminate()
 
 
@@ -275,12 +282,14 @@ def main():
         params.params['save_freq'] = 1
         params.params['ckpt_freq'] = 1
         params.params['reward_predictor_val_interval'] = 1
+        num_frames = 5000
     else:
         params.params['n_initial_prefs'] = 500
         params.params['n_initial_epochs'] = args.n_initial_epochs
         params.params['save_freq'] = 10
         params.params['ckpt_freq'] = 100
         params.params['reward_predictor_val_interval'] = 50
+        num_frames = 1e6 * args.million_frames
 
     if args.env == 'GridWorldNoFrameskip-v4':
         params.params['policy'] = 'mlp'
@@ -311,7 +320,7 @@ def main():
 
     train(
         args.env,
-        num_frames=1e6 * args.million_frames,
+        num_frames=num_frames,
         seed=args.seed,
         lr=args.lr,
         rp_lr=args.rp_lr,
