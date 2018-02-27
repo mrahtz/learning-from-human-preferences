@@ -237,7 +237,7 @@ def main():
     parser.add_argument('--orig_rewards', action='store_true')
     parser.add_argument('--skip_prefs', action='store_true')
     parser.add_argument('--batchnorm', action='store_true')
-    parser.add_argument('--dropout', type=float, default=0.5)
+    parser.add_argument('--dropout', type=float, default=0.0)
     parser.add_argument('--n_preds', type=int, default=1)
     parser.add_argument('--save_initial_prefs', action='store_true')
     parser.add_argument('--random_queries', action='store_true')
