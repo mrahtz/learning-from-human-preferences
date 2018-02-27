@@ -21,6 +21,7 @@ sys.path.insert(0, 'baselines')
 from baselines import bench, logger  # noqa: E402 (import not at top of file)
 from baselines.a2c.a2c import learn  # noqa: E402
 from baselines.a2c.policies import MlpPolicy, CnnPolicy  # noqa: E402
+from baselines.a2c.utils import Scheduler  # noqa: E402
 from baselines.common import set_global_seeds  # noqa: E402
 from baselines.common.atari_wrappers import wrap_deepmind_nomax  # noqa: E402
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv  # noqa: E402, E501
@@ -42,14 +43,10 @@ def configure_logger(log_dir):
         dir=baselines_dir, output_formats=formats)
 
 
-def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
+def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
           rp_ckpt_path, load_prefs_dir, headless, log_dir, ent_coef,
           db_max, segs_max, log_interval, policy_ckpt_dir):
     configure_logger(log_dir)
-
-    num_timesteps = int(num_frames / 4 * 1.1)
-
-    # divide by 4 due to frameskip, then do a little extras so episodes end
 
     def make_env(rank):
         def _thunk():
@@ -120,16 +117,14 @@ def train(env_id, num_frames, seed, lr, rp_lr, lrschedule, num_cpu,
                     name='a2c',
                     cluster_dict=cluster_dict)
         learn(
-            policy_fn,
-            env,
-            seed,
-            seg_pipe,
-            go_pipe,
-            total_timesteps=num_timesteps,
-            lr=lr,
-            lrschedule=lrschedule,
+            policy=policy_fn,
+            env=env,
+            seed=seed,
+            seg_pipe=seg_pipe,
+            go_pipe=go_pipe,
             log_dir=log_dir,
-            ent_coef=0.01,
+            lr_scheduler=lr_scheduler,
+            total_timesteps=num_timesteps,
             log_interval=log_interval,
             load_path=policy_ckpt_dir,
             reward_predictor=reward_predictor,
@@ -211,14 +206,17 @@ def main():
         help='Learning rate schedule',
         choices=['constant', 'linear'],
         default='constant')
-    parser.add_argument('--lr', type=float, default=7e-4)
     parser.add_argument('--rp_lr', type=float, default=2e-4)
-    parser.add_argument(
-        '--million_frames',
-        help='How many frames to train (/ 1e6). '
-        'This number gets divided by 4 due to frameskip',
-        type=int,
-        default=40)
+    parser.add_argument('--lr', type=float, default=7e-4)
+    parser.add_argument("--lr_zero_million_timesteps",
+                        type=int, default=None,
+                        help='If set, decay learning rate linearly, reaching '
+                        ' zero at this many timesteps')
+    parser.add_argument('--million_timesteps',
+                        type=int, default=10,
+                        help='How many million timesteps to train for. '
+                             '(The number of frames trained for is this '
+                             'multiplied by 4 due to frameskip.)')
     parser.add_argument('--n_envs', type=int, default=1)
     parser.add_argument('--rp_ckpt_path')
     parser.add_argument('--load_prefs_dir')
@@ -282,14 +280,14 @@ def main():
         params.params['save_freq'] = 1
         params.params['ckpt_freq'] = 1
         params.params['reward_predictor_val_interval'] = 1
-        num_frames = 5000
+        num_timesteps = 1000
     else:
         params.params['n_initial_prefs'] = 500
         params.params['n_initial_epochs'] = args.n_initial_epochs
         params.params['save_freq'] = 10
         params.params['ckpt_freq'] = 100
         params.params['reward_predictor_val_interval'] = 50
-        num_frames = 1e6 * args.million_frames
+        num_timesteps = int(args.million_timesteps * 1e6)
 
     if args.env == 'MovingDotNoFrameskip-v0':
         params.params['policy'] = 'mlp'
@@ -318,13 +316,22 @@ def main():
         print(args, file=args_file)
         print(params.params, file=args_file)
 
+    if args.lr_zero_million_timesteps is None:
+        schedule = 'constant'
+        nvalues = 0  # ignored
+    else:
+        schedule = 'linear'
+        nvalues = int(args.lr_zero_million_timesteps * 1e6)
+    lr_scheduler = Scheduler(v=args.lr,
+                             nvalues=nvalues,
+                             schedule=schedule)
+
     train(
-        args.env,
-        num_frames=num_frames,
+        env_id=args.env,
+        num_timesteps=num_timesteps,
         seed=args.seed,
-        lr=args.lr,
+        lr_scheduler=lr_scheduler,
         rp_lr=args.rp_lr,
-        lrschedule=args.lrschedule,
         num_cpu=args.n_envs,
         rp_ckpt_path=args.rp_ckpt_path,
         load_prefs_dir=args.load_prefs_dir,

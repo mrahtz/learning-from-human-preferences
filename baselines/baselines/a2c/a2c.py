@@ -10,7 +10,7 @@ import joblib
 import params as run_params
 import tensorflow as tf
 from baselines import logger
-from baselines.a2c.utils import (Scheduler, cat_entropy, discount_with_dones,
+from baselines.a2c.utils import (cat_entropy, discount_with_dones,
                                  find_trainable_variables, make_path, mse)
 from baselines.common import explained_variance, set_global_seeds
 from utils import Segment
@@ -31,14 +31,13 @@ class Model(object):
                  nsteps,
                  nstack,
                  num_procs,
+                 lr_scheduler,
                  ent_coef=0.01,
                  vf_coef=0.5,
                  max_grad_norm=0.5,
-                 lr=7e-4,
                  alpha=0.99,
                  epsilon=1e-5,
-                 total_timesteps=int(80e6),
-                 lrschedule='linear'):
+                 total_timesteps=int(80e6)):
         config = tf.ConfigProto(
             allow_soft_placement=True,
             intra_op_parallelism_threads=num_procs,
@@ -73,12 +72,10 @@ class Model(object):
             learning_rate=LR, decay=alpha, epsilon=epsilon)
         _train = trainer.apply_gradients(grads)
 
-        lr = Scheduler(v=lr, nvalues=total_timesteps, schedule=lrschedule)
-
         def train(obs, states, rewards, masks, actions, values):
             advs = rewards - values
             for step in range(len(obs)):
-                cur_lr = lr.value()
+                cur_lr = lr_scheduler.value()
             if run_params.params['print_lr']:
                 import datetime
                 print(str(datetime.datetime.now()), cur_lr)
@@ -322,14 +319,13 @@ def learn(policy,
           seg_pipe,
           go_pipe,
           log_dir,
+          lr_scheduler,
           nsteps=5,
           nstack=4,
           total_timesteps=int(80e6),
           vf_coef=0.5,
           ent_coef=0.01,
           max_grad_norm=0.5,
-          lr=7e-4,
-          lrschedule='linear',
           epsilon=1e-5,
           alpha=0.99,
           gamma=0.99,
@@ -359,11 +355,10 @@ def learn(policy,
             ent_coef=ent_coef,
             vf_coef=vf_coef,
             max_grad_norm=max_grad_norm,
-            lr=lr,
+            lr_scheduler=lr_scheduler,
             alpha=alpha,
             epsilon=epsilon,
-            total_timesteps=total_timesteps,
-            lrschedule=lrschedule)
+            total_timesteps=total_timesteps)
 
     if save_interval and logger.get_dir():
         import cloudpickle
