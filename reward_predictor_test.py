@@ -7,7 +7,7 @@ from numpy.testing import (assert_allclose, assert_approx_equal,
                            assert_array_equal, assert_raises)
 
 import gym
-import gym_gridworld  # noqa: F401 (imported but unused)
+import gym_moving_dot  # noqa: F401 (imported but unused)
 import params
 import tensorflow as tf
 from baselines.common.atari_wrappers import wrap_deepmind_nomax
@@ -256,7 +256,7 @@ class TestRewardPredictor(unittest.TestCase):
         Test whether the handcrafted reward function can extract the position
         of the dot correctly
         """
-        env = wrap_deepmind_nomax(gym.make('GridWorldNoFrameskip-v4'))
+        env = wrap_deepmind_nomax(gym.make('MovingDotNoFrameskip-v0'))
 
         nh, nw, nc = env.observation_space.shape
         nenvs = 1

@@ -9,7 +9,7 @@ import time
 from multiprocessing import Process, Queue
 
 import gym
-import gym_gridworld  # noqa: F401 (imported but unused)
+import gym_moving_dot  # noqa: F401 (imported but unused)
 import params
 
 from pref_interface import PrefInterface
@@ -291,7 +291,7 @@ def main():
         params.params['reward_predictor_val_interval'] = 50
         num_frames = 1e6 * args.million_frames
 
-    if args.env == 'GridWorldNoFrameskip-v4':
+    if args.env == 'MovingDotNoFrameskip-v0':
         params.params['policy'] = 'mlp'
     elif args.env == 'PongNoFrameskip-v4':
         params.params['policy'] = 'cnn'
