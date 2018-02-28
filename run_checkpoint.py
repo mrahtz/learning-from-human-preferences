@@ -1,23 +1,26 @@
 #!/usr/bin/env python
 
 import argparse
+import sys
 import time
 from collections import deque
 
 import numpy as np
 
 import cloudpickle
-from enduro_wrapper import EnduroWrapper
 import gym
 import gym_moving_dot  # noqa: F401 (imported but unused)
+import matplotlib
+import matplotlib.pyplot as plt  # noqa: E401 (import not at top of file)
 import params
-from baselines.common.atari_wrappers import wrap_deepmind_nomax
+from enduro_wrapper import EnduroWrapper
+from matplotlib.ticker import FormatStrFormatter  # noqa: E401
 from reward_predictor import RewardPredictorEnsemble
 
-import matplotlib
+sys.path.insert(0, 'baselines')
+from baselines.common.atari_wrappers import wrap_deepmind_nomax
+
 matplotlib.use('Qt5Agg')
-import matplotlib.pyplot as plt  # noqa: E401 (import not at top of file)
-from matplotlib.ticker import FormatStrFormatter  # noqa: E401
 
 
 def update_obs(obs, raw_obs, nc):
