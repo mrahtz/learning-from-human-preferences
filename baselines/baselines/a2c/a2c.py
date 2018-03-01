@@ -326,7 +326,7 @@ def learn(policy,
           gamma=0.99,
           log_interval=100,
           load_path=None,
-          save_interval=10000,
+          save_interval=1000,
           reward_predictor=None,
           episode_vid_queue=None):
 
