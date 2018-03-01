@@ -302,6 +302,8 @@ class Runner(object):
         mb_obs = mb_obs.reshape(self.batch_ob_shape)
         last_values = self.model.value(self.obs, self.states,
                                        self.dones).tolist()
+        t7 = time.time()
+        logkv("bootstrap_rewards_ms", (t7 - t6) * 1000)
         # discount/bootstrap off value fn
         for n, (rewards, dones, value) in enumerate(
                 zip(mb_rewards, mb_dones, last_values)):
@@ -318,8 +320,8 @@ class Runner(object):
                 rewards = discount_with_dones(rewards, dones, self.gamma)
             mb_rewards[n] = rewards
 
-        t7 = time.time()
-        logkv('discount_rewards_ms', (t7 - t6) * 1000)
+        t8 = time.time()
+        logkv('discount_rewards_ms', (t8 - t7) * 1000)
 
         mb_rewards = mb_rewards.flatten()
         mb_actions = mb_actions.flatten()
