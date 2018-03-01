@@ -205,11 +205,11 @@ def main():
     parser.add_argument('--rp_lr', type=float, default=2e-4)
     parser.add_argument('--lr', type=float, default=7e-4)
     parser.add_argument("--lr_zero_million_timesteps",
-                        type=int, default=None,
+                        type=float, default=None,
                         help='If set, decay learning rate linearly, reaching '
                         ' zero at this many timesteps')
     parser.add_argument('--million_timesteps',
-                        type=int, default=10,
+                        type=float, default=10.,
                         help='How many million timesteps to train for. '
                              '(The number of frames trained for is this '
                              'multiplied by 4 due to frameskip.)')
