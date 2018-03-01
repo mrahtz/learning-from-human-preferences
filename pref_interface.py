@@ -139,7 +139,7 @@ class PrefInterface:
             self.recv_segments(segments, seg_pipe, segs_max)
             if len(segments) >= 2:
                 break
-            print("Not enough segments yet; sleeping...")
+            print("Waiting for segments...")
             time.sleep(2.0)
 
         while True:
