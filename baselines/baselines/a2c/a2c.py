@@ -148,8 +148,7 @@ class Runner(object):
         self.reward_predictor = reward_predictor
         self.episode_vid_queue = episode_vid_queue
 
-        self.n_episodes = [0 for _ in range(nenv)]
-        self.true_reward = [0 for _ in range(nenv)]
+        self.orig_reward = [0 for _ in range(nenv)]
         self.tr_ops = [tf.Variable(0) for _ in range(nenv)]
         self.summ_ops = [
             tf.summary.scalar('true reward %d' % env_n, self.tr_ops[env_n])
@@ -157,7 +156,7 @@ class Runner(object):
         ]
         self.sess = tf.Session()
         self.writer = tf.summary.FileWriter(
-            osp.join(log_dir, 'true_reward'), flush_secs=5)
+            osp.join(log_dir, 'orig_reward'), flush_secs=5)
         self.sess.run([op.initializer for op in self.tr_ops])
 
     def update_obs(self, obs):
@@ -251,22 +250,18 @@ class Runner(object):
         t2 = time.time()
         logkv('env_steps_ms', (t2 - t1) * 1000)
 
-        # Log true rewards
+        # Log original rewards
         for env_n, (rs, dones) in enumerate(zip(mb_rewards, mb_dones)):
             assert_equal(rs.shape, (self.nsteps, ))
             assert_equal(dones.shape, (self.nsteps, ))
             for step_n in range(self.nsteps):
-                self.true_reward[env_n] += rs[step_n]
+                self.orig_reward[env_n] += rs[step_n]
                 if dones[step_n]:
-                    if run_params.params['debug']:
-                        print("Env %d: episode finished, true reward %d" %
-                              (env_n, self.true_reward[env_n]))
-                    a = self.tr_ops[env_n].assign(self.true_reward[env_n])
-                    self.sess.run(a)
-                    summ = self.sess.run(self.summ_ops[env_n])
-                    self.writer.add_summary(summ, self.n_episodes[env_n])
-                    self.true_reward[env_n] = 0
-                    self.n_episodes[env_n] += 1
+                    logger.record_tabular(
+                        "orig_reward_{}".format(env_n),
+                        self.orig_reward[env_n])
+                    logger.dump_tabular()
+                    self.orig_reward[env_n] = 0
 
         t3 = time.time()
         logkv('log_rewards_ms', (t3 - t2) * 1000)
