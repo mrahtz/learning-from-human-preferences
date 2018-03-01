@@ -16,6 +16,7 @@ from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble, train_reward_predictor
 from enduro_wrapper import EnduroWrapper
 from utils import vid_proc
+import easy_tf_log
 
 sys.path.insert(0, 'baselines')
 from baselines import bench, logger  # noqa: E402 (import not at top of file)
@@ -320,6 +321,10 @@ def main():
     lr_scheduler = Scheduler(v=args.lr,
                              nvalues=nvalues,
                              schedule=schedule)
+
+    misc_logs_dir = osp.join(log_dir, 'misc')
+    os.makedirs(misc_logs_dir)
+    easy_tf_log.set_dir(misc_logs_dir)
 
     train(
         env_id=args.env,
