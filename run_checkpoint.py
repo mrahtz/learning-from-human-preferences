@@ -11,7 +11,7 @@ import numpy as np
 from matplotlib.ticker import FormatStrFormatter
 
 import gym
-import gym_gridworld  # noqa: F401 (imported but unused)
+import gym_moving_dot  # noqa: F401 (imported but unused)
 import params
 from enduro_wrapper import EnduroWrapper
 from reward_predictor import RewardPredictorEnsemble
