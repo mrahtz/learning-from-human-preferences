@@ -5,22 +5,22 @@ import sys
 import time
 from collections import deque
 
-import numpy as np
-
 import cloudpickle
-import gym
-import gym_moving_dot  # noqa: F401 (imported but unused)
 import matplotlib
-import matplotlib.pyplot as plt  # noqa: E401 (import not at top of file)
+import numpy as np
+from matplotlib.ticker import FormatStrFormatter
+
+import gym
+import gym_gridworld  # noqa: F401 (imported but unused)
 import params
 from enduro_wrapper import EnduroWrapper
-from matplotlib.ticker import FormatStrFormatter  # noqa: E401
 from reward_predictor import RewardPredictorEnsemble
 
-sys.path.insert(0, 'baselines')
-from baselines.common.atari_wrappers import wrap_deepmind_nomax
-
-matplotlib.use('Qt5Agg')
+if True:  # To silence flake8 warnings about imports not at top
+    matplotlib.use('Qt5Agg')
+    import matplotlib.pyplot as plt
+    sys.path.insert(0, 'baselines')
+    from baselines.common.atari_wrappers import wrap_deepmind_nomax
 
 
 def update_obs(obs, raw_obs, nc):
@@ -35,6 +35,7 @@ class ValueGraph:
         self.ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
         self.fig.set_size_inches(4, 2)
         self.ax.set_xlim([0, 100])
+        self.ax.grid(axis='y')  # Draw a line at 0 reward
         self.y_min = float('inf')
         self.y_max = -float('inf')
         self.line, = self.ax.plot([], [])
