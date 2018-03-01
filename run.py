@@ -280,7 +280,7 @@ def main():
         params.params['n_initial_prefs'] = 500
         params.params['n_initial_epochs'] = args.n_initial_epochs
         params.params['save_freq'] = 10
-        params.params['ckpt_freq'] = 100
+        params.params['ckpt_freq'] = 20
         params.params['reward_predictor_val_interval'] = 50
         num_timesteps = int(args.million_timesteps * 1e6)
 
