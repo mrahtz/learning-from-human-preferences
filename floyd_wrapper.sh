@@ -15,6 +15,11 @@ cd gym-moving-dot
 pip install .
 cd ..
 
+git clone https://github.com/mrahtz/easy-tf-log
+cd easy-tf-log
+pip install .
+cd ..
+
 pip install --upgrade cython cloudpickle joblib azure==1.0.3 mpi4py
 
 $*
