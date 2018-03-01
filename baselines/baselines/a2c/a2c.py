@@ -14,6 +14,7 @@ from baselines.a2c.utils import (cat_entropy, discount_with_dones,
                                  find_trainable_variables, make_path, mse)
 from baselines.common import explained_variance, set_global_seeds
 from utils import Segment
+from easy_tf_log import logkv
 
 
 """
@@ -201,6 +202,7 @@ class Runner(object):
                 self.episode_frames = []
 
     def run(self):
+        t1 = time.time()
         nenvs = len(self.env.remotes)
         mb_obs, mb_rewards, mb_actions, mb_values, mb_dones = \
             [], [], [], [], []
@@ -246,6 +248,9 @@ class Runner(object):
         # before we'd actually run any steps, so drop it.
         mb_dones = mb_dones[:, 1:]
 
+        t2 = time.time()
+        logkv('env_steps_ms', (t2 - t1) * 1000)
+
         # Log true rewards
         for env_n, (rs, dones) in enumerate(zip(mb_rewards, mb_dones)):
             assert_equal(rs.shape, (self.nsteps, ))
@@ -263,13 +268,22 @@ class Runner(object):
                     self.true_reward[env_n] = 0
                     self.n_episodes[env_n] += 1
 
+        t3 = time.time()
+        logkv('log_rewards_ms', (t3 - t2) * 1000)
+
         # Generate segments
         if self.reward_predictor:
             self.gen_segments(mb_obs, mb_rewards, mb_dones)
 
+        t4 = time.time()
+        logkv('gen_segments_ms', (t4 - t3) * 1000)
+
         # Save frames for episode rendering
         if self.episode_vid_queue is not None:
             self.save_episode_frames(mb_obs, mb_dones)
+
+        t5 = time.time()
+        logkv('save_frames_ms', (t5 - t4) * 1000)
 
         # Replace rewards with those from reward predictor
         if run_params.params['debug']:
@@ -285,6 +299,9 @@ class Runner(object):
 
             if run_params.params['debug']:
                 print("Predicted rewards:\n", mb_rewards)
+
+        t6 = time.time()
+        logkv('pred_rewards_ms', (t6 - t5) * 1000)
 
         # Discount rewards
         mb_obs = mb_obs.reshape(self.batch_ob_shape)
@@ -305,6 +322,9 @@ class Runner(object):
             else:
                 rewards = discount_with_dones(rewards, dones, self.gamma)
             mb_rewards[n] = rewards
+
+        t7 = time.time()
+        logkv('discount_rewards_ms', (t7 - t6) * 1000)
 
         mb_rewards = mb_rewards.flatten()
         mb_actions = mb_actions.flatten()
@@ -402,8 +422,11 @@ def learn(policy,
     fps_nsteps = 0
     train = False
     for update in range(1, total_timesteps // nbatch + 1):
+        t1 = time.time()
         # Run for nsteps
         obs, states, rewards, masks, actions, values = runner.run()
+        t2 = time.time()
+        logkv('runner_run_ms', (t2 - t1) * 1000)
 
         # Before we're told to start training, just generate segments
         if not train:
@@ -417,6 +440,9 @@ def learn(policy,
 
         policy_loss, value_loss, policy_entropy, cur_lr = model.train(
             obs, states, rewards, masks, actions, values)
+
+        t3 = time.time()
+        logkv('model_train_ms', (t3 - t2) * 1000)
 
         fps_nsteps += nbatch
 
