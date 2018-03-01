@@ -201,11 +201,6 @@ def main():
     parser.add_argument(
         '--env', help='environment ID', default='EnduroNoFrameskip-v4')
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument(
-        '--lrschedule',
-        help='Learning rate schedule',
-        choices=['constant', 'linear'],
-        default='constant')
     parser.add_argument('--rp_lr', type=float, default=2e-4)
     parser.add_argument('--lr', type=float, default=7e-4)
     parser.add_argument("--lr_zero_million_timesteps",
