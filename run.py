@@ -313,7 +313,7 @@ def main():
 
     if args.lr_zero_million_timesteps is None:
         schedule = 'constant'
-        nvalues = 0  # ignored
+        nvalues = 1  # ignored
     else:
         schedule = 'linear'
         nvalues = int(args.lr_zero_million_timesteps * 1e6)
