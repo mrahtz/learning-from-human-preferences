@@ -260,7 +260,7 @@ class Runner(object):
                     logger.record_tabular(
                         "orig_reward_{}".format(env_n),
                         self.orig_reward[env_n])
-                    logger.dump_tabular()
+                    # logger.dump_tabular() will be called later on
                     self.orig_reward[env_n] = 0
 
         t3 = time.time()
@@ -457,8 +457,15 @@ def learn(policy,
             logger.record_tabular("explained_variance", float(ev))
             logger.record_tabular("learning_rate", cur_lr)
             logger.dump_tabular()
+
+        t4 = time.time()
+        logkv('logger_dump_ms', (t4 - t3) * 1000)
+
         if save_interval and (update % save_interval == 0
                               or update == 1) and logger.get_dir():
             savepath = osp.join(logger.get_dir(), 'checkpoint%.5i' % update)
             print('Saving to', savepath)
             model.save(savepath)
+
+        t5 = time.time()
+        logkv('a2c_save_ms', (t5 - t4) * 1000)
