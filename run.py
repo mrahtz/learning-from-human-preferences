@@ -131,7 +131,8 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
             log_interval=log_interval,
             load_path=policy_ckpt_dir,
             reward_predictor=reward_predictor,
-            episode_vid_queue=episode_vid_queue)
+            episode_vid_queue=episode_vid_queue,
+            ent_coef=ent_coef)
 
     def trp():
         reward_predictor = RewardPredictorEnsemble(
