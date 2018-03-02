@@ -1,4 +1,5 @@
 import queue
+import random
 import socket
 import time
 
@@ -187,7 +188,13 @@ def vid_proc(q, playback_speed=1, zoom_factor=1, mode='restart_on_get'):
                 time.sleep(1/60)
 
 
-def get_port_range(start_port, n_ports):
+def get_port_range(start_port, n_ports, random_stagger=False):
+    # If multiple runs try and call this function at the same time,
+    # the function could return the same port range.
+    # To guard against this, automatically offset the port range.
+    if random_stagger:
+        start_port += random.randint(0, 20) * n_ports
+
     free_range_found = False
     while not free_range_found:
         ports = []
