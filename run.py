@@ -101,7 +101,10 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
     if params.params['no_a2c']:
         parts_to_run.remove('a2c')
 
-    ports = get_port_range(start_port=2200, n_ports=len(parts_to_run) + 1)
+    ports = get_port_range(
+        start_port=2200,
+        n_ports=len(parts_to_run) + 1,
+        random_stagger=True)
     cluster_dict = {'ps': ['localhost:{}'.format(ports[0])]}
     for part, port in zip(parts_to_run, ports[1:]):
         cluster_dict[part] = ['localhost:{}'.format(port)]
