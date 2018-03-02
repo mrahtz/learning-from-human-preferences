@@ -1,0 +1,20 @@
+[[source]]
+
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+
+[packages]
+
+tensorflow = "*"
+scipy = "*"
+joblib = "*"
+gym = {extras = ["atari"]}
+gym-moving-dot = {git = 'https://github.com/mrahtz/gym-moving-dot'}
+easy-tf-log = {git = 'https://github.com/mrahtz/easy-tf-log'}
+cloudpickle = "*"
+
+
+[dev-packages]
+
