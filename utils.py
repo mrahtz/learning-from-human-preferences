@@ -1,4 +1,5 @@
 import queue
+import socket
 import time
 
 import numpy as np
@@ -184,3 +185,30 @@ def vid_proc(q, playback_speed=1, zoom_factor=1, mode='restart_on_get'):
             except queue.Empty:
                 t = (t + playback_speed) % len(frames)
                 time.sleep(1/60)
+
+
+def get_port_range(start_port, n_ports):
+    free_range_found = False
+    while not free_range_found:
+        ports = []
+        for port_n in range(n_ports):
+            port = start_port + port_n
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.bind(("127.0.0.1", port))
+                ports.append(port)
+            except socket.error as e:
+                if e.errno == 48:
+                    break
+                else:
+                    raise e
+            finally:
+                s.close()
+        if len(ports) < n_ports:
+            # The last port we tried was in use
+            # Try again, starting from the next port
+            start_port = port + 1
+        else:
+            free_range_found = True
+
+    return ports

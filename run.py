@@ -15,7 +15,7 @@ import params
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble, train_reward_predictor
 from enduro_wrapper import EnduroWrapper
-from utils import vid_proc
+from utils import vid_proc, get_port_range
 import easy_tf_log
 
 sys.path.insert(0, 'baselines')
@@ -101,10 +101,9 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
     if params.params['no_a2c']:
         parts_to_run.remove('a2c')
 
-    port = 2200
-    cluster_dict = {'ps': ['localhost:{}'.format(port)]}
-    for part in parts_to_run:
-        port += 1
+    ports = get_port_range(start_port=2200, n_ports=len(parts_to_run) + 1)
+    cluster_dict = {'ps': ['localhost:{}'.format(ports[0])]}
+    for part, port in zip(parts_to_run, ports[1:]):
         cluster_dict[part] = ['localhost:{}'.format(port)]
 
     def ps():

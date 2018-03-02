@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
+import socket
 import unittest
 
 import numpy as np
 
-from utils import RunningStat, PrefDB
+from utils import PrefDB, RunningStat, get_port_range
 
 
 class TestUtils(unittest.TestCase):
@@ -94,6 +95,34 @@ class TestUtils(unittest.TestCase):
         p.del_first()
         self.assertEquals(len(p.prefs), 0)
         self.assertEquals(len(p.segments), 0)
+
+    def test_get_port_range(self):
+        # Test 1: if we ask for 3 ports starting from port 60000
+        # (which nothing should be listening on), we should get back
+        # 60000, 60001 and 60002
+        ports = get_port_range(60000, 3)
+        self.assertEqual(ports, [60000, 60001, 60002])
+
+        # Test 2: if we set something listening on port 60000
+        # then ask for the same ports as in test 1,
+        # the function should skip over 60000 and give us the next
+        # three ports
+        s1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s1.bind(("127.0.0.1", 60000))
+        ports = get_port_range(60000, 3)
+        self.assertEqual(ports, [60001, 60002, 60003])
+
+        # Test 3: if we set something listening on port 60002,
+        # the function should realise it can't allocate a continuous
+        # range starting from 60000 and should give us a range starting
+        # from 60003
+        s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s2.bind(("127.0.0.1", 60002))
+        ports = get_port_range(60000, 3)
+        self.assertEqual(ports, [60003, 60004, 60005])
+
+        s2.close()
+        s1.close()
 
 
 if __name__ == '__main__':
