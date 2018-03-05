@@ -289,7 +289,7 @@ def train_reward_predictor(reward_predictor, lr, pref_pipe, go_pipe,
         recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
 
         if params.params['save_prefs'] and \
-                step % params.params['save_freq'] == 0:
+                step % params.params['prefs_save_interval'] == 0:
             print("=== Saving preferences...")
             fname = osp.join(log_dir, "train_%d.pkl" % step)
             save_pref_db(pref_db_train, fname)
@@ -603,7 +603,8 @@ class RewardPredictorEnsemble:
                 summaries = self.sess.run(self.summaries, feed_dict)
                 self.test_writer.add_summary(summaries, self.n_steps)
 
-            if self.n_steps % params.params['ckpt_freq'] == 0:
+            ckpt_interval = params.params['reward_predictor_ckpt_interval']
+            if self.n_steps % ckpt_interval == 0 and self.n_steps != 0:
                 self.save()
 
 
