@@ -396,26 +396,31 @@ def learn(policy,
     fps_tstart = time.time()
     fps_nsteps = 0
     train = False
+
+    # Before we're told to start training the policy itself,
+    # just generate segments for the reward predictor to be trained with
+    while not train:
+        obs, states, rewards, masks, actions, values = runner.run()
+        logger.dump_tabular()  # Write original reward logs
+        try:
+            go_pipe.get(block=False)
+        except queue.Empty:
+            continue
+        else:
+            train = True
+
+    print("Starting RL training")
+
     for update in range(1, total_timesteps // nbatch + 1):
         # Run for nsteps
         obs, states, rewards, masks, actions, values = runner.run()
-
-        # Before we're told to start training, just generate segments
-        if not train:
-            try:
-                go_pipe.get(block=False)
-            except queue.Empty:
-                continue
-            else:
-                train = True
-                print("Starting RL training")
 
         policy_loss, value_loss, policy_entropy, cur_lr = model.train(
             obs, states, rewards, masks, actions, values)
 
         fps_nsteps += nbatch
 
-        if update % log_interval == 0 or update == 1:
+        if update % log_interval == 0 and update != 0:
             fps = fps_nsteps / (time.time() - fps_tstart)
             fps_nsteps = 0
             fps_tstart = time.time()
