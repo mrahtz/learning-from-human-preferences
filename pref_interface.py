@@ -139,7 +139,7 @@ class PrefInterface:
             self.recv_segments(segments, seg_pipe, segs_max)
             if len(segments) >= 2:
                 break
-            print("Waiting for segments...")
+            print("Waiting for segments")
             time.sleep(2.0)
 
         while True:
@@ -155,7 +155,11 @@ class PrefInterface:
                 print(pair_idxs)
 
             if not params.params['random_query']:
-                (n1, n2), s1, s2 = self.least_certain_seg_pair(segments, pair_idxs)
+                # TODO: this /might/ be currently broken
+                # e.g. try running
+                # ./run.py --n_initial_prefs 1 --headless
+                (n1, n2), s1, s2 = \
+                    self.least_certain_seg_pair(segments, pair_idxs)
             else:
                 i = np.random.choice(len(pair_idxs))
                 (n1, n2) = pair_idxs[i]

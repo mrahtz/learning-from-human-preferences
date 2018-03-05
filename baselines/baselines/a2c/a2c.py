@@ -100,11 +100,19 @@ class Model(object):
         self.value = step_model.value
         self.initial_state = step_model.initial_state
         self.sess = sess
-        self.saver = tf.train.Saver(max_to_keep=1)
+        # Why var_list=params?
+        # Otherwise we'll also save optimizer parameters,
+        # which take up a /lot/ of space.
+        # Why save_relative_paths=True?
+        # So that the plain-text 'checkpoint' file written uses relative paths,
+        # which seems to be needed in order to avoid confusing saver.restore()
+        # when restoring from FloydHub runs.
+        self.saver = tf.train.Saver(
+            max_to_keep=1, var_list=params, save_relative_paths=True)
         tf.global_variables_initializer().run(session=sess)
 
     def load(self, ckpt_path):
-        self.saver.restore(self.sess, self.ckpt_path)
+        self.saver.restore(self.sess, ckpt_path)
 
     def save(self, ckpt_path, step_n):
         return self.saver.save(self.sess, ckpt_path, step_n)
@@ -148,8 +156,6 @@ class Runner(object):
             for env_n in range(nenv)
         ]
         self.sess = tf.Session()
-        self.writer = tf.summary.FileWriter(
-            osp.join(log_dir, 'orig_reward'), flush_secs=5)
         self.sess.run([op.initializer for op in self.tr_ops])
 
     def update_obs(self, obs):
@@ -354,18 +360,16 @@ def learn(policy,
     with open(osp.join(ckpt_dir, 'make_model.pkl'), 'wb') as fh:
         fh.write(cloudpickle.dumps(make_model))
 
-    print("Initialising model...")
+    print("Initialising policy...")
     if load_path is None:
         model = make_model()
     else:
-        # TODO: this still doesn't seem to be loading the most recent
-        # checkpoint in FloydHub runs (e.g. 193). Not sure whether it's this
-        # code that's broken, or the way that baselines is loaded.
         with open(osp.join(load_path, 'make_model.pkl'), 'rb') as fh:
             make_model = cloudpickle.loads(fh.read())
         model = make_model()
 
-        ckpt_path = osp.join(load_path, 'policy')
+        ckpt_path = tf.train.latest_checkpoint(load_path)
+        model.load(ckpt_path)
         print("Loaded policy from checkpoint '{}'".format(ckpt_path))
 
     ckpt_path = osp.join(ckpt_dir, 'policy')
@@ -381,14 +385,14 @@ def learn(policy,
         reward_predictor=reward_predictor,
         episode_vid_queue=episode_vid_queue)
 
-    print("Running...")
-
     # nsteps: e.g. 5
     # nenvs: e.g. 16
     nbatch = nenvs * nsteps
     fps_tstart = time.time()
     fps_nsteps = 0
     train = False
+
+    print("Starting agent(s)")
 
     # Before we're told to start training the policy itself,
     # just generate segments for the reward predictor to be trained with
@@ -402,7 +406,7 @@ def learn(policy,
         else:
             train = True
 
-    print("Starting RL training")
+    print("Starting policy training")
 
     for update in range(1, total_timesteps // nbatch + 1):
         # Run for nsteps
