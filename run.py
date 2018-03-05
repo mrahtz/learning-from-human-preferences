@@ -218,7 +218,6 @@ def main():
                              '(The number of frames trained for is this '
                              'multiplied by 4 due to frameskip.)')
     parser.add_argument('--n_envs', type=int, default=1)
-    parser.add_argument('--rp_ckpt_path')
     parser.add_argument('--load_prefs_dir')
     parser.add_argument('--headless', action='store_true')
     seconds_since_epoch = str(int(time.time()))
@@ -248,9 +247,28 @@ def main():
     parser.add_argument('--no_gather_prefs', action='store_true')
     parser.add_argument('--no_a2c', action='store_true')
     parser.add_argument('--render_episodes', action='store_true')
-    parser.add_argument('--load_policy_ckpt_dir')
+
+    # Reward predictor options
+    parser.add_argument('--n_initial_prefs', type=int, default=500,
+                        help='How many preferences to collect from a random '
+                             'policy before starting reward predictor '
+                             'training')
+    parser.add_argument('--load_reward_predictor_ckpt',
+                        help='File to load reward predictor checkpoint from '
+                             '(e.g. runs/foo/reward_predictor_checkpoints/'
+                             'reward_predictor.ckpt-100)')
+
+    parser.add_argument('--reward_predictor_ckpt_interval',
+                        type=int, default=100,
+                        help='No. training batches between reward '
+                             'predictor checkpoints')
+
+    # A2C options
+    parser.add_argument('--load_policy_ckpt_dir',
+                        help='Load a policy checkpoint from this directory.')
     parser.add_argument('--policy_ckpt_interval', type=int, default=100,
                         help="No. updates between policy checkpoints")
+
     args = parser.parse_args()
 
     params.init_params()
@@ -284,10 +302,11 @@ def main():
         params.params['reward_predictor_val_interval'] = 1
         num_timesteps = 1000
     else:
-        params.params['n_initial_prefs'] = 500
+        params.params['n_initial_prefs'] = args.n_initial_prefs
         params.params['n_initial_epochs'] = args.n_initial_epochs
         params.params['prefs_save_interval'] = 10
-        params.params['reward_predictor_ckpt_interval'] = 20
+        params.params['reward_predictor_ckpt_interval'] = \
+            args.reward_predictor_ckpt_interval
         params.params['reward_predictor_val_interval'] = 50
         num_timesteps = int(args.million_timesteps * 1e6)
 
@@ -339,7 +358,7 @@ def main():
         lr_scheduler=lr_scheduler,
         rp_lr=args.rp_lr,
         num_cpu=args.n_envs,
-        rp_ckpt_path=args.rp_ckpt_path,
+        rp_ckpt_path=args.load_reward_predictor_ckpt,
         load_prefs_dir=args.load_prefs_dir,
         headless=args.headless,
         log_dir=log_dir,
