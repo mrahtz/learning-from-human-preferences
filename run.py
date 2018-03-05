@@ -45,8 +45,8 @@ def configure_logger(log_dir):
 
 
 def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
-          rp_ckpt_path, load_prefs_dir, headless, log_dir, ent_coef,
-          db_max, segs_max, log_interval, policy_ckpt_dir):
+          rp_ckpt_path, load_prefs_dir, headless, log_dir, ent_coef, db_max,
+          segs_max, log_interval, policy_ckpt_dir, policy_ckpt_interval):
     configure_logger(log_dir)
 
     def make_env(rank):
@@ -132,7 +132,8 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
             load_path=policy_ckpt_dir,
             reward_predictor=reward_predictor,
             episode_vid_queue=episode_vid_queue,
-            ent_coef=ent_coef)
+            ent_coef=ent_coef,
+            save_interval=policy_ckpt_interval)
 
     def trp():
         reward_predictor = RewardPredictorEnsemble(
@@ -236,7 +237,6 @@ def main():
     parser.add_argument('--save_pretrain', action='store_true')
     parser.add_argument('--print_lr', action='store_true')
     parser.add_argument('--n_initial_epochs', type=int, default=200)
-    parser.add_argument('--policy_ckpt_dir')
     parser.add_argument('--log_dir')
     parser.add_argument('--orig_rewards', action='store_true')
     parser.add_argument('--skip_prefs', action='store_true')
@@ -248,6 +248,9 @@ def main():
     parser.add_argument('--no_gather_prefs', action='store_true')
     parser.add_argument('--no_a2c', action='store_true')
     parser.add_argument('--render_episodes', action='store_true')
+    parser.add_argument('--load_policy_ckpt_dir')
+    parser.add_argument('--policy_ckpt_interval', type=int, default=100,
+                        help="No. updates between policy checkpoints")
     args = parser.parse_args()
 
     params.init_params()
@@ -276,15 +279,15 @@ def main():
         print("=== WARNING: running in test mode", file=sys.stderr)
         params.params['n_initial_prefs'] = 2
         params.params['n_initial_epochs'] = 1
-        params.params['save_freq'] = 1
-        params.params['ckpt_freq'] = 1
+        params.params['prefs_save_interval'] = 1
+        params.params['reward_predictor_ckpt_interval'] = 1
         params.params['reward_predictor_val_interval'] = 1
         num_timesteps = 1000
     else:
         params.params['n_initial_prefs'] = 500
         params.params['n_initial_epochs'] = args.n_initial_epochs
-        params.params['save_freq'] = 10
-        params.params['ckpt_freq'] = 20
+        params.params['prefs_save_interval'] = 10
+        params.params['reward_predictor_ckpt_interval'] = 20
         params.params['reward_predictor_val_interval'] = 50
         num_timesteps = int(args.million_timesteps * 1e6)
 
@@ -344,7 +347,8 @@ def main():
         db_max=args.db_max,
         segs_max=args.segs_max,
         log_interval=args.log_interval,
-        policy_ckpt_dir=args.policy_ckpt_dir)
+        policy_ckpt_dir=args.load_policy_ckpt_dir,
+        policy_ckpt_interval=args.policy_ckpt_interval)
 
 
 if __name__ == '__main__':

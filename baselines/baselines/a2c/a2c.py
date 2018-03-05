@@ -1,17 +1,17 @@
-import glob
+import os
 import os.path as osp
 import queue
 import time
 
+import cloudpickle
 import numpy as np
+import tensorflow as tf
 from numpy.testing import assert_equal
 
-import joblib
 import params as run_params
-import tensorflow as tf
 from baselines import logger
 from baselines.a2c.utils import (cat_entropy, discount_with_dones,
-                                 find_trainable_variables, make_path, mse)
+                                 find_trainable_variables, mse)
 from baselines.common import explained_variance, set_global_seeds
 from utils import Segment
 
@@ -93,27 +93,21 @@ class Model(object):
                 [pg_loss, vf_loss, entropy, _train], td_map)
             return policy_loss, value_loss, policy_entropy, cur_lr
 
-        def save(save_path):
-            ps = sess.run(params)
-            make_path(osp.dirname(save_path))
-            joblib.dump(ps, save_path)
-
-        def load(load_path):
-            loaded_params = joblib.load(load_path)
-            restores = []
-            for p, loaded_p in zip(params, loaded_params):
-                restores.append(p.assign(loaded_p))
-            sess.run(restores)
-
         self.train = train
         self.train_model = train_model
         self.step_model = step_model
         self.step = step_model.step
         self.value = step_model.value
         self.initial_state = step_model.initial_state
-        self.save = save
-        self.load = load
+        self.sess = sess
+        self.saver = tf.train.Saver(max_to_keep=1)
         tf.global_variables_initializer().run(session=sess)
+
+    def load(self, ckpt_path):
+        self.saver.restore(self.sess, self.ckpt_path)
+
+    def save(self, ckpt_path, step_n):
+        return self.saver.save(self.sess, ckpt_path, step_n)
 
 
 class Runner(object):
@@ -355,10 +349,10 @@ def learn(policy,
             epsilon=epsilon,
             total_timesteps=total_timesteps)
 
-    if save_interval and logger.get_dir():
-        import cloudpickle
-        with open(osp.join(logger.get_dir(), 'make_model.pkl'), 'wb') as fh:
-            fh.write(cloudpickle.dumps(make_model))
+    ckpt_dir = osp.join(log_dir, 'policy_checkpoints')
+    os.makedirs(ckpt_dir)
+    with open(osp.join(ckpt_dir, 'make_model.pkl'), 'wb') as fh:
+        fh.write(cloudpickle.dumps(make_model))
 
     print("Initialising model...")
     if load_path is None:
@@ -370,12 +364,11 @@ def learn(policy,
         with open(osp.join(load_path, 'make_model.pkl'), 'rb') as fh:
             make_model = cloudpickle.loads(fh.read())
         model = make_model()
-        ckpts = glob.glob(osp.join(load_path, 'checkpoint*'))
-        last_ckpt_n = sorted([int(c.split('checkpoint')[1])
-                              for c in ckpts])[-1]
-        ckpt_file = osp.join(load_path, 'checkpoint{}'.format(last_ckpt_n))
-        print("Loading policy checkpoint from {}...".format(ckpt_file))
-        model.load(ckpt_file)
+
+        ckpt_path = osp.join(load_path, 'policy')
+        print("Loaded policy from checkpoint '{}'".format(ckpt_path))
+
+    ckpt_path = osp.join(ckpt_dir, 'policy')
 
     runner = Runner(
         env,
@@ -435,8 +428,6 @@ def learn(policy,
             logger.record_tabular("learning_rate", cur_lr)
             logger.dump_tabular()
 
-        if save_interval and (update % save_interval == 0
-                              or update == 1) and logger.get_dir():
-            savepath = osp.join(logger.get_dir(), 'checkpoint%.5i' % update)
-            print('Saving to', savepath)
-            model.save(savepath)
+        if update % save_interval == 0 and update != 0:
+            last_ckpt = model.save(ckpt_path, update)
+            print("Saved policy checkpoint to '{}'".format(last_ckpt))
