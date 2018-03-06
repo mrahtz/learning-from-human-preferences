@@ -380,14 +380,6 @@ class RewardPredictorEnsemble:
             mean_loss = tf.reduce_mean(loss_ops)
             mean_accuracy = tf.reduce_mean(acc_ops)
 
-            self.r_norm = RunningStat(shape=n_preds)
-            self.r_norm_state = tf.placeholder(tf.float32,
-                                               shape=len(self.r_norm.state))
-            self.r_norm_state_var = tf.Variable(self.r_norm.state,
-                                                name='norm_state')
-            self.r_norm_state_assign = \
-                self.r_norm_state_var.assign(self.r_norm_state)
-
             # Only the reward predictor training process should initialize/save
             # the network
             if name != 'train_reward':
@@ -407,9 +399,7 @@ class RewardPredictorEnsemble:
                     print("Loading reward predictor checkpoint from",
                           ckpt_path)
                     self.saver.restore(sess, ckpt_path)
-                    self.r_norm.state = sess.run(self.r_norm_state_var)
-                    print("Loaded r_norm state", self.r_norm.state)
-                    print("Reward predictor checkpoint loaded!")
+                    print("Reard predictor checkpoint loaded!")
 
                 self.train_writer = tf.summary.FileWriter(
                     osp.join(log_dir, 'reward_pred', 'train'), flush_secs=5)
@@ -442,6 +432,7 @@ class RewardPredictorEnsemble:
         self.pred_ops = pred_ops
         self.n_preds = n_preds
         self.n_steps = 0
+        self.r_norm = RunningStat(shape=n_preds)
 
     def raw_rewards(self, obs):
         """
@@ -545,9 +536,6 @@ class RewardPredictorEnsemble:
         return preds
 
     def save(self):
-        print("Saving r_norm state", self.r_norm.state)
-        self.sess.run(self.r_norm_state_assign, feed_dict={self.r_norm_state:
-                                                           self.r_norm.state})
         ckpt_name = self.saver.save(self.sess, self.checkpoint_file,
                                     self.n_steps)
         return ckpt_name
