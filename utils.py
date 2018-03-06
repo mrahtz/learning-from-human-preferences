@@ -51,14 +51,6 @@ class RunningStat(object):
     def shape(self):
         return self._M.shape
 
-    @property
-    def state(self):
-        return [self._n, self._M, self._S]
-
-    @state.setter
-    def state(self, state):
-        self._n, self._M, self._S = state
-
 
 class Segment:
     def __init__(self):
