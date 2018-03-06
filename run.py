@@ -117,8 +117,8 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
             reward_predictor = None
         else:
             reward_predictor = RewardPredictorEnsemble(
-                    name='a2c',
-                    cluster_dict=cluster_dict)
+                name='a2c',
+                cluster_dict=cluster_dict)
         learn(
             policy=policy_fn,
             env=env,
@@ -137,10 +137,10 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
 
     def trp():
         reward_predictor = RewardPredictorEnsemble(
-                name='train_reward',
-                cluster_dict=cluster_dict,
-                log_dir=log_dir,
-                ckpt_path=rp_ckpt_path)
+            name='train_reward',
+            cluster_dict=cluster_dict,
+            log_dir=log_dir,
+            ckpt_path=rp_ckpt_path)
         train_reward_predictor(
             reward_predictor=reward_predictor,
             lr=rp_lr,
@@ -149,6 +149,17 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
             load_prefs_dir=load_prefs_dir,
             log_dir=log_dir,
             db_max=db_max)
+
+    def pi_procf(pi):
+        # We have to give PrefInterface the reward predictor /after/ init,
+        # because init needs to spawn a GUI process (using fork()), and the
+        # Objective C APIs (invoked when dealing with GUI stuff) aren't
+        # happy if running in a process forked from a multithreaded parent.
+        reward_predictor = RewardPredictorEnsemble(
+            name='pref_interface',
+            cluster_dict=cluster_dict)
+        pi.init_reward_predictor(reward_predictor)
+        pi.run(seg_pipe, pref_pipe, segs_max)
 
     ps_proc = Process(target=ps, daemon=True)
     ps_proc.start()
@@ -166,19 +177,7 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
     if 'pref_interface' in parts_to_run:
         synthetic_prefs = headless
         pi = PrefInterface(headless, synthetic_prefs)
-
-        # We have to give PrefInterface the reward predictor /after/ init,
-        # because init needs to spawn a GUI process (using fork()),
-        # and the Objective C APIs (invoked when dealing with GUI stuff) aren't
-        # happy if running in a processed forked from a multithreaded parent.
-        reward_predictor = RewardPredictorEnsemble(
-                name='pref_interface',
-                cluster_dict=cluster_dict)
-        pi.init_reward_predictor(reward_predictor)
-
-        def pi_procf():
-            pi.run(seg_pipe, pref_pipe, segs_max)
-        pi_proc = Process(target=pi_procf, daemon=True)
+        pi_proc = Process(target=pi_procf, daemon=True, args=(pi, ))
         pi_proc.start()
 
     if 'train_reward' not in parts_to_run:
