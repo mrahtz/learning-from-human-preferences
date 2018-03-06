@@ -150,6 +150,17 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
             log_dir=log_dir,
             db_max=db_max)
 
+    def pi_procf(pi):
+        # We have to give PrefInterface the reward predictor /after/ init,
+        # because init needs to spawn a GUI process (using fork()), and the
+        # Objective C APIs (invoked when dealing with GUI stuff) aren't
+        # happy if running in a process forked from a multithreaded parent.
+        reward_predictor = RewardPredictorEnsemble(
+            name='pref_interface',
+            cluster_dict=cluster_dict)
+        pi.init_reward_predictor(reward_predictor)
+        pi.run(seg_pipe, pref_pipe, segs_max)
+
     ps_proc = Process(target=ps, daemon=True)
     ps_proc.start()
 
@@ -166,18 +177,7 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
     if 'pref_interface' in parts_to_run:
         synthetic_prefs = headless
         pi = PrefInterface(headless, synthetic_prefs)
-
-        # We have to give PrefInterface the reward predictor /after/ init,
-        # because init needs to spawn a GUI process (using fork()),
-        # and the Objective C APIs (invoked when dealing with GUI stuff) aren't
-        # happy if running in a processed forked from a multithreaded parent.
-        reward_predictor = RewardPredictorEnsemble(
-            name='pref_interface', cluster_dict=cluster_dict)
-        pi.init_reward_predictor(reward_predictor)
-
-        def pi_procf():
-            pi.run(seg_pipe, pref_pipe, segs_max)
-        pi_proc = Process(target=pi_procf, daemon=True)
+        pi_proc = Process(target=pi_procf, daemon=True, args=(pi, ))
         pi_proc.start()
 
     if 'train_reward' not in parts_to_run:
