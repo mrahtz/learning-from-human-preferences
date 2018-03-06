@@ -155,9 +155,6 @@ class PrefInterface:
                 print(pair_idxs)
 
             if not params.params['random_query']:
-                # TODO: this /might/ be currently broken
-                # e.g. try running
-                # ./run.py --n_initial_prefs 1 --headless
                 (n1, n2), s1, s2 = \
                     self.least_certain_seg_pair(segments, pair_idxs)
             else:

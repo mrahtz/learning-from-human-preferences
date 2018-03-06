@@ -383,7 +383,7 @@ class RewardPredictorEnsemble:
             # Only the reward predictor training process should initialize/save
             # the network
             if name != 'train_reward':
-                while sess.run(tf.report_uninitialized_variables()):
+                while sess.run(tf.report_uninitialized_variables()).any():
                     print("%s waiting for variable initialization..." % name)
                     time.sleep(1.0)
             else:
