@@ -5,8 +5,8 @@ import time
 
 import cloudpickle
 import numpy as np
-import tensorflow as tf
 from numpy.testing import assert_equal
+import tensorflow as tf
 
 import params as run_params
 from baselines import logger
@@ -36,8 +36,7 @@ class Model(object):
                  vf_coef=0.5,
                  max_grad_norm=0.5,
                  alpha=0.99,
-                 epsilon=1e-5,
-                 total_timesteps=int(80e6)):
+                 epsilon=1e-5):
         config = tf.ConfigProto(
             allow_soft_placement=True,
             intra_op_parallelism_threads=num_procs,
@@ -74,7 +73,8 @@ class Model(object):
 
         def train(obs, states, rewards, masks, actions, values):
             advs = rewards - values
-            for step in range(len(obs)):
+            n_steps = len(obs)
+            for _ in range(n_steps):
                 cur_lr = lr_scheduler.value()
             if run_params.params['print_lr']:
                 import datetime
@@ -123,7 +123,6 @@ class Runner(object):
                  env,
                  model,
                  seg_pipe,
-                 log_dir,
                  nsteps=5,
                  nstack=4,
                  gamma=0.99,
@@ -206,7 +205,7 @@ class Runner(object):
         mb_states = self.states
 
         # Run for nsteps steps in the environment
-        for n in range(self.nsteps):
+        for _ in range(self.nsteps):
             actions, values, states = self.model.step(self.obs, self.states,
                                                       self.dones)
             # TODO: move this down below
@@ -270,6 +269,8 @@ class Runner(object):
         if run_params.params['debug']:
             print("Original rewards:\n", mb_rewards)
         if self.reward_predictor:
+            orig_rewards = np.copy(mb_rewards)
+
             assert_equal(mb_obs.shape, (nenvs, self.nsteps, 84, 84, 4))
             mb_obs_allenvs = mb_obs.reshape(nenvs * self.nsteps, 84, 84, 4)
 
@@ -277,6 +278,10 @@ class Runner(object):
             assert_equal(rewards_allenvs.shape, (nenvs * self.nsteps, ))
             mb_rewards = rewards_allenvs.reshape(nenvs, self.nsteps)
             assert_equal(mb_rewards.shape, (nenvs, self.nsteps))
+
+            ev = explained_variance(mb_rewards.flatten(),
+                                    orig_rewards.flatten())
+            logger.record_tabular("explained_variance_predicted_rewards", ev)
 
             if run_params.params['debug']:
                 print("Predicted rewards:\n", mb_rewards)
@@ -352,8 +357,7 @@ def learn(policy,
             max_grad_norm=max_grad_norm,
             lr_scheduler=lr_scheduler,
             alpha=alpha,
-            epsilon=epsilon,
-            total_timesteps=total_timesteps)
+            epsilon=epsilon)
 
     ckpt_dir = osp.join(log_dir, 'policy_checkpoints')
     os.makedirs(ckpt_dir)
@@ -378,7 +382,6 @@ def learn(policy,
         env,
         model,
         seg_pipe,
-        log_dir,
         nsteps=nsteps,
         nstack=nstack,
         gamma=gamma,
