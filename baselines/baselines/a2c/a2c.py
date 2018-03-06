@@ -1,17 +1,17 @@
-import glob
+import os
 import os.path as osp
 import queue
 import time
 
+import cloudpickle
 import numpy as np
+import tensorflow as tf
 from numpy.testing import assert_equal
 
-import joblib
 import params as run_params
-import tensorflow as tf
 from baselines import logger
 from baselines.a2c.utils import (cat_entropy, discount_with_dones,
-                                 find_trainable_variables, make_path, mse)
+                                 find_trainable_variables, mse)
 from baselines.common import explained_variance, set_global_seeds
 from utils import Segment
 
@@ -93,27 +93,29 @@ class Model(object):
                 [pg_loss, vf_loss, entropy, _train], td_map)
             return policy_loss, value_loss, policy_entropy, cur_lr
 
-        def save(save_path):
-            ps = sess.run(params)
-            make_path(osp.dirname(save_path))
-            joblib.dump(ps, save_path)
-
-        def load(load_path):
-            loaded_params = joblib.load(load_path)
-            restores = []
-            for p, loaded_p in zip(params, loaded_params):
-                restores.append(p.assign(loaded_p))
-            sess.run(restores)
-
         self.train = train
         self.train_model = train_model
         self.step_model = step_model
         self.step = step_model.step
         self.value = step_model.value
         self.initial_state = step_model.initial_state
-        self.save = save
-        self.load = load
+        self.sess = sess
+        # Why var_list=params?
+        # Otherwise we'll also save optimizer parameters,
+        # which take up a /lot/ of space.
+        # Why save_relative_paths=True?
+        # So that the plain-text 'checkpoint' file written uses relative paths,
+        # which seems to be needed in order to avoid confusing saver.restore()
+        # when restoring from FloydHub runs.
+        self.saver = tf.train.Saver(
+            max_to_keep=1, var_list=params, save_relative_paths=True)
         tf.global_variables_initializer().run(session=sess)
+
+    def load(self, ckpt_path):
+        self.saver.restore(self.sess, ckpt_path)
+
+    def save(self, ckpt_path, step_n):
+        return self.saver.save(self.sess, ckpt_path, step_n)
 
 
 class Runner(object):
@@ -147,16 +149,13 @@ class Runner(object):
         self.reward_predictor = reward_predictor
         self.episode_vid_queue = episode_vid_queue
 
-        self.n_episodes = [0 for _ in range(nenv)]
-        self.true_reward = [0 for _ in range(nenv)]
+        self.orig_reward = [0 for _ in range(nenv)]
         self.tr_ops = [tf.Variable(0) for _ in range(nenv)]
         self.summ_ops = [
             tf.summary.scalar('true reward %d' % env_n, self.tr_ops[env_n])
             for env_n in range(nenv)
         ]
         self.sess = tf.Session()
-        self.writer = tf.summary.FileWriter(
-            osp.join(log_dir, 'true_reward'), flush_secs=5)
         self.sess.run([op.initializer for op in self.tr_ops])
 
     def update_obs(self, obs):
@@ -246,22 +245,18 @@ class Runner(object):
         # before we'd actually run any steps, so drop it.
         mb_dones = mb_dones[:, 1:]
 
-        # Log true rewards
+        # Log original rewards
         for env_n, (rs, dones) in enumerate(zip(mb_rewards, mb_dones)):
             assert_equal(rs.shape, (self.nsteps, ))
             assert_equal(dones.shape, (self.nsteps, ))
             for step_n in range(self.nsteps):
-                self.true_reward[env_n] += rs[step_n]
+                self.orig_reward[env_n] += rs[step_n]
                 if dones[step_n]:
-                    if run_params.params['debug']:
-                        print("Env %d: episode finished, true reward %d" %
-                              (env_n, self.true_reward[env_n]))
-                    a = self.tr_ops[env_n].assign(self.true_reward[env_n])
-                    self.sess.run(a)
-                    summ = self.sess.run(self.summ_ops[env_n])
-                    self.writer.add_summary(summ, self.n_episodes[env_n])
-                    self.true_reward[env_n] = 0
-                    self.n_episodes[env_n] += 1
+                    logger.record_tabular(
+                        "orig_reward_{}".format(env_n),
+                        self.orig_reward[env_n])
+                    # logger.dump_tabular() will be called later on
+                    self.orig_reward[env_n] = 0
 
         # Generate segments
         if self.reward_predictor:
@@ -331,7 +326,7 @@ def learn(policy,
           gamma=0.99,
           log_interval=100,
           load_path=None,
-          save_interval=10000,
+          save_interval=1000,
           reward_predictor=None,
           episode_vid_queue=None):
 
@@ -360,27 +355,24 @@ def learn(policy,
             epsilon=epsilon,
             total_timesteps=total_timesteps)
 
-    if save_interval and logger.get_dir():
-        import cloudpickle
-        with open(osp.join(logger.get_dir(), 'make_model.pkl'), 'wb') as fh:
-            fh.write(cloudpickle.dumps(make_model))
+    ckpt_dir = osp.join(log_dir, 'policy_checkpoints')
+    os.makedirs(ckpt_dir)
+    with open(osp.join(ckpt_dir, 'make_model.pkl'), 'wb') as fh:
+        fh.write(cloudpickle.dumps(make_model))
 
-    print("Initialising model...")
+    print("Initialising policy...")
     if load_path is None:
         model = make_model()
     else:
-        # TODO: this still doesn't seem to be loading the most recent
-        # checkpoint in FloydHub runs (e.g. 193). Not sure whether it's this
-        # code that's broken, or the way that baselines is loaded.
         with open(osp.join(load_path, 'make_model.pkl'), 'rb') as fh:
             make_model = cloudpickle.loads(fh.read())
         model = make_model()
-        ckpts = glob.glob(osp.join(load_path, 'checkpoint*'))
-        last_ckpt_n = sorted([int(c.split('checkpoint')[1])
-                              for c in ckpts])[-1]
-        ckpt_file = osp.join(load_path, 'checkpoint{}'.format(last_ckpt_n))
-        print("Loading policy checkpoint from {}...".format(ckpt_file))
-        model.load(ckpt_file)
+
+        ckpt_path = tf.train.latest_checkpoint(load_path)
+        model.load(ckpt_path)
+        print("Loaded policy from checkpoint '{}'".format(ckpt_path))
+
+    ckpt_path = osp.join(ckpt_dir, 'policy')
 
     runner = Runner(
         env,
@@ -393,34 +385,39 @@ def learn(policy,
         reward_predictor=reward_predictor,
         episode_vid_queue=episode_vid_queue)
 
-    print("Running...")
-
     # nsteps: e.g. 5
     # nenvs: e.g. 16
     nbatch = nenvs * nsteps
     fps_tstart = time.time()
     fps_nsteps = 0
     train = False
+
+    print("Starting agent(s)")
+
+    # Before we're told to start training the policy itself,
+    # just generate segments for the reward predictor to be trained with
+    while not train:
+        obs, states, rewards, masks, actions, values = runner.run()
+        logger.dump_tabular()  # Write original reward logs
+        try:
+            go_pipe.get(block=False)
+        except queue.Empty:
+            continue
+        else:
+            train = True
+
+    print("Starting policy training")
+
     for update in range(1, total_timesteps // nbatch + 1):
         # Run for nsteps
         obs, states, rewards, masks, actions, values = runner.run()
-
-        # Before we're told to start training, just generate segments
-        if not train:
-            try:
-                go_pipe.get(block=False)
-            except queue.Empty:
-                continue
-            else:
-                train = True
-                print("Starting RL training")
 
         policy_loss, value_loss, policy_entropy, cur_lr = model.train(
             obs, states, rewards, masks, actions, values)
 
         fps_nsteps += nbatch
 
-        if update % log_interval == 0 or update == 1:
+        if update % log_interval == 0 and update != 0:
             fps = fps_nsteps / (time.time() - fps_tstart)
             fps_nsteps = 0
             fps_tstart = time.time()
@@ -434,8 +431,7 @@ def learn(policy,
             logger.record_tabular("explained_variance", float(ev))
             logger.record_tabular("learning_rate", cur_lr)
             logger.dump_tabular()
-        if save_interval and (update % save_interval == 0
-                              or update == 1) and logger.get_dir():
-            savepath = osp.join(logger.get_dir(), 'checkpoint%.5i' % update)
-            print('Saving to', savepath)
-            model.save(savepath)
+
+        if update % save_interval == 0 and update != 0:
+            last_ckpt = model.save(ckpt_path, update)
+            print("Saved policy checkpoint to '{}'".format(last_ckpt))

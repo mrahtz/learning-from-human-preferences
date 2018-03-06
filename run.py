@@ -15,7 +15,8 @@ import params
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble, train_reward_predictor
 from enduro_wrapper import EnduroWrapper
-from utils import vid_proc
+from utils import vid_proc, get_port_range
+import easy_tf_log
 
 sys.path.insert(0, 'baselines')
 from baselines import bench, logger  # noqa: E402 (import not at top of file)
@@ -44,8 +45,8 @@ def configure_logger(log_dir):
 
 
 def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
-          rp_ckpt_path, load_prefs_dir, headless, log_dir, ent_coef,
-          db_max, segs_max, log_interval, policy_ckpt_dir):
+          rp_ckpt_path, load_prefs_dir, headless, log_dir, ent_coef, db_max,
+          segs_max, log_interval, policy_ckpt_dir, policy_ckpt_interval):
     configure_logger(log_dir)
 
     def make_env(rank):
@@ -100,10 +101,12 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
     if params.params['no_a2c']:
         parts_to_run.remove('a2c')
 
-    port = 2200
-    cluster_dict = {'ps': ['localhost:{}'.format(port)]}
-    for part in parts_to_run:
-        port += 1
+    ports = get_port_range(
+        start_port=2200,
+        n_ports=len(parts_to_run) + 1,
+        random_stagger=True)
+    cluster_dict = {'ps': ['localhost:{}'.format(ports[0])]}
+    for part, port in zip(parts_to_run, ports[1:]):
         cluster_dict[part] = ['localhost:{}'.format(port)]
 
     def ps():
@@ -128,7 +131,9 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
             log_interval=log_interval,
             load_path=policy_ckpt_dir,
             reward_predictor=reward_predictor,
-            episode_vid_queue=episode_vid_queue)
+            episode_vid_queue=episode_vid_queue,
+            ent_coef=ent_coef,
+            save_interval=policy_ckpt_interval)
 
     def trp():
         reward_predictor = RewardPredictorEnsemble(
@@ -204,16 +209,15 @@ def main():
     parser.add_argument('--rp_lr', type=float, default=2e-4)
     parser.add_argument('--lr', type=float, default=7e-4)
     parser.add_argument("--lr_zero_million_timesteps",
-                        type=int, default=None,
+                        type=float, default=None,
                         help='If set, decay learning rate linearly, reaching '
                         ' zero at this many timesteps')
     parser.add_argument('--million_timesteps',
-                        type=int, default=10,
+                        type=float, default=10.,
                         help='How many million timesteps to train for. '
                              '(The number of frames trained for is this '
                              'multiplied by 4 due to frameskip.)')
     parser.add_argument('--n_envs', type=int, default=1)
-    parser.add_argument('--rp_ckpt_path')
     parser.add_argument('--load_prefs_dir')
     parser.add_argument('--headless', action='store_true')
     seconds_since_epoch = str(int(time.time()))
@@ -232,7 +236,6 @@ def main():
     parser.add_argument('--save_pretrain', action='store_true')
     parser.add_argument('--print_lr', action='store_true')
     parser.add_argument('--n_initial_epochs', type=int, default=200)
-    parser.add_argument('--policy_ckpt_dir')
     parser.add_argument('--log_dir')
     parser.add_argument('--orig_rewards', action='store_true')
     parser.add_argument('--skip_prefs', action='store_true')
@@ -244,6 +247,28 @@ def main():
     parser.add_argument('--no_gather_prefs', action='store_true')
     parser.add_argument('--no_a2c', action='store_true')
     parser.add_argument('--render_episodes', action='store_true')
+
+    # Reward predictor options
+    parser.add_argument('--n_initial_prefs', type=int, default=500,
+                        help='How many preferences to collect from a random '
+                             'policy before starting reward predictor '
+                             'training')
+    parser.add_argument('--load_reward_predictor_ckpt',
+                        help='File to load reward predictor checkpoint from '
+                             '(e.g. runs/foo/reward_predictor_checkpoints/'
+                             'reward_predictor.ckpt-100)')
+
+    parser.add_argument('--reward_predictor_ckpt_interval',
+                        type=int, default=100,
+                        help='No. training batches between reward '
+                             'predictor checkpoints')
+
+    # A2C options
+    parser.add_argument('--load_policy_ckpt_dir',
+                        help='Load a policy checkpoint from this directory.')
+    parser.add_argument('--policy_ckpt_interval', type=int, default=100,
+                        help="No. updates between policy checkpoints")
+
     args = parser.parse_args()
 
     params.init_params()
@@ -272,15 +297,16 @@ def main():
         print("=== WARNING: running in test mode", file=sys.stderr)
         params.params['n_initial_prefs'] = 2
         params.params['n_initial_epochs'] = 1
-        params.params['save_freq'] = 1
-        params.params['ckpt_freq'] = 1
+        params.params['prefs_save_interval'] = 1
+        params.params['reward_predictor_ckpt_interval'] = 1
         params.params['reward_predictor_val_interval'] = 1
         num_timesteps = 1000
     else:
-        params.params['n_initial_prefs'] = 500
+        params.params['n_initial_prefs'] = args.n_initial_prefs
         params.params['n_initial_epochs'] = args.n_initial_epochs
-        params.params['save_freq'] = 10
-        params.params['ckpt_freq'] = 20
+        params.params['prefs_save_interval'] = 10
+        params.params['reward_predictor_ckpt_interval'] = \
+            args.reward_predictor_ckpt_interval
         params.params['reward_predictor_val_interval'] = 50
         num_timesteps = int(args.million_timesteps * 1e6)
 
@@ -321,6 +347,10 @@ def main():
                              nvalues=nvalues,
                              schedule=schedule)
 
+    misc_logs_dir = osp.join(log_dir, 'misc')
+    os.makedirs(misc_logs_dir)
+    easy_tf_log.set_dir(misc_logs_dir)
+
     train(
         env_id=args.env,
         num_timesteps=num_timesteps,
@@ -328,7 +358,7 @@ def main():
         lr_scheduler=lr_scheduler,
         rp_lr=args.rp_lr,
         num_cpu=args.n_envs,
-        rp_ckpt_path=args.rp_ckpt_path,
+        rp_ckpt_path=args.load_reward_predictor_ckpt,
         load_prefs_dir=args.load_prefs_dir,
         headless=args.headless,
         log_dir=log_dir,
@@ -336,7 +366,8 @@ def main():
         db_max=args.db_max,
         segs_max=args.segs_max,
         log_interval=args.log_interval,
-        policy_ckpt_dir=args.policy_ckpt_dir)
+        policy_ckpt_dir=args.load_policy_ckpt_dir,
+        policy_ckpt_interval=args.policy_ckpt_interval)
 
 
 if __name__ == '__main__':

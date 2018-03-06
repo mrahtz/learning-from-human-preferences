@@ -241,9 +241,10 @@ def train_reward_predictor(reward_predictor, lr, pref_pipe, go_pipe,
                 break
             print("Waiting for preferences; %d so far" % len(pref_db_train))
             recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
-            if params.params['save_prefs']:
-                save_prefs(log_dir, 'initial', pref_db_train, pref_db_val)
-            time.sleep(10.0)
+            time.sleep(5.0)
+
+    if params.params['save_prefs']:
+        save_prefs(log_dir, 'initial', pref_db_train, pref_db_val)
 
     print("Finished accumulating initial preferences at",
           str(datetime.datetime.now()))
@@ -289,7 +290,7 @@ def train_reward_predictor(reward_predictor, lr, pref_pipe, go_pipe,
         recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
 
         if params.params['save_prefs'] and \
-                step % params.params['save_freq'] == 0:
+                step % params.params['prefs_save_interval'] == 0:
             print("=== Saving preferences...")
             fname = osp.join(log_dir, "train_%d.pkl" % step)
             save_pref_db(pref_db_train, fname)
@@ -393,8 +394,9 @@ class RewardPredictorEnsemble:
                 if log_dir is None:
                     raise ValueError("Must supply log_dir for train_reward")
                 self.saver = tf.train.Saver(max_to_keep=1)
-                self.checkpoint_file = osp.join(log_dir, 'checkpoints',
-                                                'reward_network.ckpt')
+                self.checkpoint_file = osp.join(log_dir,
+                                                'reward_predictor_checkpoints',
+                                                'reward_predictor.ckpt')
                 if ckpt_path is None:
                     sess.run(tf.global_variables_initializer())
                 else:
@@ -540,7 +542,6 @@ class RewardPredictorEnsemble:
     def save(self):
         ckpt_name = self.saver.save(self.sess, self.checkpoint_file,
                                     self.n_steps)
-        print("Saved reward predictor checkpoint to '{}'".format(ckpt_name))
         return ckpt_name
 
     def train(self, prefs_train, prefs_val):
@@ -603,8 +604,11 @@ class RewardPredictorEnsemble:
                 summaries = self.sess.run(self.summaries, feed_dict)
                 self.test_writer.add_summary(summaries, self.n_steps)
 
-            if self.n_steps % params.params['ckpt_freq'] == 0:
-                self.save()
+            ckpt_interval = params.params['reward_predictor_ckpt_interval']
+            if self.n_steps % ckpt_interval == 0 and self.n_steps != 0:
+                saved_path = self.save()
+                print("Saved reward predictor checkpoint to '{}'".format(
+                    saved_path))
 
 
 class RewardPredictor:

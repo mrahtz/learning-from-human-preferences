@@ -1,19 +1,21 @@
 #!/usr/bin/env python
 
 import argparse
+import os.path as osp
 import sys
 import time
 from collections import deque
 
 import cloudpickle
-import matplotlib
+import gym_moving_dot  # noqa: F401 (imported but unused)
 import numpy as np
-from matplotlib.ticker import FormatStrFormatter
+import tensorflow as tf
 
 import gym
-import gym_gridworld  # noqa: F401 (imported but unused)
+import matplotlib
 import params
 from enduro_wrapper import EnduroWrapper
+from matplotlib.ticker import FormatStrFormatter
 from reward_predictor import RewardPredictorEnsemble
 
 if True:  # To silence flake8 warnings about imports not at top
@@ -61,10 +63,9 @@ class ValueGraph:
 
 def main():
     parser = argparse.ArgumentParser(description="Run a trained model.")
-    parser.add_argument("model", help="e.g. LOG_DIR/make_model.pkl")
-    parser.add_argument("checkpoint", help="e.g. LOG_DIR/checkpoint100000")
+    parser.add_argument("ckpt_dir")
     parser.add_argument("--env", default='MovingDotNoFrameskip-v0')
-    parser.add_argument("--reward_predictor_checkpoint")
+    parser.add_argument("--reward_predictor_ckpt")
     parser.add_argument("--frame_interval_ms", type=float, default=0.)
     args = parser.parse_args()
 
@@ -72,19 +73,19 @@ def main():
 
     env = gym.make(args.env)
     if args.env == 'EnduroNoFrameskip-v4':
-        print("Wrapping")
         env = EnduroWrapper(env)
     env = wrap_deepmind_nomax(env)
     env.unwrapped.maxsteps = 500
 
-    with open(args.model, 'rb') as fh:
+    model_file = osp.join(args.ckpt_dir, 'make_model.pkl')
+    with open(model_file, 'rb') as fh:
         make_model = cloudpickle.loads(fh.read())
-    print("Initialising...")
+    print("Initialising policy...")
     model = make_model()
-    print("Initialisation done!")
+
+    ckpt_file = tf.train.latest_checkpoint(args.ckpt_dir)
     print("Loading checkpoint...")
-    model.load(args.checkpoint)
-    print("Loading checkpoint done!")
+    model.load(ckpt_file)
 
     nenvs = 1
     nstack = int(model.step_model.X.shape[-1])
@@ -98,7 +99,7 @@ def main():
 
     # Set up reward predictor
 
-    if args.reward_predictor_checkpoint is None:
+    if args.reward_predictor_ckpt is None:
         reward_predictor = None
     else:
         params.init_params()
@@ -113,7 +114,7 @@ def main():
             name='train_reward',
             cluster_dict=cluster_dict,
             load_network=True,
-            rp_ckpt_dir=args.reward_predictor_checkpoint,
+            rp_ckpt_dir=args.reward_predictor_ckpt,
             log_dir='/tmp')
         value_log = deque(maxlen=100)
         value_graph = ValueGraph()
