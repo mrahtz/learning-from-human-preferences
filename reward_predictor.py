@@ -6,8 +6,8 @@ import queue
 import time
 
 import numpy as np
-import tensorflow as tf
 from numpy.testing import assert_equal
+import tensorflow as tf
 
 import params
 from utils import PrefDB, RunningStat
@@ -78,6 +78,7 @@ def dense_layer(x,
 
     return x
 
+
 def get_position(s):
     # s is (?, 84, 84, 4)
     s = s[..., -1]  # select last frame; now (?, 84, 84)
@@ -116,10 +117,7 @@ def net_handcrafted(s):
     c6 = tf.cast(xc >= 82, tf.int64)
     c8 = tf.cast(yc >= 82, tf.int64)
 
-    against_wall = a1 * c8 + \
-                   a2 * c6 + \
-                   a3 * c7 + \
-                   a4 * c5
+    against_wall = a1 * c8 + a2 * c6 + a3 * c7 + a4 * c5
 
     r *= 1 - against_wall
 
@@ -171,7 +169,7 @@ def net_conv(s, batchnorm, dropout, training, reuse):
     x = tf.reshape(x, [-1, int(w * h * c)])
 
     x = dense_layer(x, 64, "d1", reuse, activation='relu')
-    x = dense_layer(x, 1,  "d2", reuse, activation=None)
+    x = dense_layer(x, 1, "d2", reuse, activation=None)
     x = x[:, 0]
 
     return x
@@ -187,8 +185,6 @@ def reward_pred_net(s, dropout, batchnorm, reuse, training):
     else:
         raise Exception("Unknown reward predictor network architecture",
                         params.params['network'])
-
-    return x
 
 
 def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
@@ -223,7 +219,7 @@ def save_prefs(log_dir, name, pref_db_train, pref_db_val):
     save_pref_db(pref_db_val, fname)
 
 
-def train_reward_predictor(reward_predictor, lr, pref_pipe, go_pipe,
+def train_reward_predictor(reward_predictor, pref_pipe, go_pipe,
                            load_prefs_dir, log_dir, db_max):
     if load_prefs_dir:
         print("Loading preferences...")
@@ -387,7 +383,7 @@ class RewardPredictorEnsemble:
             # Only the reward predictor training process should initialize/save
             # the network
             if name != 'train_reward':
-                while len(sess.run(tf.report_uninitialized_variables())) > 0:
+                while sess.run(tf.report_uninitialized_variables()):
                     print("%s waiting for variable initialization..." % name)
                     time.sleep(1.0)
             else:
