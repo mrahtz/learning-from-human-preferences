@@ -205,7 +205,8 @@ def get_port_range(start_port, n_ports, random_stagger=False):
                 s.bind(("127.0.0.1", port))
                 ports.append(port)
             except socket.error as e:
-                if e.errno == 48:
+                if e.errno == 98:  # Address already in use
+                    print("Warning: port {} already in use".format(port))
                     break
                 else:
                     raise e
