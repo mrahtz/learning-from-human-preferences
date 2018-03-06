@@ -10,13 +10,13 @@ from multiprocessing import Process, Queue
 
 import gym
 import gym_moving_dot  # noqa: F401 (imported but unused)
+import easy_tf_log
 import params
 
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble, train_reward_predictor
 from enduro_wrapper import EnduroWrapper
 from utils import vid_proc, get_port_range
-import easy_tf_log
 
 sys.path.insert(0, 'baselines')
 from baselines import bench, logger  # noqa: E402 (import not at top of file)
@@ -117,8 +117,8 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
             reward_predictor = None
         else:
             reward_predictor = RewardPredictorEnsemble(
-                    name='a2c',
-                    cluster_dict=cluster_dict)
+                name='a2c',
+                cluster_dict=cluster_dict)
         learn(
             policy=policy_fn,
             env=env,
@@ -137,13 +137,13 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
 
     def trp():
         reward_predictor = RewardPredictorEnsemble(
-                name='train_reward',
-                cluster_dict=cluster_dict,
-                log_dir=log_dir,
-                ckpt_path=rp_ckpt_path)
+            name='train_reward',
+            cluster_dict=cluster_dict,
+            log_dir=log_dir,
+            ckpt_path=rp_ckpt_path,
+            lr=rp_lr)
         train_reward_predictor(
             reward_predictor=reward_predictor,
-            lr=rp_lr,
             pref_pipe=pref_pipe,
             go_pipe=go_pipe,
             load_prefs_dir=load_prefs_dir,
@@ -172,8 +172,7 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
         # and the Objective C APIs (invoked when dealing with GUI stuff) aren't
         # happy if running in a processed forked from a multithreaded parent.
         reward_predictor = RewardPredictorEnsemble(
-                name='pref_interface',
-                cluster_dict=cluster_dict)
+            name='pref_interface', cluster_dict=cluster_dict)
         pi.init_reward_predictor(reward_predictor)
 
         def pi_procf():
