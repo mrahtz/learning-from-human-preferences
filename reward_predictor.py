@@ -536,8 +536,8 @@ class RewardPredictorEnsemble:
         return preds
 
     def save(self):
-        ckpt_name = self.saver.save(self.sess, self.checkpoint_file,
-                                    self.n_steps)
+        # TODO put back n_steps
+        ckpt_name = self.saver.save(self.sess, self.checkpoint_file)
         return ckpt_name
 
     def train(self, prefs_train, prefs_val):
