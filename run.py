@@ -7,30 +7,28 @@ import subprocess
 import sys
 from multiprocessing import Process, Queue
 
-import gym
 import easy_tf_log
+import gym
+
 import params
 from args import parse_args
-
+from enduro_wrapper import EnduroWrapper
+from openai_baselines import bench, logger
+from openai_baselines.a2c.a2c import learn
+from openai_baselines.a2c.policies import MlpPolicy, CnnPolicy
+from openai_baselines.a2c.utils import Scheduler
+from openai_baselines.common import set_global_seeds
+from openai_baselines.common.atari_wrappers import wrap_deepmind_nomax
+from openai_baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble, train_reward_predictor
-from enduro_wrapper import EnduroWrapper
 from utils import vid_proc, get_port_range
-
-sys.path.insert(0, 'baselines')
-from baselines import bench, logger  # noqa: E402 (import not at top of file)
-from baselines.a2c.a2c import learn  # noqa: E402
-from baselines.a2c.policies import MlpPolicy, CnnPolicy  # noqa: E402
-from baselines.a2c.utils import Scheduler  # noqa: E402
-from baselines.common import set_global_seeds  # noqa: E402
-from baselines.common.atari_wrappers import wrap_deepmind_nomax  # noqa: E402
-from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv  # noqa: E402, E501
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
 
 
 def configure_logger(log_dir):
-    baselines_dir = osp.join(log_dir, 'baselines')
+    baselines_dir = osp.join(log_dir, 'openai_baselines')
     os.makedirs(baselines_dir)
 
     json_file = open(osp.join(baselines_dir, 'progress.json'), 'wt')

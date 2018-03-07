@@ -1,17 +1,11 @@
 import os
 import numpy as np
 import tensorflow as tf
-import baselines.common.tf_util as U
 from collections import deque
 
 def sample(logits):
     noise = tf.random_uniform(tf.shape(logits))
     return tf.argmax(logits - tf.log(-tf.log(noise)), 1)
-
-def std(x):
-    mean = tf.reduce_mean(x)
-    var = tf.reduce_mean(tf.square(x-mean))
-    return tf.sqrt(var)
 
 def cat_entropy(logits):
     a0 = logits - tf.reduce_max(logits, 1, keep_dims=True)
@@ -61,43 +55,95 @@ def fc(x, scope, nh, act=tf.nn.relu, init_scale=1.0):
         h = act(z)
         return h
 
-def dense(x, size, name, weight_init=None, bias_init=0, weight_loss_dict=None, reuse=None):
-    with tf.variable_scope(name, reuse=reuse):
-        assert (len(U.scope_name().split('/')) == 2)
+def batch_to_seq(h, nbatch, nsteps, flat=False):
+    if flat:
+        h = tf.reshape(h, [nbatch, nsteps])
+    else:
+        h = tf.reshape(h, [nbatch, nsteps, -1])
+    return [tf.squeeze(v, [1]) for v in tf.split(axis=1, num_or_size_splits=nsteps, value=h)]
 
-        w = tf.get_variable("w", [x.get_shape()[1], size], initializer=weight_init)
-        b = tf.get_variable("b", [size], initializer=tf.constant_initializer(bias_init))
-        weight_decay_fc = 3e-4
+def seq_to_batch(h, flat = False):
+    shape = h[0].get_shape().as_list()
+    if not flat:
+        assert(len(shape) > 1)
+        nh = h[0].get_shape()[-1].value
+        return tf.reshape(tf.concat(axis=1, values=h), [-1, nh])
+    else:
+        return tf.reshape(tf.stack(values=h, axis=1), [-1])
 
-        if weight_loss_dict is not None:
-            weight_decay = tf.multiply(tf.nn.l2_loss(w), weight_decay_fc, name='weight_decay_loss')
-            if weight_loss_dict is not None:
-                weight_loss_dict[w] = weight_decay_fc
-                weight_loss_dict[b] = 0.0
+def lstm(xs, ms, s, scope, nh, init_scale=1.0):
+    nbatch, nin = [v.value for v in xs[0].get_shape()]
+    nsteps = len(xs)
+    with tf.variable_scope(scope):
+        wx = tf.get_variable("wx", [nin, nh*4], initializer=ortho_init(init_scale))
+        wh = tf.get_variable("wh", [nh, nh*4], initializer=ortho_init(init_scale))
+        b = tf.get_variable("b", [nh*4], initializer=tf.constant_initializer(0.0))
 
-            tf.add_to_collection(U.scope_name().split('/')[0] + '_' + 'losses', weight_decay)
+    c, h = tf.split(axis=1, num_or_size_splits=2, value=s)
+    for idx, (x, m) in enumerate(zip(xs, ms)):
+        c = c*(1-m)
+        h = h*(1-m)
+        z = tf.matmul(x, wx) + tf.matmul(h, wh) + b
+        i, f, o, u = tf.split(axis=1, num_or_size_splits=4, value=z)
+        i = tf.nn.sigmoid(i)
+        f = tf.nn.sigmoid(f)
+        o = tf.nn.sigmoid(o)
+        u = tf.tanh(u)
+        c = f*c + i*u
+        h = o*tf.tanh(c)
+        xs[idx] = h
+    s = tf.concat(axis=1, values=[c, h])
+    return xs, s
 
-        return tf.nn.bias_add(tf.matmul(x, w), b)
+def _ln(x, g, b, e=1e-5, axes=[1]):
+    u, s = tf.nn.moments(x, axes=axes, keep_dims=True)
+    x = (x-u)/tf.sqrt(s+e)
+    x = x*g+b
+    return x
+
+def lnlstm(xs, ms, s, scope, nh, init_scale=1.0):
+    nbatch, nin = [v.value for v in xs[0].get_shape()]
+    nsteps = len(xs)
+    with tf.variable_scope(scope):
+        wx = tf.get_variable("wx", [nin, nh*4], initializer=ortho_init(init_scale))
+        gx = tf.get_variable("gx", [nh*4], initializer=tf.constant_initializer(1.0))
+        bx = tf.get_variable("bx", [nh*4], initializer=tf.constant_initializer(0.0))
+
+        wh = tf.get_variable("wh", [nh, nh*4], initializer=ortho_init(init_scale))
+        gh = tf.get_variable("gh", [nh*4], initializer=tf.constant_initializer(1.0))
+        bh = tf.get_variable("bh", [nh*4], initializer=tf.constant_initializer(0.0))
+
+        b = tf.get_variable("b", [nh*4], initializer=tf.constant_initializer(0.0))
+
+        gc = tf.get_variable("gc", [nh], initializer=tf.constant_initializer(1.0))
+        bc = tf.get_variable("bc", [nh], initializer=tf.constant_initializer(0.0))
+
+    c, h = tf.split(axis=1, num_or_size_splits=2, value=s)
+    for idx, (x, m) in enumerate(zip(xs, ms)):
+        c = c*(1-m)
+        h = h*(1-m)
+        z = _ln(tf.matmul(x, wx), gx, bx) + _ln(tf.matmul(h, wh), gh, bh) + b
+        i, f, o, u = tf.split(axis=1, num_or_size_splits=4, value=z)
+        i = tf.nn.sigmoid(i)
+        f = tf.nn.sigmoid(f)
+        o = tf.nn.sigmoid(o)
+        u = tf.tanh(u)
+        c = f*c + i*u
+        h = o*tf.tanh(_ln(c, gc, bc))
+        xs[idx] = h
+    s = tf.concat(axis=1, values=[c, h])
+    return xs, s
 
 def conv_to_fc(x):
     nh = np.prod([v.value for v in x.get_shape()[1:]])
     x = tf.reshape(x, [-1, nh])
     return x
 
-def kl_div(action_dist1, action_dist2, action_size):
-    mean1, std1 = action_dist1[:, :action_size], action_dist1[:, action_size:]
-    mean2, std2 = action_dist2[:, :action_size], action_dist2[:, action_size:]
-
-    numerator = tf.square(mean1 - mean2) + tf.square(std1) - tf.square(std2)
-    denominator = 2 * tf.square(std2) + 1e-8
-    return tf.reduce_sum(
-        numerator/denominator + tf.log(std2) - tf.log(std1),reduction_indices=-1)
-
 def discount_with_dones(rewards, dones, gamma):
     discounted = []
     r = 0
     for reward, done in zip(rewards[::-1], dones[::-1]):
-        r = reward + gamma*r*(1.-done) # fixed off by one bug
+        r = reward + gamma * r * (1. - done)  # fixed off by one bug
         discounted.append(r)
     return discounted[::-1]
 
@@ -114,37 +160,9 @@ def constant(p):
 def linear(p):
     return 1-p
 
-
-def middle_drop(p):
-    eps = 0.75
-    if 1-p<eps:
-        return eps*0.1
-    return 1-p
-
-def double_linear_con(p):
-    p *= 2
-    eps = 0.125
-    if 1-p<eps:
-        return eps
-    return 1-p
-
-
-def double_middle_drop(p):
-    eps1 = 0.75
-    eps2 = 0.25
-    if 1-p<eps1:
-        if 1-p<eps2:
-            return eps2*0.5
-        return eps1*0.1
-    return 1-p
-
-
 schedules = {
     'linear':linear,
-    'constant':constant,
-    'double_linear_con':double_linear_con,
-    'middle_drop':middle_drop,
-    'double_middle_drop':double_middle_drop
+    'constant':constant
 }
 
 class Scheduler(object):
@@ -198,3 +216,38 @@ class EpisodeStats:
             return np.mean(self.rewbuffer)
         else:
             return 0
+
+
+# For ACER
+def get_by_index(x, idx):
+    assert(len(x.get_shape()) == 2)
+    assert(len(idx.get_shape()) == 1)
+    idx_flattened = tf.range(0, x.shape[0]) * x.shape[1] + idx
+    y = tf.gather(tf.reshape(x, [-1]),  # flatten input
+                  idx_flattened)  # use flattened indices
+    return y
+
+def check_shape(ts,shapes):
+    i = 0
+    for (t,shape) in zip(ts,shapes):
+        assert t.get_shape().as_list()==shape, "id " + str(i) + " shape " + str(t.get_shape()) + str(shape)
+        i += 1
+
+def avg_norm(t):
+    return tf.reduce_mean(tf.sqrt(tf.reduce_sum(tf.square(t), axis=-1)))
+
+def myadd(g1, g2, param):
+    print([g1, g2, param.name])
+    assert (not (g1 is None and g2 is None)), param.name
+    if g1 is None:
+        return g2
+    elif g2 is None:
+        return g1
+    else:
+        return g1 + g2
+
+def my_explained_variance(qpred, q):
+    _, vary = tf.nn.moments(q, axes=[0, 1])
+    _, varpred = tf.nn.moments(q - qpred, axes=[0, 1])
+    check_shape([vary, varpred], [[]] * 2)
+    return 1.0 - (varpred / vary)
