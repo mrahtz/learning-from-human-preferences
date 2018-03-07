@@ -12,7 +12,11 @@ def display_notification(title, text):
 def main():
     running_jobs = set()
     while True:
-        output = subprocess.check_output(['floyd', 'status']).decode().rstrip()
+        try:
+            output = subprocess.check_output(['floyd', 'status'])
+            output = output.decode().strip()
+        except subprocess.CalledProcessError:
+            continue
         output = output.split('\n')
         output = output[2:]  # Skip header lines
 
@@ -24,7 +28,7 @@ def main():
             status = fields[2]
 
             if status == 'running' and job_id not in running_jobs:
-                print("Found running job {}".format(job_id))
+                print("Found new running job {}".format(job_id))
                 running_jobs.add(job_id)
             elif ((status == 'shutdown' or status == 'success')
                   and job_id in running_jobs):
