@@ -18,11 +18,11 @@ from enduro_wrapper import EnduroWrapper
 from matplotlib.ticker import FormatStrFormatter
 from reward_predictor import RewardPredictorEnsemble
 
+from openai_baselines.common.atari_wrappers import wrap_deepmind_nomax
+
 if True:  # To silence flake8 warnings about imports not at top
     matplotlib.use('Qt5Agg')
     import matplotlib.pyplot as plt
-    sys.path.insert(0, 'openai_baselines')
-    from baselines.common.atari_wrappers import wrap_deepmind_nomax
 
 
 def update_obs(obs, raw_obs, nc):
