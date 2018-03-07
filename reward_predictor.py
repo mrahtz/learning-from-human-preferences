@@ -233,7 +233,7 @@ def train_reward_predictor(reward_predictor, pref_pipe, go_pipe,
     # network at the beginning of training"
     if not params.params['skip_prefs']:
         while True:
-            if len(pref_db_train) >= params.params['n_initial_prefs']:
+            if len(pref_db_train) >= params.params['n_initial_prefs'] and len(pref_db_val):
                 break
             print("Waiting for preferences; %d so far" % len(pref_db_train))
             recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
