@@ -402,7 +402,6 @@ def learn(policy,
     # just generate segments for the reward predictor to be trained with
     while not train:
         obs, states, rewards, masks, actions, values = runner.run()
-        logger.dump_tabular()  # Write original reward logs
         try:
             go_pipe.get(block=False)
         except queue.Empty:
