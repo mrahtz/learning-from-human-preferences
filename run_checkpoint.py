@@ -21,7 +21,7 @@ from reward_predictor import RewardPredictorEnsemble
 if True:  # To silence flake8 warnings about imports not at top
     matplotlib.use('Qt5Agg')
     import matplotlib.pyplot as plt
-    sys.path.insert(0, 'baselines')
+    sys.path.insert(0, 'openai_baselines')
     from baselines.common.atari_wrappers import wrap_deepmind_nomax
 
 

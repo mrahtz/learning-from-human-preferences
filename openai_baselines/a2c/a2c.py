@@ -9,10 +9,10 @@ from numpy.testing import assert_equal
 import tensorflow as tf
 
 import params as run_params
-from baselines import logger
-from baselines.a2c.utils import (cat_entropy, discount_with_dones,
-                                 find_trainable_variables, mse)
-from baselines.common import explained_variance, set_global_seeds
+from openai_baselines import logger
+from openai_baselines.a2c.utils import (cat_entropy, discount_with_dones,
+                                        find_trainable_variables, mse)
+from openai_baselines.common import explained_variance, set_global_seeds
 from utils import Segment
 
 
