@@ -34,24 +34,12 @@ def configure_a2c_logger(log_dir):
     logger.Logger.CURRENT = logger.Logger(dir=a2c_dir, output_formats=[tb])
 
 
-def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
+def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, n_envs,
           rp_ckpt_path, load_prefs_dir, headless, log_dir, ent_coef, db_max,
           segs_max, log_interval, policy_ckpt_dir, policy_ckpt_interval):
     configure_a2c_logger(log_dir)
 
-    def make_env(rank):
-        def _thunk():
-            env = gym.make(env_id)
-            env.seed(seed + rank)
-            if params.params['env'] == 'EnduroNoFrameskip-v4':
-                env = EnduroWrapper(env)
-            gym.logger.setLevel(logging.WARN)
-            return wrap_deepmind_nomax(env)
-
-        return _thunk
-
-    set_global_seeds(seed)
-    env = SubprocVecEnv([make_env(i) for i in range(num_cpu)])
+    env = make_envs(env_id, n_envs, seed)
 
     if params.params['policy'] == 'mlp':
         policy_fn = MlpPolicy
@@ -185,6 +173,23 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
     ps_proc.terminate()
 
 
+def make_envs(env_id, n_envs, seed):
+    def make_env(rank):
+        def _thunk():
+            env = gym.make(env_id)
+            env.seed(seed + rank)
+            if params.params['env'] == 'EnduroNoFrameskip-v4':
+                env = EnduroWrapper(env)
+            gym.logger.setLevel(logging.WARN)
+            return wrap_deepmind_nomax(env)
+        return _thunk
+
+    set_global_seeds(seed)
+    env = SubprocVecEnv([make_env(i) for i in range(n_envs)])
+
+    return env
+
+
 def main():
     args = parse_args()
 
@@ -274,7 +279,7 @@ def main():
         seed=args.seed,
         lr_scheduler=lr_scheduler,
         rp_lr=args.rp_lr,
-        num_cpu=args.n_envs,
+        n_envs=args.n_envs,
         rp_ckpt_path=args.load_reward_predictor_ckpt,
         load_prefs_dir=args.load_prefs_dir,
         headless=args.headless,
