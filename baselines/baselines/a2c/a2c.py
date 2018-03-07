@@ -115,7 +115,8 @@ class Model(object):
         self.saver.restore(self.sess, ckpt_path)
 
     def save(self, ckpt_path, step_n):
-        return self.saver.save(self.sess, ckpt_path, step_n)
+        # TODO put back step_n
+        return self.saver.save(self.sess, ckpt_path)
 
 
 class Runner(object):
