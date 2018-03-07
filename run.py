@@ -13,7 +13,7 @@ import gym
 import params
 from args import parse_args
 from enduro_wrapper import EnduroWrapper
-from openai_baselines import bench, logger
+from openai_baselines import logger
 from openai_baselines.a2c.a2c import learn
 from openai_baselines.a2c.policies import MlpPolicy, CnnPolicy
 from openai_baselines.a2c.utils import Scheduler
@@ -27,24 +27,17 @@ from utils import vid_proc, get_port_range
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
 
 
-def configure_logger(log_dir):
-    baselines_dir = osp.join(log_dir, 'openai_baselines')
-    os.makedirs(baselines_dir)
-
-    json_file = open(osp.join(baselines_dir, 'progress.json'), 'wt')
-    json = logger.JSONOutputFormat(json_file)
-
-    tb = logger.TensorBoardOutputFormat(baselines_dir)
-
-    formats = [json, tb]
-    logger.Logger.CURRENT = logger.Logger(
-        dir=baselines_dir, output_formats=formats)
+def configure_a2c_logger(log_dir):
+    a2c_dir = osp.join(log_dir, 'a2c')
+    os.makedirs(a2c_dir)
+    tb = logger.TensorBoardOutputFormat(a2c_dir)
+    logger.Logger.CURRENT = logger.Logger(dir=a2c_dir, output_formats=[tb])
 
 
 def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
           rp_ckpt_path, load_prefs_dir, headless, log_dir, ent_coef, db_max,
           segs_max, log_interval, policy_ckpt_dir, policy_ckpt_interval):
-    configure_logger(log_dir)
+    configure_a2c_logger(log_dir)
 
     def make_env(rank):
         def _thunk():
@@ -52,10 +45,6 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
             env.seed(seed + rank)
             if params.params['env'] == 'EnduroNoFrameskip-v4':
                 env = EnduroWrapper(env)
-            env = bench.Monitor(
-                env,
-                logger.get_dir()
-                and osp.join(logger.get_dir(), "{}.monitor.json".format(rank)))
             gym.logger.setLevel(logging.WARN)
             return wrap_deepmind_nomax(env)
 
@@ -63,6 +52,7 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
 
     set_global_seeds(seed)
     env = SubprocVecEnv([make_env(i) for i in range(num_cpu)])
+
     if params.params['policy'] == 'mlp':
         policy_fn = MlpPolicy
     elif params.params['policy'] == 'cnn':
