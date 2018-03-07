@@ -5,13 +5,12 @@ import os
 import os.path as osp
 import subprocess
 import sys
-import time
 from multiprocessing import Process, Queue
 
 import gym
-import gym_moving_dot  # noqa: F401 (imported but unused)
 import easy_tf_log
 import params
+from args import parse_args
 
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble, train_reward_predictor
@@ -199,76 +198,7 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, num_cpu,
 
 
 def main():
-    import argparse
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument(
-        '--env', help='environment ID', default='EnduroNoFrameskip-v4')
-    parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument('--rp_lr', type=float, default=2e-4)
-    parser.add_argument('--lr', type=float, default=7e-4)
-    parser.add_argument("--lr_zero_million_timesteps",
-                        type=float, default=None,
-                        help='If set, decay learning rate linearly, reaching '
-                        ' zero at this many timesteps')
-    parser.add_argument('--million_timesteps',
-                        type=float, default=10.,
-                        help='How many million timesteps to train for. '
-                             '(The number of frames trained for is this '
-                             'multiplied by 4 due to frameskip.)')
-    parser.add_argument('--n_envs', type=int, default=1)
-    parser.add_argument('--load_prefs_dir')
-    parser.add_argument('--headless', action='store_true')
-    seconds_since_epoch = str(int(time.time()))
-    parser.add_argument('--run_name', default=seconds_since_epoch)
-    parser.add_argument('--ent_coef', type=float, default=0.01)
-    parser.add_argument('--db_max', type=int, default=3000)
-    parser.add_argument('--segs_max', type=int, default=1000)
-    parser.add_argument('--log_interval', type=int, default=100)
-    parser.add_argument('--test_mode', action='store_true')
-    parser.add_argument('--just_pretrain', action='store_true')
-    parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--no_pretrain', action='store_true')
-    parser.add_argument('--save_prefs', action='store_true')
-    parser.add_argument('--network', default='conv')
-    parser.add_argument('--just_prefs', action='store_true')
-    parser.add_argument('--save_pretrain', action='store_true')
-    parser.add_argument('--print_lr', action='store_true')
-    parser.add_argument('--n_initial_epochs', type=int, default=200)
-    parser.add_argument('--log_dir')
-    parser.add_argument('--orig_rewards', action='store_true')
-    parser.add_argument('--skip_prefs', action='store_true')
-    parser.add_argument('--batchnorm', action='store_true')
-    parser.add_argument('--dropout', type=float, default=0.0)
-    parser.add_argument('--n_preds', type=int, default=1)
-    parser.add_argument('--save_initial_prefs', action='store_true')
-    parser.add_argument('--random_queries', action='store_true')
-    parser.add_argument('--no_gather_prefs', action='store_true')
-    parser.add_argument('--no_a2c', action='store_true')
-    parser.add_argument('--render_episodes', action='store_true')
-
-    # Reward predictor options
-    parser.add_argument('--n_initial_prefs', type=int, default=500,
-                        help='How many preferences to collect from a random '
-                             'policy before starting reward predictor '
-                             'training')
-    parser.add_argument('--load_reward_predictor_ckpt',
-                        help='File to load reward predictor checkpoint from '
-                             '(e.g. runs/foo/reward_predictor_checkpoints/'
-                             'reward_predictor.ckpt-100)')
-
-    parser.add_argument('--reward_predictor_ckpt_interval',
-                        type=int, default=100,
-                        help='No. training batches between reward '
-                             'predictor checkpoints')
-
-    # A2C options
-    parser.add_argument('--load_policy_ckpt_dir',
-                        help='Load a policy checkpoint from this directory.')
-    parser.add_argument('--policy_ckpt_interval', type=int, default=100,
-                        help="No. updates between policy checkpoints")
-
-    args = parser.parse_args()
+    args = parse_args()
 
     params.init_params()
     params.params['test_mode'] = args.test_mode
