@@ -227,7 +227,6 @@ def main():
     args = parse_args()
 
     params.init_params()
-    params.params['test_mode'] = args.test_mode
     params.params['just_pretrain'] = args.just_pretrain
     params.params['debug'] = args.debug
     params.params['no_pretrain'] = args.no_pretrain
