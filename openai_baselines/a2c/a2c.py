@@ -4,6 +4,7 @@ import queue
 import time
 
 import cloudpickle
+import easy_tf_log
 import numpy as np
 from numpy.testing import assert_equal
 import tensorflow as tf
@@ -150,13 +151,7 @@ class Runner(object):
         self.episode_vid_queue = episode_vid_queue
 
         self.orig_reward = [0 for _ in range(nenv)]
-        self.tr_ops = [tf.Variable(0) for _ in range(nenv)]
-        self.summ_ops = [
-            tf.summary.scalar('true reward %d' % env_n, self.tr_ops[env_n])
-            for env_n in range(nenv)
-        ]
         self.sess = tf.Session()
-        self.sess.run([op.initializer for op in self.tr_ops])
 
     def update_obs(self, obs):
         # Do frame-stacking here instead of the FrameStack wrapper to reduce
@@ -252,10 +247,10 @@ class Runner(object):
             for step_n in range(self.nsteps):
                 self.orig_reward[env_n] += rs[step_n]
                 if dones[step_n]:
-                    logger.record_tabular(
+                    print("Orig reward {}".format(self.orig_reward[env_n]))
+                    easy_tf_log.logkv(
                         "orig_reward_{}".format(env_n),
                         self.orig_reward[env_n])
-                    # logger.dump_tabular() will be called later on
                     self.orig_reward[env_n] = 0
 
         # Generate segments

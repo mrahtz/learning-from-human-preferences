@@ -9,6 +9,7 @@ from multiprocessing import Process, Queue
 
 import easy_tf_log
 import gym
+import gym_moving_dot
 
 import params
 from args import parse_args
