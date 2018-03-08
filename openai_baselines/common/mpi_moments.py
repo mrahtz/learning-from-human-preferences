@@ -1,6 +1,6 @@
 from mpi4py import MPI
 import numpy as np
-from baselines.common import zipsame
+from openai_baselines.common import zipsame
 
 def mpi_moments(x, axis=0):
     x = np.asarray(x, dtype='float64')
