@@ -113,8 +113,7 @@ def main():
         reward_predictor = RewardPredictorEnsemble(
             name='train_reward',
             cluster_dict=cluster_dict,
-            load_network=True,
-            rp_ckpt_dir=args.reward_predictor_ckpt,
+            ckpt_path=args.reward_predictor_ckpt,
             log_dir='/tmp')
         value_log = deque(maxlen=100)
         value_graph = ValueGraph()

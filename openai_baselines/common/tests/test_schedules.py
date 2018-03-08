@@ -1,6 +1,6 @@
 import numpy as np
 
-from baselines.common.schedules import ConstantSchedule, PiecewiseSchedule
+from openai_baselines.common.schedules import ConstantSchedule, PiecewiseSchedule
 
 
 def test_piecewise_schedule():
