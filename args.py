@@ -17,6 +17,8 @@ def parse_args():
     args = parser.parse_args()
 
     log_dir = get_log_dir(args)
+    if args.mode == 'pretrain_reward_predictor' and args.load_prefs_dir is None:
+        raise Exception("Error: please specify preference databases to train with (--load_prefs_dir)")
     general_args = {
         'env_id': args.env,
         'mode': args.mode,
@@ -25,7 +27,8 @@ def parse_args():
         'render_episodes': args.render_episodes,
         'n_initial_prefs': args.n_initial_prefs,
         'db_max': args.db_max,
-        'log_dir': log_dir
+        'log_dir': log_dir,
+        'prefs_dir': args.load_prefs_dir
     }
 
     num_timesteps = int(args.million_timesteps * 1e6)
@@ -56,15 +59,16 @@ def parse_args():
         'n_initial_epochs': args.n_initial_epochs,
         'dropout': args.dropout,
         'batchnorm': args.batchnorm,
-        'ckpt': args.load_reward_predictor_ckpt,
+        'ckpt_path': args.load_reward_predictor_ckpt,
         'ckpt_interval': args.reward_predictor_ckpt_interval,
+        'lr': args.reward_predictor_learning_rate
     }
 
     if general_args['test_mode']:
         reward_predictor_training_args['val_interval'] = 1
         # Override specified arguments
         general_args['n_initial_prefs'] = 1
-        reward_predictor_training_args['n_initial_epochs'] = 1
+        reward_predictor_training_args['n_initial_epochs'] = 2
         reward_predictor_training_args['ckpt_interval'] = 1
         a2c_args['num_timesteps'] = 1000
     else:
@@ -145,8 +149,8 @@ def add_a2c_args(parser):
 
 
 def add_reward_predictor_args(parser):
-    parser.add_argument('--network', default='conv')
-    parser.add_argument('--rp_lr', type=float, default=2e-4)
+    parser.add_argument('--network', choices=['moving_dot_features', 'cnn'], default='cnn')
+    parser.add_argument('--reward_predictor_learning_rate', type=float, default=2e-4)
     parser.add_argument('--n_initial_epochs', type=int, default=200)
     parser.add_argument('--dropout', type=float, default=0.0)
     parser.add_argument('--batchnorm', action='store_true')
@@ -155,8 +159,8 @@ def add_reward_predictor_args(parser):
                              '(e.g. runs/foo/reward_predictor_checkpoints/'
                              'reward_predictor.ckpt-100)')
     parser.add_argument('--reward_predictor_ckpt_interval',
-                        type=int, default=100,
-                        help='No. training batches between reward '
+                        type=int, default=1,
+                        help='No. training epochs between reward '
                              'predictor checkpoints')
 
 
