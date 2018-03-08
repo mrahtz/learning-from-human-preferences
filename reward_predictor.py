@@ -10,9 +10,9 @@ from numpy.testing import assert_equal
 import tensorflow as tf
 
 import params
-from utils import PrefDB, RunningStat
+from pref_interface import get_initial_prefs
+from utils import RunningStat
 
-VAL_FRACTION = 0.2
 
 
 def batch_iter(data, batch_size, shuffle=False):
@@ -175,52 +175,24 @@ def net_conv(s, batchnorm, dropout, training, reuse):
     return x
 
 
-def reward_pred_net(s, dropout, batchnorm, reuse, training):
-    if params.params['network'] == 'handcrafted':
+def reward_pred_net(network, s, dropout, batchnorm, reuse, training):
+    if network == 'handcrafted':
         return net_handcrafted(s)
-    elif params.params['network'] == 'easyfeatures':
+    elif network == 'easyfeatures':
         return net_easyfeatures(s, reuse)
-    elif params.params['network'] == 'conv':
+    elif network == 'conv':
         return net_conv(s, batchnorm, dropout, training, reuse)
     else:
         raise Exception("Unknown reward predictor network architecture",
-                        params.params['network'])
+                        network)
 
 
-def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
-    n_recvd = 0
-    while True:
-        try:
-            s1, s2, mu = pref_pipe.get(timeout=0.1)
-            n_recvd += 1
-        except queue.Empty:
-            break
 
-        if np.random.rand() < VAL_FRACTION:
-            pref_db_val.append(s1, s2, mu)
-        else:
-            pref_db_train.append(s1, s2, mu)
-
-        if len(pref_db_val) > db_max * VAL_FRACTION:
-            pref_db_val.del_first()
-        assert len(pref_db_val) <= db_max * VAL_FRACTION
-
-        if len(pref_db_train) > db_max * (1 - VAL_FRACTION):
-            pref_db_train.del_first()
-        assert len(pref_db_train) <= db_max * (1 - VAL_FRACTION)
-    if params.params['debug']:
-        print("{} preferences received".format(n_recvd))
-
-
-def save_prefs(log_dir, name, pref_db_train, pref_db_val):
-    fname = osp.join(log_dir, "train_{}.pkl".format(name))
-    save_pref_db(pref_db_train, fname)
-    fname = osp.join(log_dir, "val_{}.pkl".format(name))
-    save_pref_db(pref_db_val, fname)
 
 
 def train_reward_predictor(reward_predictor, pref_pipe, go_pipe,
-                           load_prefs_dir, log_dir, db_max):
+                           load_prefs_dir, log_dir, db_max,
+                           prefs_save_interval):
     pref_db_train, pref_db_val = get_initial_prefs(db_max, load_prefs_dir, log_dir, pref_pipe)
 
     if params.params['just_prefs']:
@@ -258,72 +230,7 @@ def train_reward_predictor(reward_predictor, pref_pipe, go_pipe,
         reward_predictor.train(pref_db_train, pref_db_val)
         recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
 
-        if params.params['save_prefs'] and \
-                step % params.params['prefs_save_interval'] == 0:
-            print("=== Saving preferences...")
-            fname = osp.join(log_dir, "train_%d.pkl" % step)
-            save_pref_db(pref_db_train, fname)
-            fname = osp.join(log_dir, "val_%d.pkl" % step)
-            save_pref_db(pref_db_val, fname)
-            if prev_save_step is not None:
-                os.remove(osp.join(log_dir, "train_%d.pkl" % prev_save_step))
-                os.remove(osp.join(log_dir, "val_%d.pkl" % prev_save_step))
-            prev_save_step = step
-
         step += 1
-
-
-def get_initial_prefs(db_max, load_prefs_dir, log_dir, pref_pipe):
-    if load_prefs_dir:
-        print("Loading preferences...")
-        # TODO make this more flexible
-        pref_db_train, pref_db_val = load_pref_db(load_prefs_dir)
-    else:
-        pref_db_val = PrefDB()
-        pref_db_train = PrefDB()
-
-    # Page 15: "We collect 500 comparisons from a randomly initialized policy
-    # network at the beginning of training"
-    if not params.params['skip_prefs']:
-        while True:
-            if len(pref_db_train) >= params.params['n_initial_prefs'] and len(pref_db_val):
-                break
-            print("Waiting for preferences; %d so far" % len(pref_db_train))
-            recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
-            time.sleep(5.0)
-
-    if params.params['just_prefs'] or params.params['save_initial_prefs']:
-        save_prefs(log_dir, 'initial', pref_db_train, pref_db_val)
-
-    print("Finished accumulating initial preferences at",
-          str(datetime.datetime.now()))
-    print("({} preferences over {} segments)".format(
-        len(pref_db_train.prefs), len(pref_db_train.segments)))
-
-    return pref_db_train, pref_db_val
-
-
-def save_pref_db(pref_db, fname):
-    with open(fname, 'wb') as pkl_file:
-        pickle.dump(pref_db, pkl_file)
-
-
-def load_pref_db(pref_dir):
-    train_fname = osp.join(pref_dir, 'train_postpretrain.pkl')
-    if not os.path.isfile(train_fname):
-        train_fname = osp.join(pref_dir, 'train_initial.pkl')
-    with open(train_fname, 'rb') as pkl_file:
-        print("Loading training preferences from '{}'".format(train_fname))
-        pref_db_train = pickle.load(pkl_file)
-
-    val_fname = osp.join(pref_dir, 'val_postpretrain.pkl')
-    if not os.path.isfile(val_fname):
-        val_fname = osp.join(pref_dir, 'val_initial.pkl')
-    with open(val_fname, 'rb') as pkl_file:
-        print("Loading validation preferences from '{}'".format(val_fname))
-        pref_db_val = pickle.load(pkl_file)
-
-    return pref_db_train, pref_db_val
 
 
 class RewardPredictorEnsemble:
@@ -339,10 +246,13 @@ class RewardPredictorEnsemble:
 
     def __init__(self,
                  name,
+                 network,
                  lr=1e-4,
                  cluster_dict=None,
                  ckpt_path=None,
-                 dropout=0.5,
+                 batchnorm=False,
+                 dropout=0.0,
+                 n_preds=1,
                  log_dir=None):
         rps = []
         reward_ops = []
@@ -363,16 +273,12 @@ class RewardPredictorEnsemble:
             ps_device="/job:ps/task:0",
             worker_device="/job:{}/task:0".format(name))
 
-        # TODO pass these instead of getting them from global params
-        batchnorm = params.params['batchnorm']
-        dropout = params.params['dropout']
-        n_preds = params.params['n_preds']
         with graph.as_default():
             for i in range(n_preds):
                 with tf.device(device_setter):
                     with tf.variable_scope("pred_%d" % i):
                         rp = RewardPredictor(
-                            dropout=dropout, batchnorm=batchnorm, lr=lr)
+                            network=network, dropout=dropout, batchnorm=batchnorm, lr=lr)
                 reward_ops.append(rp.r1)
                 pred_ops.append(rp.pred)
                 train_ops.append(rp.train)
@@ -622,7 +528,7 @@ class RewardPredictor:
     - loss      Loss summed over the whole batch
     """
 
-    def __init__(self, dropout, batchnorm, lr):
+    def __init__(self, network, dropout, batchnorm, lr):
         training = tf.placeholder(tf.bool)
 
         # Each element of the batch is one trajectory segment.
@@ -637,9 +543,9 @@ class RewardPredictor:
         s1_unrolled = tf.reshape(s1, [-1, 84, 84, 4], name='a')
         s2_unrolled = tf.reshape(s2, [-1, 84, 84, 4], name='b')
 
-        _r1 = reward_pred_net(
+        _r1 = reward_pred_net(network,
             s1_unrolled, dropout, batchnorm, reuse=None, training=training)
-        _r2 = reward_pred_net(
+        _r2 = reward_pred_net(network,
             s2_unrolled, dropout, batchnorm, reuse=True, training=training)
 
         # Shape should be 'unrolled batch size'

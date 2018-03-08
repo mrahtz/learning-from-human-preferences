@@ -1,16 +1,22 @@
 #!/usr/bin/env python
-
+import datetime
 import queue
 import time
 from itertools import combinations
 from multiprocessing import Process, Queue
+from utils import save_pref_db
 
 import numpy as np
 from numpy.testing import assert_equal
 
-import params
 from scipy.ndimage import zoom
-from utils import vid_proc
+
+from utils import vid_proc, PrefDB
+
+import os.path as osp
+import logging
+import sys
+import os
 
 
 class PrefInterface:
@@ -20,47 +26,6 @@ class PrefInterface:
         if not headless:
             Process(target=vid_proc, args=(self.vid_q,), daemon=True).start()
         self.synthetic_prefs = synthetic_prefs
-
-    def least_certain_seg_pair(self, segments, pair_idxs):
-        """
-        - Calculate predicted preferences for every possible pair of segments
-        - Calculate the pair with the highest uncertainty
-        - Return the index of that pair of segments
-        - Send that pair of segments, along with segment IDs, to be checked by
-          the user
-        """
-        s1s = []
-        s2s = []
-        for i1, i2 in pair_idxs:
-            s1s.append(segments[i1].frames)
-            s2s.append(segments[i2].frames)
-        pair_preds = self.reward_predictor.preferences(s1s, s2s)
-        pair_preds = np.array(pair_preds)
-        n_preds = self.reward_predictor.n_preds
-        assert_equal(pair_preds.shape, (n_preds, len(pair_idxs), 2))
-
-        # Each predictor gives two outputs:
-        # - p1: the probability of segment 1 being preferred
-        # - p2: the probability of segment 2 being preferred
-        #       (= 1 - p1)
-        # We want to calculate variance of predictions across all
-        # predictors in the ensemble.
-        # If L is a list, var(L) = var(1 - L).
-        # So we can calculate the variance based on either p1 or p2
-        # and get the same result.
-        preds = pair_preds[:, :, 0]
-        assert_equal(preds.shape, (n_preds, len(pair_idxs)))
-
-        # Calculate variances across ensemble members
-        pred_vars = np.var(preds, axis=0)
-        assert_equal(pred_vars.shape, (len(pair_idxs), ))
-
-        highest_var_i = np.argmax(pred_vars)
-        check_idxs = pair_idxs[highest_var_i]
-        check_s1 = segments[check_idxs[0]]
-        check_s2 = segments[check_idxs[1]]
-
-        return check_idxs, check_s1, check_s2
 
     def recv_segments(self, segments, seg_pipe, segs_max):
         n_segs = 0
@@ -128,9 +93,6 @@ class PrefInterface:
 
         return pref
 
-    def init_reward_predictor(self, reward_predictor):
-        self.reward_predictor = reward_predictor
-
     def run(self, seg_pipe, pref_pipe, segs_max):
         tested_pairs = []
         segments = []
@@ -150,21 +112,14 @@ class PrefInterface:
                 self.recv_segments(segments, seg_pipe, segs_max)
                 pair_idxs = self.sample_pair_idxs(segments,
                                                   exclude_pairs=tested_pairs)
-            if params.params['debug']:
-                print("Sampled segment pairs:")
-                print(pair_idxs)
+            logging.debug("Sampled segment pairs:", pair_idxs)
 
-            if not params.params['random_query']:
-                (n1, n2), s1, s2 = \
-                    self.least_certain_seg_pair(segments, pair_idxs)
-            else:
-                i = np.random.choice(len(pair_idxs))
-                (n1, n2) = pair_idxs[i]
-                s1 = segments[n1]
-                s2 = segments[n2]
+            i = np.random.choice(len(pair_idxs))
+            (n1, n2) = pair_idxs[i]
+            s1 = segments[n1]
+            s2 = segments[n2]
 
-            if params.params['debug']:
-                print("Querying preference for segments", n1, "and", n2)
+            logging.debug("Querying preference for segments", n1, "and", n2)
 
             if not self.synthetic_prefs:
                 pref = self.ask_user(n1, n2, s1.frames, s2.frames)
@@ -184,3 +139,46 @@ class PrefInterface:
                 pref_pipe.put((s1, s2, pref))
             tested_pairs.append((n1, n2))
             tested_pairs.append((n2, n1))
+
+
+def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
+    n_recvd = 0
+    val_fraction = 0.2
+    while True:
+        try:
+            s1, s2, mu = pref_pipe.get(timeout=0.1)
+            n_recvd += 1
+        except queue.Empty:
+            break
+
+        if np.random.rand() < val_fraction:
+            pref_db_val.append(s1, s2, mu)
+        else:
+            pref_db_train.append(s1, s2, mu)
+
+        if len(pref_db_val) > db_max * val_fraction:
+            pref_db_val.del_first()
+        assert len(pref_db_val) <= db_max * val_fraction
+
+        if len(pref_db_train) > db_max * (1 - val_fraction):
+            pref_db_train.del_first()
+        assert len(pref_db_train) <= db_max * (1 - val_fraction)
+
+
+def get_initial_prefs(pref_pipe, n_initial_prefs, db_max):
+    pref_db_val = PrefDB()
+    pref_db_train = PrefDB()
+    # Page 15: "We collect 500 comparisons from a randomly initialized policy
+    # network at the beginning of training"
+    while len(pref_db_train) < n_initial_prefs or len(pref_db_val) == 0:
+        print("Waiting for preferences; %d so far" % len(pref_db_train))
+        recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
+        time.sleep(5.0)
+
+    return pref_db_train, pref_db_val
+
+def save_prefs(pref_db_train, pref_db_val, save_dir, name):
+    fname = osp.join(save_dir, "train_{}.pkl".format(name))
+    save_pref_db(pref_db_train, fname)
+    fname = osp.join(save_dir, "val_{}.pkl".format(name))
+    save_pref_db(pref_db_val, fname)
