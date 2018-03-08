@@ -62,16 +62,6 @@ def run(env_id, num_timesteps, seed, lr_scheduler, rp_lr, n_envs,
 
     ps_proc = start_parameter_server(cluster_dict)
 
-    if 'train_reward' in parts_to_run:
-        train_proc = start_reward_predictor_training(cluster_dict=cluster_dict,
-                                                     log_dir=log_dir,
-                                                     rp_ckpt_path=rp_ckpt_path,
-                                                     pref_pipe=pref_pipe,
-                                                     go_pipe=go_pipe,
-                                                     load_prefs_dir=load_prefs_dir,
-                                                     db_max=db_max,
-                                                     rp_lr=rp_lr)
-
     if 'a2c' in parts_to_run:
         a2c_proc = start_policy_training(cluster_dict=cluster_dict, env=env, seed=seed, seg_pipe=seg_pipe,
                                          go_pipe=go_pipe, log_dir=log_dir, lr_scheduler=lr_scheduler, num_timesteps=num_timesteps,
@@ -81,6 +71,16 @@ def run(env_id, num_timesteps, seed, lr_scheduler, rp_lr, n_envs,
     if 'pref_interface' in parts_to_run:
         pi_proc = start_pref_interface(cluster_dict=cluster_dict, seg_pipe=seg_pipe, pref_pipe=pref_pipe,
                                        segs_max=segs_max, headless=headless)
+
+    if 'train_reward' in parts_to_run:
+        train_proc = start_reward_predictor_training(cluster_dict=cluster_dict,
+                                                     log_dir=log_dir,
+                                                     rp_ckpt_path=rp_ckpt_path,
+                                                     pref_pipe=pref_pipe,
+                                                     go_pipe=go_pipe,
+                                                     load_prefs_dir=load_prefs_dir,
+                                                     db_max=db_max,
+                                                     rp_lr=rp_lr)
 
     if 'train_reward' not in parts_to_run:
         go_pipe.put(True)
