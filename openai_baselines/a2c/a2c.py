@@ -9,12 +9,12 @@ import numpy as np
 from numpy.testing import assert_equal
 import tensorflow as tf
 
-import params as run_params
 from openai_baselines import logger
 from openai_baselines.a2c.utils import (cat_entropy, discount_with_dones,
                                         find_trainable_variables, mse)
 from openai_baselines.common import explained_variance, set_global_seeds
 from utils import Segment
+import logging
 
 
 """
@@ -77,9 +77,6 @@ class Model(object):
             n_steps = len(obs)
             for _ in range(n_steps):
                 cur_lr = lr_scheduler.value()
-            if run_params.params['print_lr']:
-                import datetime
-                print(str(datetime.datetime.now()), cur_lr)
             td_map = {
                 train_model.X: obs,
                 A: actions,
@@ -124,6 +121,7 @@ class Runner(object):
     def __init__(self,
                  env,
                  model,
+                 gen_segments,
                  seg_pipe,
                  nsteps=5,
                  nstack=4,
@@ -152,6 +150,7 @@ class Runner(object):
 
         self.orig_reward = [0 for _ in range(nenv)]
         self.sess = tf.Session()
+        self.gen_segments = gen_segments
 
     def update_obs(self, obs):
         # Do frame-stacking here instead of the FrameStack wrapper to reduce
@@ -159,7 +158,7 @@ class Runner(object):
         self.obs = np.roll(self.obs, shift=-1, axis=3)
         self.obs[:, :, :, -1] = obs[:, :, :, 0]
 
-    def gen_segments(self, mb_obs, mb_rewards, mb_dones):
+    def save_segments(self, mb_obs, mb_rewards, mb_dones):
         # Only generate segments from the first environment
         # TODO: is this the right choice...?
         e0_obs = mb_obs[0]
@@ -205,7 +204,7 @@ class Runner(object):
             actions, values, states = self.model.step(self.obs, self.states,
                                                       self.dones)
             # TODO: move this down below
-            if run_params.params['env'] == 'MovingDotNoFrameskip-v0':
+            if self.env.env_id == 'MovingDotNoFrameskip-v0':
                 # For MovingDot, reward depends on both current observation and
                 # action, so encode action in the observations
                 # Offset of 100 so it doesn't interfere with oracle position
@@ -222,8 +221,6 @@ class Runner(object):
             for n, done in enumerate(dones):
                 if done:
                     self.obs[n] = self.obs[n] * 0
-                    if run_params.params['debug']:
-                        print("Env %d done" % n)
             # SubprocVecEnv automatically resets when done
             self.update_obs(obs)
             mb_rewards.append(rewards)
@@ -247,23 +244,21 @@ class Runner(object):
             for step_n in range(self.nsteps):
                 self.orig_reward[env_n] += rs[step_n]
                 if dones[step_n]:
-                    print("Orig reward {}".format(self.orig_reward[env_n]))
                     easy_tf_log.logkv(
                         "orig_reward_{}".format(env_n),
                         self.orig_reward[env_n])
                     self.orig_reward[env_n] = 0
 
         # Generate segments
-        if self.reward_predictor:
-            self.gen_segments(mb_obs, mb_rewards, mb_dones)
+        if self.gen_segments:
+            self.save_segments(mb_obs, mb_rewards, mb_dones)
 
         # Save frames for episode rendering
         if self.episode_vid_queue is not None:
             self.save_episode_frames(mb_obs, mb_dones)
 
         # Replace rewards with those from reward predictor
-        if run_params.params['debug']:
-            print("Original rewards:\n", mb_rewards)
+        logging.debug("Original rewards:\n", mb_rewards)
         if self.reward_predictor:
             orig_rewards = np.copy(mb_rewards)
 
@@ -279,8 +274,7 @@ class Runner(object):
                                     orig_rewards.flatten())
             logger.record_tabular("explained_variance_predicted_rewards", ev)
 
-            if run_params.params['debug']:
-                print("Predicted rewards:\n", mb_rewards)
+            logging.debug("Predicted rewards:\n", mb_rewards)
 
         # Discount rewards
         mb_obs = mb_obs.reshape(self.batch_ob_shape)
@@ -316,6 +310,7 @@ def learn(policy,
           go_pipe,
           log_dir,
           lr_scheduler,
+          gen_segments,
           nsteps=5,
           nstack=4,
           total_timesteps=int(80e6),
@@ -375,9 +370,10 @@ def learn(policy,
     ckpt_path = osp.join(ckpt_dir, 'policy')
 
     runner = Runner(
-        env,
-        model,
-        seg_pipe,
+        env=env,
+        model=model,
+        seg_pipe=seg_pipe,
+        gen_segments=gen_segments,
         nsteps=nsteps,
         nstack=nstack,
         gamma=gamma,

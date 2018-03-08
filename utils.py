@@ -7,6 +7,8 @@ import numpy as np
 import pyglet
 
 from scipy.ndimage import zoom
+import os.path as osp
+import pickle
 
 
 # https://github.com/joschu/modular_rl/blob/master/modular_rl/running_stat.py
@@ -103,6 +105,27 @@ class PrefDB:
     def __len__(self):
         return len(self.prefs)
 
+def save_pref_db(pref_db, fname):
+    with open(fname, 'wb') as pkl_file:
+        pickle.dump(pref_db, pkl_file)
+
+
+def load_pref_db(pref_dir):
+    train_fname = osp.join(pref_dir, 'train_postpretrain.pkl')
+    if not osp.isfile(train_fname):
+        train_fname = osp.join(pref_dir, 'train_initial.pkl')
+    with open(train_fname, 'rb') as pkl_file:
+        print("Loading training preferences from '{}'".format(train_fname))
+        pref_db_train = pickle.load(pkl_file)
+
+    val_fname = osp.join(pref_dir, 'val_postpretrain.pkl')
+    if not osp.isfile(val_fname):
+        val_fname = osp.join(pref_dir, 'val_initial.pkl')
+    with open(val_fname, 'rb') as pkl_file:
+        print("Loading validation preferences from '{}'".format(val_fname))
+        pref_db_val = pickle.load(pkl_file)
+
+    return pref_db_train, pref_db_val
 
 class Im(object):
     def __init__(self, display=None):
