@@ -3,8 +3,8 @@
 import logging
 import os
 import os.path as osp
-import subprocess
 import sys
+import subprocess
 from multiprocessing import Process, Queue
 
 import easy_tf_log
@@ -35,48 +35,72 @@ def configure_a2c_logger(log_dir):
     logger.Logger.CURRENT = logger.Logger(dir=a2c_dir, output_formats=[tb])
 
 
-def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, n_envs,
-          rp_ckpt_path, load_prefs_dir, headless, log_dir, ent_coef, db_max,
-          segs_max, log_interval, policy_ckpt_dir, policy_ckpt_interval):
+def run(env_id, num_timesteps, seed, lr_scheduler, rp_lr, n_envs,
+        rp_ckpt_path, load_prefs_dir, headless, log_dir, ent_coef, db_max,
+        segs_max, log_interval, policy_ckpt_dir, policy_ckpt_interval):
     configure_a2c_logger(log_dir)
 
     env = make_envs(env_id, n_envs, seed)
-
-    if params.params['policy'] == 'mlp':
-        policy_fn = MlpPolicy
-    elif params.params['policy'] == 'cnn':
-        policy_fn = CnnPolicy
-    else:
-        raise Exception("Unknown policy {}".format(params.params['policy']))
 
     seg_pipe = Queue()
     pref_pipe = Queue()
     go_pipe = Queue(maxsize=1)
 
-    def episode_vid_proc():
-        vid_proc(
-            episode_vid_queue,
-            playback_speed=2,
-            zoom_factor=2,
-            mode='play_through')
-
-    if params.params['render_episodes']:
-        episode_vid_queue = Queue()
-        Process(
-            target=episode_vid_proc,
-            daemon=True).start()
-    else:
-        episode_vid_queue = None
-
     parts_to_run = ['a2c', 'pref_interface', 'train_reward']
-
     if params.params['no_gather_prefs'] or params.params['orig_rewards']:
         parts_to_run.remove('pref_interface')
     if params.params['orig_rewards']:
         parts_to_run.remove('train_reward')
     if params.params['no_a2c']:
         parts_to_run.remove('a2c')
+    cluster_dict = create_cluster_dict(parts_to_run)
 
+    if params.params['render_episodes']:
+        start_episode_renderer()
+    else:
+        episode_vid_queue = None
+
+    ps_proc = start_parameter_server(cluster_dict)
+
+    if 'train_reward' in parts_to_run:
+        train_proc = start_reward_predictor_training(cluster_dict=cluster_dict,
+                                                     log_dir=log_dir,
+                                                     rp_ckpt_path=rp_ckpt_path,
+                                                     pref_pipe=pref_pipe,
+                                                     go_pipe=go_pipe,
+                                                     load_prefs_dir=load_prefs_dir,
+                                                     db_max=db_max,
+                                                     rp_lr=rp_lr)
+
+    if 'a2c' in parts_to_run:
+        a2c_proc = start_policy_training(cluster_dict=cluster_dict, env=env, seed=seed, seg_pipe=seg_pipe,
+                                         go_pipe=go_pipe, log_dir=log_dir, lr_scheduler=lr_scheduler, num_timesteps=num_timesteps,
+                                         policy_ckpt_dir=policy_ckpt_dir, episode_vid_queue=episode_vid_queue,
+                                         ent_coef=ent_coef, policy_ckpt_interval=policy_ckpt_interval, log_interval=log_interval)
+
+    if 'pref_interface' in parts_to_run:
+        pi_proc = start_pref_interface(cluster_dict=cluster_dict, seg_pipe=seg_pipe, pref_pipe=pref_pipe,
+                                       segs_max=segs_max, headless=headless)
+
+    if 'train_reward' not in parts_to_run:
+        go_pipe.put(True)
+
+    if params.params['just_prefs'] or params.params['just_pretrain']:
+        train_proc.join()
+    elif a2c_proc:
+        a2c_proc.join()
+    else:
+        raise Exception("Error: no parts to wait for?")
+
+    env.close()  # Kill the SubprocVecEnv processes
+    if 'train_proc' in parts_to_run:
+        train_proc.terminate()
+    if 'pref_interface' in parts_to_run:
+        pi_proc.terminate()
+    ps_proc.terminate()
+
+
+def create_cluster_dict(parts_to_run):
     ports = get_port_range(
         start_port=2200,
         n_ports=len(parts_to_run) + 1,
@@ -84,10 +108,35 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, n_envs,
     cluster_dict = {'ps': ['localhost:{}'.format(ports[0])]}
     for part, port in zip(parts_to_run, ports[1:]):
         cluster_dict[part] = ['localhost:{}'.format(port)]
+    return cluster_dict
 
-    def ps():
-        RewardPredictorEnsemble(name='ps', cluster_dict=cluster_dict)
 
+def start_pref_interface(cluster_dict, seg_pipe, pref_pipe, segs_max, headless):
+    def pi_procf(pi):
+        # We have to give PrefInterface the reward predictor /after/ init,
+        # because init needs to spawn a GUI process (using fork()), and the
+        # Objective C APIs (invoked when dealing with GUI stuff) aren't
+        # happy if running in a process forked from a multithreaded parent.
+        reward_predictor = RewardPredictorEnsemble(
+            name='pref_interface',
+            cluster_dict=cluster_dict)
+        pi.init_reward_predictor(reward_predictor)
+        pi.run(seg_pipe, pref_pipe, segs_max)
+    pi = PrefInterface(headless=headless, synthetic_prefs=headless)
+    pi_proc = Process(target=pi_procf, daemon=True, args=(pi,))
+    pi_proc.start()
+    return pi_proc
+
+
+def start_policy_training(cluster_dict, env, seed, seg_pipe, go_pipe,
+                          log_dir, lr_scheduler, num_timesteps, policy_ckpt_dir, episode_vid_queue, ent_coef, policy_ckpt_interval,
+                          log_interval):
+    if params.params['policy'] == 'mlp':
+        policy_fn = MlpPolicy
+    elif params.params['policy'] == 'cnn':
+        policy_fn = CnnPolicy
+    else:
+        raise Exception("Unknown policy {}".format(params.params['policy']))
     def a2c():
         if params.params['orig_rewards']:
             reward_predictor = None
@@ -110,7 +159,12 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, n_envs,
             episode_vid_queue=episode_vid_queue,
             ent_coef=ent_coef,
             save_interval=policy_ckpt_interval)
+    a2c_proc = Process(target=a2c, daemon=True)
+    a2c_proc.start()
+    return a2c_proc
 
+
+def start_reward_predictor_training(cluster_dict, log_dir, rp_ckpt_path, pref_pipe, go_pipe, load_prefs_dir, db_max, rp_lr):
     def trp():
         reward_predictor = RewardPredictorEnsemble(
             name='train_reward',
@@ -125,53 +179,31 @@ def train(env_id, num_timesteps, seed, lr_scheduler, rp_lr, n_envs,
             load_prefs_dir=load_prefs_dir,
             log_dir=log_dir,
             db_max=db_max)
+    train_proc = Process(target=trp, daemon=True)
+    train_proc.start()
+    return train_proc
 
-    def pi_procf(pi):
-        # We have to give PrefInterface the reward predictor /after/ init,
-        # because init needs to spawn a GUI process (using fork()), and the
-        # Objective C APIs (invoked when dealing with GUI stuff) aren't
-        # happy if running in a process forked from a multithreaded parent.
-        reward_predictor = RewardPredictorEnsemble(
-            name='pref_interface',
-            cluster_dict=cluster_dict)
-        pi.init_reward_predictor(reward_predictor)
-        pi.run(seg_pipe, pref_pipe, segs_max)
+
+def start_parameter_server(cluster_dict):
+    def ps():
+        RewardPredictorEnsemble(name='ps', cluster_dict=cluster_dict)
 
     ps_proc = Process(target=ps, daemon=True)
     ps_proc.start()
+    return ps_proc
 
-    train_proc = None
-    if 'train_reward' in parts_to_run:
-        train_proc = Process(target=trp, daemon=True)
-        train_proc.start()
 
-    a2c_proc = None
-    if 'a2c' in parts_to_run:
-        a2c_proc = Process(target=a2c, daemon=True)
-        a2c_proc.start()
-
-    if 'pref_interface' in parts_to_run:
-        synthetic_prefs = headless
-        pi = PrefInterface(headless, synthetic_prefs)
-        pi_proc = Process(target=pi_procf, daemon=True, args=(pi, ))
-        pi_proc.start()
-
-    if 'train_reward' not in parts_to_run:
-        go_pipe.put(True)
-
-    if params.params['just_prefs'] or params.params['just_pretrain']:
-        train_proc.join()
-    elif a2c_proc:
-        a2c_proc.join()
-    else:
-        raise Exception("Error: no parts to wait for?")
-
-    env.close()  # Kill the SubprocVecEnv processes
-    if 'train_proc' in parts_to_run:
-        train_proc.terminate()
-    if 'pref_interface' in parts_to_run:
-        pi_proc.terminate()
-    ps_proc.terminate()
+def start_episode_renderer():
+    def episode_vid_proc():
+        vid_proc(
+            episode_vid_queue,
+            playback_speed=2,
+            zoom_factor=2,
+            mode='play_through')
+    episode_vid_queue = Queue()
+    Process(
+        target=episode_vid_proc,
+        daemon=True).start()
 
 
 def make_envs(env_id, n_envs, seed):
@@ -274,7 +306,7 @@ def main():
     os.makedirs(misc_logs_dir)
     easy_tf_log.set_dir(misc_logs_dir)
 
-    train(
+    run(
         env_id=args.env,
         num_timesteps=num_timesteps,
         seed=args.seed,
