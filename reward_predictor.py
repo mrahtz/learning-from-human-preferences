@@ -221,34 +221,7 @@ def save_prefs(log_dir, name, pref_db_train, pref_db_val):
 
 def train_reward_predictor(reward_predictor, pref_pipe, go_pipe,
                            load_prefs_dir, log_dir, db_max):
-    if load_prefs_dir:
-        print("Loading preferences...")
-        # TODO make this more flexible
-        pref_db_train, pref_db_val = load_pref_db(load_prefs_dir)
-    else:
-        pref_db_val = PrefDB()
-        pref_db_train = PrefDB()
-
-    # Page 15: "We collect 500 comparisons from a randomly initialized policy
-    # network at the beginning of training"
-    if not params.params['skip_prefs']:
-        while True:
-            if len(pref_db_train) >= params.params['n_initial_prefs'] and len(pref_db_val):
-                break
-            print("Waiting for preferences; %d so far" % len(pref_db_train))
-            recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
-            time.sleep(5.0)
-
-    if params.params['save_prefs']:
-        save_prefs(log_dir, 'initial', pref_db_train, pref_db_val)
-
-    print("Finished accumulating initial preferences at",
-          str(datetime.datetime.now()))
-    print("({} preferences over {} segments)".format(
-        len(pref_db_train.prefs), len(pref_db_train.segments)))
-
-    if params.params['just_prefs'] or params.params['save_initial_prefs']:
-        save_prefs(log_dir, 'initial', pref_db_train, pref_db_val)
+    pref_db_train, pref_db_val = get_initial_prefs(db_max, load_prefs_dir, log_dir, pref_pipe)
 
     if params.params['just_prefs']:
         return
@@ -298,6 +271,34 @@ def train_reward_predictor(reward_predictor, pref_pipe, go_pipe,
             prev_save_step = step
 
         step += 1
+
+
+def get_initial_prefs(db_max, load_prefs_dir, log_dir, pref_pipe):
+    if load_prefs_dir:
+        print("Loading preferences...")
+        # TODO make this more flexible
+        pref_db_train, pref_db_val = load_pref_db(load_prefs_dir)
+    else:
+        pref_db_val = PrefDB()
+        pref_db_train = PrefDB()
+    # Page 15: "We collect 500 comparisons from a randomly initialized policy
+    # network at the beginning of training"
+    if not params.params['skip_prefs']:
+        while True:
+            if len(pref_db_train) >= params.params['n_initial_prefs'] and len(pref_db_val):
+                break
+            print("Waiting for preferences; %d so far" % len(pref_db_train))
+            recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
+            time.sleep(5.0)
+    if params.params['save_prefs']:
+        save_prefs(log_dir, 'initial', pref_db_train, pref_db_val)
+    print("Finished accumulating initial preferences at",
+          str(datetime.datetime.now()))
+    print("({} preferences over {} segments)".format(
+        len(pref_db_train.prefs), len(pref_db_train.segments)))
+    if params.params['just_prefs'] or params.params['save_initial_prefs']:
+        save_prefs(log_dir, 'initial', pref_db_train, pref_db_val)
+    return pref_db_train, pref_db_val
 
 
 def save_pref_db(pref_db, fname):
