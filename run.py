@@ -73,7 +73,7 @@ def run(general_args, a2c_args, pref_interface_args, reward_predictor_training_a
                                        **pref_interface_args)
         pref_db_train, pref_db_val = get_initial_prefs(pref_pipe=pref_pipe,
                                                        n_initial_prefs=general_args['n_initial_prefs'],
-                                                       db_max=general_args['db_max'])
+                                                       max_prefs=general_args['max_prefs'])
         pref_interface.save_prefs(pref_db_train=pref_db_train, pref_db_val=pref_db_val,
                                   save_dir=general_args['log_dir'], name='initial')
         pi_proc.terminate()
@@ -88,7 +88,7 @@ def run(general_args, a2c_args, pref_interface_args, reward_predictor_training_a
                                                    go_pipe=start_policy_training_flag,
                                                    make_reward_predictor=make_reward_predictor,
                                                    n_initial_epochs=reward_predictor_training_args['n_initial_epochs'],
-                                                   db_max=general_args['db_max'],
+                                                   max_prefs=general_args['max_prefs'],
                                                    prefs_dir=general_args['prefs_dir'],
                                                    val_interval=reward_predictor_training_args['val_interval'],
                                                    ckpt_interval=reward_predictor_training_args['ckpt_interval'],
@@ -127,7 +127,7 @@ def run(general_args, a2c_args, pref_interface_args, reward_predictor_training_a
                                                    go_pipe=start_policy_training_flag,
                                                    make_reward_predictor=make_reward_predictor,
                                                    n_initial_epochs=reward_predictor_training_args['n_initial_epochs'],
-                                                   db_max=general_args['db_max'],
+                                                   max_prefs=general_args['max_prefs'],
                                                    prefs_dir=general_args['prefs_dir'],
                                                    val_interval=reward_predictor_training_args['val_interval'],
                                                    ckpt_interval=reward_predictor_training_args['ckpt_interval'])
@@ -178,14 +178,14 @@ def make_envs(env_id, n_envs, seed):
     return env
 
 
-def get_initial_prefs(pref_pipe, n_initial_prefs, db_max):
+def get_initial_prefs(pref_pipe, n_initial_prefs, max_prefs):
     pref_db_val = PrefDB()
     pref_db_train = PrefDB()
     # Page 15: "We collect 500 comparisons from a randomly initialized policy
     # network at the beginning of training"
     while len(pref_db_train) < n_initial_prefs or len(pref_db_val) == 0:
         print("Waiting for preferences; %d so far" % len(pref_db_train))
-        recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
+        recv_prefs(pref_pipe, pref_db_train, pref_db_val, max_prefs)
         time.sleep(5.0)
 
     return pref_db_train, pref_db_val
@@ -239,13 +239,13 @@ def start_policy_training(cluster_dict, make_reward_predictor, env_id, n_envs, s
     return env, proc
 
 
-def start_pref_interface(seg_pipe, pref_pipe, segs_max, headless):
+def start_pref_interface(seg_pipe, pref_pipe, max_segs, headless):
     def f():
         # The preference interface needs to get input from stdin.
         # stdin is automatically closed at the beginning of child processes in Python,
         # so this feels like a bit of a hack, but it seems to be fine.
         sys.stdin = os.fdopen(0)
-        pi.run(seg_pipe, pref_pipe, segs_max)
+        pi.run(seg_pipe, pref_pipe, max_segs)
     # Needs to be done in the main process because does GUI work
     pi = PrefInterface(headless=headless, synthetic_prefs=headless)
     proc = Process(target=f, daemon=True)
@@ -254,7 +254,7 @@ def start_pref_interface(seg_pipe, pref_pipe, segs_max, headless):
 
 
 def start_reward_predictor_training(cluster_dict, make_reward_predictor, just_pretrain, pref_pipe,
-                                    go_pipe, db_max, n_initial_epochs,
+                                    go_pipe, max_prefs, n_initial_epochs,
                                     prefs_dir, ckpt_path, val_interval, ckpt_interval):
     def f():
         reward_predictor = make_reward_predictor('train', cluster_dict)
@@ -265,7 +265,7 @@ def start_reward_predictor_training(cluster_dict, make_reward_predictor, just_pr
         else:
             pref_db_train, pref_db_val = get_initial_prefs(pref_pipe=pref_pipe,
                                                            n_initial_prefs=n_initial_epochs,
-                                                           db_max=db_max)
+                                                           max_prefs=max_prefs)
 
         print("Pretraining reward predictor for {} epochs".format(n_initial_epochs))
         for i in range(n_initial_epochs):
@@ -285,7 +285,7 @@ def start_reward_predictor_training(cluster_dict, make_reward_predictor, just_pr
             reward_predictor.train(pref_db_train, pref_db_val, val_interval)
             if i and i % ckpt_interval == 0:
                 reward_predictor.save()
-            recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
+            recv_prefs(pref_pipe, pref_db_train, pref_db_val, max_prefs)
 
     proc = Process(target=f, daemon=True)
     proc.start()
