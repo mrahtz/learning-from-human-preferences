@@ -70,7 +70,8 @@ def parse_args():
         general_args['n_initial_prefs'] = 1
         reward_predictor_training_args['n_initial_epochs'] = 2
         reward_predictor_training_args['ckpt_interval'] = 1
-        a2c_args['num_timesteps'] = 1000
+        a2c_args['ckpt_interval'] = 10
+        a2c_args['num_timesteps'] = 500
     else:
         reward_predictor_training_args['val_interval'] = 50
 
@@ -105,7 +106,7 @@ def get_git_rev():
 
 def add_general_args(parser):
     parser.add_argument('mode', choices=['gather_initial_prefs', 'pretrain_reward_predictor',
-                                           'train_policy_with_preferences', 'train_policy_with_original_rewards'])
+                                         'train_policy_with_preferences', 'train_policy_with_original_rewards'])
     parser.add_argument('env')
 
     parser.add_argument('--test_mode', action='store_true')
