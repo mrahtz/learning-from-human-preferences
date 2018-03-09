@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import datetime
 import queue
 import time
 from itertools import combinations
@@ -7,16 +6,13 @@ from multiprocessing import Process, Queue
 from utils import save_pref_db
 
 import numpy as np
-from numpy.testing import assert_equal
 
 from scipy.ndimage import zoom
 
-from utils import vid_proc, PrefDB
+from utils import vid_proc
 
 import os.path as osp
 import logging
-import sys
-import os
 
 
 class PrefInterface:
@@ -101,7 +97,7 @@ class PrefInterface:
             self.recv_segments(segments, seg_pipe, segs_max)
             if len(segments) >= 2:
                 break
-            print("Waiting for segments")
+            print("Preference interface waiting for segments")
             time.sleep(2.0)
 
         while True:
@@ -164,18 +160,6 @@ def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
             pref_db_train.del_first()
         assert len(pref_db_train) <= db_max * (1 - val_fraction)
 
-
-def get_initial_prefs(pref_pipe, n_initial_prefs, db_max):
-    pref_db_val = PrefDB()
-    pref_db_train = PrefDB()
-    # Page 15: "We collect 500 comparisons from a randomly initialized policy
-    # network at the beginning of training"
-    while len(pref_db_train) < n_initial_prefs or len(pref_db_val) == 0:
-        print("Waiting for preferences; %d so far" % len(pref_db_train))
-        recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
-        time.sleep(5.0)
-
-    return pref_db_train, pref_db_val
 
 def save_prefs(pref_db_train, pref_db_val, save_dir, name):
     fname = osp.join(save_dir, "train_{}.pkl".format(name))
