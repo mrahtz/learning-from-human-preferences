@@ -5,7 +5,8 @@ import unittest
 
 import numpy as np
 
-from utils import PrefDB, RunningStat, get_port_range
+from utils import RunningStat, get_port_range
+from pref_db import PrefDB
 
 
 class TestUtils(unittest.TestCase):

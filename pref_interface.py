@@ -3,7 +3,6 @@ import queue
 import time
 from itertools import combinations
 from multiprocessing import Process, Queue
-from utils import save_pref_db
 
 import numpy as np
 
@@ -11,7 +10,6 @@ from scipy.ndimage import zoom
 
 from utils import vid_proc
 
-import os.path as osp
 import logging
 
 
@@ -136,34 +134,3 @@ class PrefInterface:
                 pref_pipe.put((s1, s2, pref))
             tested_pairs.append((n1, n2))
             tested_pairs.append((n2, n1))
-
-
-def recv_prefs(pref_pipe, pref_db_train, pref_db_val, max_prefs):
-    n_recvd = 0
-    val_fraction = 0.2
-    while True:
-        try:
-            s1, s2, mu = pref_pipe.get(timeout=0.1)
-            n_recvd += 1
-        except queue.Empty:
-            break
-
-        if np.random.rand() < val_fraction:
-            pref_db_val.append(s1, s2, mu)
-        else:
-            pref_db_train.append(s1, s2, mu)
-
-        if len(pref_db_val) > max_prefs * val_fraction:
-            pref_db_val.del_first()
-        assert len(pref_db_val) <= max_prefs * val_fraction
-
-        if len(pref_db_train) > max_prefs * (1 - val_fraction):
-            pref_db_train.del_first()
-        assert len(pref_db_train) <= max_prefs * (1 - val_fraction)
-
-
-def save_prefs(pref_db_train, pref_db_val, save_dir, name):
-    fname = osp.join(save_dir, "train_{}.pkl".format(name))
-    save_pref_db(pref_db_train, fname)
-    fname = osp.join(save_dir, "val_{}.pkl".format(name))
-    save_pref_db(pref_db_val, fname)

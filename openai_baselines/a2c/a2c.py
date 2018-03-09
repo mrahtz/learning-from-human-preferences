@@ -13,7 +13,7 @@ from openai_baselines import logger
 from openai_baselines.a2c.utils import (cat_entropy, discount_with_dones,
                                         find_trainable_variables, mse)
 from openai_baselines.common import explained_variance, set_global_seeds
-from utils import Segment
+from pref_db import Segment
 import logging
 
 
@@ -307,7 +307,7 @@ def learn(policy,
           env,
           seed,
           seg_pipe,
-          go_pipe,
+          start_policy_training_pipe,
           log_dir,
           lr_scheduler,
           gen_segments,
@@ -393,7 +393,7 @@ def learn(policy,
     while True:
         obs, states, rewards, masks, actions, values = runner.run()
         try:
-            go_pipe.get(block=False)
+            start_policy_training_pipe.get(block=False)
         except queue.Empty:
             continue
         else:
