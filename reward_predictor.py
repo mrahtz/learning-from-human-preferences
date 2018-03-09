@@ -167,7 +167,6 @@ class RewardPredictorEnsemble:
                  network,
                  lr=1e-4,
                  cluster_dict=None,
-                 ckpt_path=None,
                  batchnorm=False,
                  dropout=0.0,
                  n_preds=1,
@@ -249,11 +248,11 @@ class RewardPredictorEnsemble:
             time.sleep(1.0)
 
     def init_network(self, ckpt_path=None):
-        if ckpt_path is None:
-            self.sess.run(self.init_op)
-        else:
+        if ckpt_path:
             self.saver.restore(self.sess, ckpt_path)
             print("Loaded reward predictor checkpoint from", ckpt_path)
+        else:
+            self.sess.run(self.init_op)
 
 
     def raw_rewards(self, obs):

@@ -408,6 +408,8 @@ def learn(policy,
         policy_loss, value_loss, policy_entropy, cur_lr = model.train(
             obs, states, rewards, masks, actions, values)
 
+        print("Trained policy for {} time steps".format((update + 1) * nbatch))
+
         fps_nsteps += nbatch
 
         if update % log_interval == 0 and update != 0:
@@ -424,6 +426,7 @@ def learn(policy,
             logger.record_tabular("explained_variance", float(ev))
             logger.record_tabular("learning_rate", cur_lr)
             logger.dump_tabular()
+
 
         if update % save_interval == 0 and update != 0:
             last_ckpt = model.save(ckpt_path, update)

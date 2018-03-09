@@ -20,7 +20,6 @@ def parse_args():
     if args.mode == 'pretrain_reward_predictor' and args.load_prefs_dir is None:
         raise Exception("Error: please specify preference databases to train with (--load_prefs_dir)")
     general_args = {
-        'env_id': args.env,
         'mode': args.mode,
         'run_name': args.run_name,
         'test_mode': args.test_mode,
@@ -40,6 +39,7 @@ def parse_args():
         nvalues = int(args.lr_zero_million_timesteps * 1e6)
     lr_scheduler = Scheduler(v=args.lr, nvalues=nvalues, schedule=schedule)
     a2c_args = {
+        'env_id': args.env,
         'ent_coef': args.ent_coef,
         'n_envs': args.n_envs,
         'seed': args.seed,
