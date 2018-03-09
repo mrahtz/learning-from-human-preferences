@@ -107,8 +107,16 @@ def run(general_args, a2c_args, pref_interface_args, reward_predictor_training_a
         ps_proc.terminate()
         return
     elif general_args['mode'] == 'train_policy_with_original_rewards':
-        # just start a2c
-        parts = ['a2c']
+        env = make_envs(general_args['env_id'], a2c_args['n_envs'], a2c_args['seed'])
+        a2c_proc = start_policy_training(cluster_dict={}, log_dir=general_args['log_dir'],
+                                         go_pipe=start_policy_training_flag, seg_pipe=seg_pipe, episode_vid_queue=episode_vid_queue,
+                                         reward_predictor=None,
+                                         gen_segments=False,
+                                         env=env,
+                                         **a2c_args)
+        start_policy_training_flag.put(True)
+        a2c_proc.join()
+        env.close()
     elif general_args['mode'] == 'train_policy_with_preferences':
         # if load preferences: load preferences; else wait for initial 500
         # start a2c
@@ -125,10 +133,6 @@ def run(general_args, a2c_args, pref_interface_args, reward_predictor_training_a
               str(datetime.datetime.now()))
     else:
         raise Exception("Unknown mode: {}".format(general_args['mode']))
-
-    # TODO
-    #env.close()  # Kill the SubprocVecEnv processes
-    ps_proc.terminate()
 
 
 def create_cluster_dict(parts_to_run):

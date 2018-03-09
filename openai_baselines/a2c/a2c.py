@@ -385,20 +385,19 @@ def learn(policy,
     nbatch = nenvs * nsteps
     fps_tstart = time.time()
     fps_nsteps = 0
-    train = False
 
     print("Starting agent(s)")
 
     # Before we're told to start training the policy itself,
     # just generate segments for the reward predictor to be trained with
-    while not train:
+    while True:
         obs, states, rewards, masks, actions, values = runner.run()
         try:
             go_pipe.get(block=False)
         except queue.Empty:
             continue
         else:
-            train = True
+            break
 
     print("Starting policy training")
 
