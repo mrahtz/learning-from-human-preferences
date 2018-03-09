@@ -4,7 +4,6 @@ import logging
 import os
 import os.path as osp
 import sys
-import subprocess
 from multiprocessing import Process, Queue
 import pref_interface
 
@@ -12,7 +11,6 @@ import easy_tf_log
 import gym
 import gym_moving_dot
 
-import params
 from args import parse_args
 from enduro_wrapper import EnduroWrapper
 from openai_baselines import logger
@@ -23,7 +21,7 @@ from openai_baselines.common.atari_wrappers import wrap_deepmind_nomax
 from openai_baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from pref_interface import PrefInterface, recv_prefs
 from reward_predictor import RewardPredictorEnsemble
-from utils import vid_proc, get_port_range, load_pref_db
+from utils import vid_proc, get_port_range, load_pref_db, PrefDB
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
 
@@ -36,42 +34,32 @@ def configure_a2c_logger(log_dir):
 
 
 def run(general_args, a2c_args, pref_interface_args, reward_predictor_training_args):
-
     seg_pipe = Queue()
     pref_pipe = Queue()
     start_policy_training_flag = Queue(maxsize=1)
-
-    """
-    reward_predictor = RewardPredictorEnsemble(
-        name='train_reward',
-        cluster_dict=cluster_dict,
-        log_dir=log_dir,
-        ckpt_path=rp_ckpt_path,
-        lr=rp_lr)
-    """
-
-    def make_reward_predictor(name, cluster_dict):
-        reward_predictor = RewardPredictorEnsemble(
-            name=name,
-            cluster_dict=cluster_dict,
-            batchnorm=reward_predictor_training_args['batchnorm'],
-            dropout=reward_predictor_training_args['dropout'])
-        return reward_predictor
 
     if general_args['render_episodes']:
         episode_vid_queue = start_episode_renderer()
     else:
         episode_vid_queue = None
 
+    def make_reward_predictor(name, cluster_dict):
+        return RewardPredictorEnsemble(
+            name=name,
+            cluster_dict=cluster_dict,
+            log_dir=general_args['log_dir'],
+            batchnorm=reward_predictor_training_args['batchnorm'],
+            dropout=reward_predictor_training_args['dropout'],
+            lr=reward_predictor_training_args['lr'],
+            network=reward_predictor_training_args['network'])
+
     if general_args['mode'] == 'gather_initial_prefs':
-        # load prefs
-        env = make_envs(general_args['env_id'], a2c_args['n_envs'], a2c_args['seed'])
-        a2c_proc = start_policy_training(cluster_dict={}, log_dir=general_args['log_dir'],
-                                         go_pipe=start_policy_training_flag, seg_pipe=seg_pipe, episode_vid_queue=episode_vid_queue,
-                                         reward_predictor=None,
-                                         gen_segments=True,
-                                         env=env,
-                                         **a2c_args)
+        env, a2c_proc = start_policy_training(cluster_dict=None,
+                                              make_reward_predictor=None,
+                                              go_pipe=start_policy_training_flag, seg_pipe=seg_pipe, episode_vid_queue=episode_vid_queue,
+                                              gen_segments=True,
+                                              log_dir=general_args['log_dir'],
+                                              **a2c_args)
         pi_proc = start_pref_interface(seg_pipe=seg_pipe, pref_pipe=pref_pipe,
                                        **pref_interface_args)
         pref_db_train, pref_db_val = pref_interface.get_initial_prefs(pref_pipe=pref_pipe,
@@ -82,22 +70,12 @@ def run(general_args, a2c_args, pref_interface_args, reward_predictor_training_a
         pi_proc.terminate()
         a2c_proc.terminate()
         env.close()
-        return
     elif general_args['mode'] == 'pretrain_reward_predictor':
-        cluster_dict = create_cluster_dict(['ps', 'train_reward'])
-        def reward_predictor_fn(name):
-            return RewardPredictorEnsemble(
-                name=name,
-                cluster_dict=cluster_dict,
-                log_dir=general_args['log_dir'],
-                ckpt_path=reward_predictor_training_args['ckpt_path'],
-                lr=reward_predictor_training_args['lr'],
-                network=reward_predictor_training_args['network'])
-        ps_proc = start_parameter_server(reward_predictor_fn)
-        reward_predictor_training_proc = start_reward_predictor_training(log_dir=general_args['log_dir'],
-                                                                         just_pretrain=True,
+        cluster_dict = create_cluster_dict(['ps', 'train'])
+        ps_proc = start_parameter_server(cluster_dict, make_reward_predictor)
+        reward_predictor_training_proc = start_reward_predictor_training(just_pretrain=True,
                                                                          pref_pipe=pref_pipe, go_pipe=start_policy_training_flag,
-                                                                         reward_predictor_fn=reward_predictor_fn,
+                                                                         make_reward_predictor=make_reward_predictor,
                                                                          n_initial_epochs=reward_predictor_training_args['n_initial_epochs'],
                                                                          db_max=general_args['db_max'],
                                                                          prefs_dir=general_args['prefs_dir'],
@@ -105,32 +83,40 @@ def run(general_args, a2c_args, pref_interface_args, reward_predictor_training_a
                                                                          ckpt_interval=reward_predictor_training_args['ckpt_interval'])
         reward_predictor_training_proc.join()
         ps_proc.terminate()
-        return
     elif general_args['mode'] == 'train_policy_with_original_rewards':
-        env = make_envs(general_args['env_id'], a2c_args['n_envs'], a2c_args['seed'])
-        a2c_proc = start_policy_training(cluster_dict={}, log_dir=general_args['log_dir'],
+        env, a2c_proc = start_policy_training(cluster_dict=None, make_reward_predictor=None,
                                          go_pipe=start_policy_training_flag, seg_pipe=seg_pipe, episode_vid_queue=episode_vid_queue,
-                                         reward_predictor=None,
                                          gen_segments=False,
-                                         env=env,
+                                         log_dir=general_args['log_dir'],
                                          **a2c_args)
         start_policy_training_flag.put(True)
         a2c_proc.join()
         env.close()
     elif general_args['mode'] == 'train_policy_with_preferences':
-        # if load preferences: load preferences; else wait for initial 500
-        # start a2c
-        # start pref interface
-        # start start reward predictor
-        parts = ['a2c', 'pref_interface', 'train_reward_predictor']
-        if load_prefs_dir:
-            print("Loading preferences...")
-            pref_db_train, pref_db_val = load_pref_db(load_prefs_dir)
-        else:
-            pref_db_val = PrefDB()
-            pref_db_train = PrefDB()
-        print("Finished accumulating initial preferences at",
-              str(datetime.datetime.now()))
+        cluster_dict = create_cluster_dict(['ps', 'train'])
+        ps_proc = start_parameter_server(cluster_dict, make_reward_predictor)
+        env, a2c_proc = start_policy_training(cluster_dict=cluster_dict, make_reward_predictor=None,
+                                              go_pipe=start_policy_training_flag, seg_pipe=seg_pipe, episode_vid_queue=episode_vid_queue,
+                                              gen_segments=True,
+                                              log_dir=general_args['log_dir'],
+                                              **a2c_args)
+        pi_proc = start_pref_interface(seg_pipe=seg_pipe, pref_pipe=pref_pipe,
+                                       **pref_interface_args)
+        reward_predictor_training_proc = start_reward_predictor_training(cluster_dict=cluster_dict,
+                                                                         ckpt_path=reward_predictor_training_args['ckpt_path'],
+                                                                         just_pretrain=False,
+                                                                         pref_pipe=pref_pipe, go_pipe=start_policy_training_flag,
+                                                                         make_reward_predictor=make_reward_predictor,
+                                                                         n_initial_epochs=reward_predictor_training_args['n_initial_epochs'],
+                                                                         db_max=general_args['db_max'],
+                                                                         prefs_dir=general_args['prefs_dir'],
+                                                                         val_interval=reward_predictor_training_args['val_interval'],
+                                                                         ckpt_interval=reward_predictor_training_args['ckpt_interval'])
+        a2c_proc.join()
+        reward_predictor_training_proc.terminate()
+        pi_proc.terminate()
+        ps_proc.terminate()
+        env.close()
     else:
         raise Exception("Unknown mode: {}".format(general_args['mode']))
 
@@ -145,29 +131,34 @@ def create_cluster_dict(parts_to_run):
     return cluster_dict
 
 
-def start_pref_interface(seg_pipe, pref_pipe, segs_max, headless):
-    def pi_procf(pi):
-        # TODO hack
-        sys.stdin = os.fdopen(0)
-        pi.run(seg_pipe, pref_pipe, segs_max)
-    pi = PrefInterface(headless=headless, synthetic_prefs=headless)
-    pi_proc = Process(target=pi_procf, daemon=True, args=(pi, ))
-    pi_proc.start()
-    return pi_proc
+def start_parameter_server(cluster_dict, make_reward_predictor):
+    def ps():
+        reward_predictor = make_reward_predictor('ps', cluster_dict)
+        reward_predictor.server.join()
+    ps_proc = Process(target=ps, daemon=True)
+    ps_proc.start()
+    return ps_proc
 
 
-def start_policy_training(cluster_dict, env, seed, seg_pipe, go_pipe, gen_segments,
-                          log_dir, lr_scheduler, num_timesteps, ckpt_dir, episode_vid_queue, ent_coef, ckpt_interval,
-                          n_envs, reward_predictor):
-    if env.env_id == 'MovingDotNoFrameskip-v0':
+def start_policy_training(cluster_dict, make_reward_predictor, env_id, n_envs, seed, seg_pipe, go_pipe, gen_segments,
+                          log_dir, lr_scheduler, num_timesteps, ckpt_dir, episode_vid_queue, ent_coef, ckpt_interval):
+    if env_id == 'MovingDotNoFrameskip-v0':
         policy_fn = MlpPolicy
-    elif env.env_id == 'PongNoFrameskip-v4' or env.env_id == 'EnduroNoFrameskip-v4':
+    elif env_id == 'PongNoFrameskip-v4' or env_id == 'EnduroNoFrameskip-v4':
         policy_fn = CnnPolicy
     else:
-        raise Exception("Unsure about policy network architecture for {}".format(env.env_id))
+        raise Exception("Unsure about policy network architecture for {}".format(env_id))
+
     configure_a2c_logger(log_dir)
 
+    # This needs to be done here because daemonic processes can't have children
+    env = make_envs(env_id, n_envs, seed)
+
     def a2c():
+        if make_reward_predictor:
+            reward_predictor = make_reward_predictor('a2c', cluster_dict)
+        else:
+            reward_predictor = None
         learn(
             policy=policy_fn,
             env=env,
@@ -185,15 +176,25 @@ def start_policy_training(cluster_dict, env, seed, seg_pipe, go_pipe, gen_segmen
             gen_segments=gen_segments)
     a2c_proc = Process(target=a2c, daemon=True)
     a2c_proc.start()
-    return a2c_proc
+    return env, a2c_proc
+
+def start_pref_interface(seg_pipe, pref_pipe, segs_max, headless):
+    def pi_procf(pi):
+        # TODO hack
+        sys.stdin = os.fdopen(0)
+        pi.run(seg_pipe, pref_pipe, segs_max)
+    pi = PrefInterface(headless=headless, synthetic_prefs=headless)
+    pi_proc = Process(target=pi_procf, daemon=True, args=(pi, ))
+    pi_proc.start()
+    return pi_proc
 
 
-def start_reward_predictor_training(log_dir, just_pretrain, pref_pipe,
-                                    go_pipe, reward_predictor_fn, db_max, n_initial_epochs,
-                                    prefs_dir, val_interval, ckpt_interval):
+def start_reward_predictor_training(cluster_dict, make_reward_predictor, just_pretrain, pref_pipe,
+                                    go_pipe, db_max, n_initial_epochs,
+                                    prefs_dir, ckpt_path, val_interval, ckpt_interval):
     def trp():
-        reward_predictor = reward_predictor_fn(name='train_reward')
-        reward_predictor.init_network()
+        reward_predictor = make_reward_predictor('train', cluster_dict)
+        reward_predictor.init_network(ckpt_path)
 
         if prefs_dir is not None:
             pref_db_train, pref_db_val = load_pref_db(prefs_dir)
@@ -202,30 +203,29 @@ def start_reward_predictor_training(log_dir, just_pretrain, pref_pipe,
                                                                           n_initial_prefs=n_initial_epochs,
                                                                           db_max=db_max)
 
+        print("Pretraining reward predictor for {} epochs".format(n_initial_epochs))
+        for i in range(n_initial_epochs):
+            print("Epoch {}".format(i))
+            reward_predictor.train(pref_db_train, pref_db_val, val_interval)
+
+            if i and i % ckpt_interval == 0:
+                reward_predictor.save()
+        print("Reward predictor pretraining done")
+
         if just_pretrain:
-            print("Pretraining for {} epochs".format(n_initial_epochs))
-            for i in range(n_initial_epochs):
-                print("Epoch {}".format(i))
-                reward_predictor.train(pref_db_train, pref_db_val, val_interval)
+            return
 
-                if i and i % ckpt_interval == 0:
-                    reward_predictor.save()
+        go_pipe.put(True)
 
-        #recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
+        while True:
+            reward_predictor.train(pref_db_train, pref_db_val, val_interval)
+            if i and i % ckpt_interval == 0:
+                reward_predictor.save()
+            recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
 
     train_proc = Process(target=trp, daemon=True)
     train_proc.start()
     return train_proc
-
-
-def start_parameter_server(reward_predictor_fn):
-    def ps():
-        reward_predictor = reward_predictor_fn(name='ps')
-        reward_predictor.server.join()
-
-    ps_proc = Process(target=ps, daemon=True)
-    ps_proc.start()
-    return ps_proc
 
 
 def start_episode_renderer():

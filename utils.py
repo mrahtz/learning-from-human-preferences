@@ -115,15 +115,15 @@ def load_pref_db(pref_dir):
     if not osp.isfile(train_fname):
         train_fname = osp.join(pref_dir, 'train_initial.pkl')
     with open(train_fname, 'rb') as pkl_file:
-        print("Loading training preferences from '{}'".format(train_fname))
         pref_db_train = pickle.load(pkl_file)
+        print("Loaded training preferences from '{}'".format(train_fname))
 
     val_fname = osp.join(pref_dir, 'val_postpretrain.pkl')
     if not osp.isfile(val_fname):
         val_fname = osp.join(pref_dir, 'val_initial.pkl')
     with open(val_fname, 'rb') as pkl_file:
-        print("Loading validation preferences from '{}'".format(val_fname))
         pref_db_val = pickle.load(pkl_file)
+        print("Loaded validation preferences from '{}'".format(val_fname))
 
     return pref_db_train, pref_db_val
 
