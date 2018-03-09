@@ -23,7 +23,7 @@ class PrefInterface:
             Process(target=vid_proc, args=(self.vid_q,), daemon=True).start()
         self.synthetic_prefs = synthetic_prefs
 
-    def recv_segments(self, segments, seg_pipe, segs_max):
+    def recv_segments(self, segments, seg_pipe, max_segs):
         n_segs = 0
         while True:
             try:
@@ -35,7 +35,7 @@ class PrefInterface:
             # (The maximum number of segments kept being 5,000 isn't mentioned
             # in the paper anywhere - it's just something I decided on. This
             # should be maximum ~ 700 MB.)
-            if len(segments) > segs_max:
+            if len(segments) > max_segs:
                 del segments[0]
 
     def sample_pair_idxs(self, segments, exclude_pairs):
@@ -89,23 +89,24 @@ class PrefInterface:
 
         return pref
 
-    def run(self, seg_pipe, pref_pipe, segs_max):
+    def run(self, seg_pipe, pref_pipe, max_segs):
         tested_pairs = []
         segments = []
 
         while True:
-            self.recv_segments(segments, seg_pipe, segs_max)
+            self.recv_segments(segments, seg_pipe, max_segs)
             if len(segments) >= 2:
                 break
             print("Preference interface waiting for segments")
             time.sleep(2.0)
 
+        # TODO label segments
         while True:
             pair_idxs = []
             # If we've tested all the possible pairs of segments so far,
             # we might have to wait
             while len(pair_idxs) == 0:
-                self.recv_segments(segments, seg_pipe, segs_max)
+                self.recv_segments(segments, seg_pipe, max_segs)
                 pair_idxs = self.sample_pair_idxs(segments,
                                                   exclude_pairs=tested_pairs)
             logging.debug("Sampled segment pairs:", pair_idxs)
@@ -137,7 +138,7 @@ class PrefInterface:
             tested_pairs.append((n2, n1))
 
 
-def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
+def recv_prefs(pref_pipe, pref_db_train, pref_db_val, max_prefs):
     n_recvd = 0
     val_fraction = 0.2
     while True:
@@ -152,13 +153,13 @@ def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
         else:
             pref_db_train.append(s1, s2, mu)
 
-        if len(pref_db_val) > db_max * val_fraction:
+        if len(pref_db_val) > max_prefs * val_fraction:
             pref_db_val.del_first()
-        assert len(pref_db_val) <= db_max * val_fraction
+        assert len(pref_db_val) <= max_prefs * val_fraction
 
-        if len(pref_db_train) > db_max * (1 - val_fraction):
+        if len(pref_db_train) > max_prefs * (1 - val_fraction):
             pref_db_train.del_first()
-        assert len(pref_db_train) <= db_max * (1 - val_fraction)
+        assert len(pref_db_train) <= max_prefs * (1 - val_fraction)
 
 
 def save_prefs(pref_db_train, pref_db_val, save_dir, name):

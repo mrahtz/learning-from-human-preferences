@@ -25,7 +25,7 @@ def parse_args():
         'test_mode': args.test_mode,
         'render_episodes': args.render_episodes,
         'n_initial_prefs': args.n_initial_prefs,
-        'db_max': args.db_max,
+        'max_prefs': args.max_prefs,
         'log_dir': log_dir,
         'prefs_dir': args.load_prefs_dir
     }
@@ -51,7 +51,7 @@ def parse_args():
 
     pref_interface_args = {
         'headless': args.headless,
-        'segs_max': args.segs_max
+        'max_segs': args.max_segs
     }
 
     reward_predictor_training_args = {
@@ -117,7 +117,8 @@ def add_general_args(parser):
                         help='How many preferences to collect from a random '
                              'policy before starting reward predictor '
                              'training')
-    parser.add_argument('--db_max', type=int, default=3000)
+    # Page 15: "We maintain a buffer of only the last 3,000 labels"
+    parser.add_argument('--max_prefs', type=int, default=3000)
 
     group = parser.add_mutually_exclusive_group();
     group.add_argument('--log_dir')
@@ -167,4 +168,7 @@ def add_reward_predictor_args(parser):
 
 def add_pref_interface_args(parser):
     parser.add_argument('--headless', action='store_true')
-    parser.add_argument('--segs_max', type=int, default=1000)
+    # Maximum number of segments to store from which to ask the user.
+    # This isn't mentioned in the paper anywhere. This is just a guess
+    # which doesn't take up too much memory.
+    parser.add_argument('--max_segs', type=int, default=1000)
