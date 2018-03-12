@@ -14,8 +14,9 @@ gym-moving-dot = {git = 'https://github.com/mrahtz/gym-moving-dot'}
 easy-tf-log = {git = 'https://github.com/mrahtz/easy-tf-log'}
 cloudpickle = "*"
 matplotlib = "*"
-"PyQt5" = "*"
+"pyqt5" = "*"
 
 
 [dev-packages]
+nose = "*"
 
