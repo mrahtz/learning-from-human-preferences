@@ -105,7 +105,7 @@ def run(general_params, a2c_params, pref_interface_params, rew_pred_training_par
         a2c_proc.join()
         env.close()
     elif general_params['mode'] == 'train_policy_with_preferences':
-        cluster_dict = create_cluster_dict(['ps', 'train'])
+        cluster_dict = create_cluster_dict(['ps', 'a2c', 'train'])
         ps_proc = start_parameter_server(cluster_dict, make_reward_predictor)
         env, a2c_proc = start_policy_training(cluster_dict=cluster_dict,
                                               make_reward_predictor=make_reward_predictor,
