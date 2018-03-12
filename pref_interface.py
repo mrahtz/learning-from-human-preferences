@@ -40,23 +40,32 @@ def sample_seg_pair(segments, tested_pairs):
 
 class PrefInterface:
 
-    def __init__(self, headless, synthetic_prefs=False):
+    def __init__(self, headless, max_segs, synthetic_prefs=False):
         self.vid_q = Queue()
         if not headless:
             Process(target=vid_proc, args=(self.vid_q,), daemon=True).start()
         self.synthetic_prefs = synthetic_prefs
+        self.seg_idx = 0
+        self.segments = []
+        self.max_segs = max_segs
 
-    def recv_segments(self, segments, seg_pipe, max_segs):
+    def recv_segments(self, seg_pipe):
+        """
+        Receive segments from `seg_pipe` into circular buffer `segments`.
+        """
         while True:
             try:
                 segment = seg_pipe.get(timeout=0.1)
             except queue.Empty:
                 break
-            segments.append(segment)
-            if len(segments) > max_segs:
-                # O(1) removal of last element :)
-                segments[0] = segments.pop()
-        easy_tf_log.logkv('n_segments', len(segments))
+
+            if len(self.segments) < self.max_segs:
+                self.segments.append(segment)
+            else:
+                self.segments[self.seg_idx] = segment
+                self.seg_idx = (self.seg_idx + 1) % self.max_segs
+
+        easy_tf_log.logkv('n_segments', len(self.segments))
 
     def ask_user(self, s1, s2):
         border = np.zeros((84, 10), dtype=np.uint8)
@@ -98,7 +107,7 @@ class PrefInterface:
         segments = []
 
         while True:
-            self.recv_segments(segments, seg_pipe, max_segs)
+            self.recv_segments(seg_pipe, max_segs)
             if len(segments) >= 2:
                 break
             print("Preference interface waiting for segments")
@@ -109,7 +118,7 @@ class PrefInterface:
             # If we've tested all the possible pairs of segments so far,
             # we might have to wait
             while True:
-                self.recv_segments(segments, seg_pipe, max_segs)
+                self.recv_segments(seg_pipe, max_segs)
                 try:
                     s1, s2 = sample_seg_pair(segments,
                                              tested_pairs=tested_pairs)

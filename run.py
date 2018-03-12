@@ -252,9 +252,9 @@ def start_pref_interface(seg_pipe, pref_pipe, max_segs, headless, log_dir):
         # so this feels like a bit of a hack, but it seems to be fine.
         sys.stdin = os.fdopen(0)
         easy_tf_log.set_dir(prefs_log_dir)
-        pi.run(seg_pipe, pref_pipe, max_segs)
+        pi.run(seg_pipe, pref_pipe)
     # Needs to be done in the main process because does GUI work
-    pi = PrefInterface(headless=headless, synthetic_prefs=headless)
+    pi = PrefInterface(headless=headless, synthetic_prefs=headless, max_segs=max_segs)
     proc = Process(target=f, daemon=True)
     proc.start()
     return proc
