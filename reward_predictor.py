@@ -51,12 +51,13 @@ def conv_layer(x, filters, kernel_size, strides, batchnorm, training, name,
         reuse=reuse)
 
     if batchnorm:
-        x = tf.layers.batch_normalization(x, training=training)
+        batchnorm_name = name + "_batchnorm"
+        x = tf.layers.batch_normalization(x, training=training, reuse=reuse, name=batchnorm_name)
 
     if activation == 'relu':
         x = tf.nn.leaky_relu(x, alpha=0.01)
     else:
-        raise Exception("Unkown activation for conv_layer", activation)
+        raise Exception("Unknown activation for conv_layer", activation)
 
     return x
 
@@ -125,16 +126,11 @@ def net_conv(s, batchnorm, dropout, training, reuse):
     x = conv_layer(x, 16, 7, 3, batchnorm, training, "c1", reuse, 'relu')
     # NB specifying seed is important because both legs of the network should dropout
     # in the same way.
-    # Also note that we use a noise shape which keeps dropout consistent across all frames
-    # of the batch.
     x = tf.layers.dropout(x, dropout, training=training, seed=0)
-
     x = conv_layer(x, 16, 5, 2, batchnorm, training, "c2", reuse, 'relu')
     x = tf.layers.dropout(x, dropout, training=training, seed=1)
-
     x = conv_layer(x, 16, 3, 1, batchnorm, training, "c3", reuse, 'relu')
     x = tf.layers.dropout(x, dropout, training=training, seed=2)
-
     x = conv_layer(x, 16, 3, 1, batchnorm, training, "c4", reuse, 'relu')
 
     w, h, c = x.get_shape()[1:]
