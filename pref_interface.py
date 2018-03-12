@@ -110,7 +110,7 @@ class PrefInterface:
             if len(self.segments) >= 2:
                 break
             print("Preference interface waiting for segments")
-            time.sleep(2.0)
+            time.sleep(5.0)
 
         while True:
             # If we've tested all the possible pairs of segments so far,
