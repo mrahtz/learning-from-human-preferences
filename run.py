@@ -75,7 +75,7 @@ def run(general_params, a2c_params, pref_interface_params, rew_pred_training_par
         pi_proc.terminate()
         a2c_proc.terminate()
         env.close()
-    elif general_params['mode'] == 'pretrain_rew_pred':
+    elif general_params['mode'] == 'pretrain_reward_predictor':
         cluster_dict = create_cluster_dict(['ps', 'train'])
         ps_proc = start_parameter_server(cluster_dict, make_reward_predictor)
         rpt_proc = start_rew_pred_training(cluster_dict=cluster_dict,
