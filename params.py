@@ -168,12 +168,11 @@ def add_reward_predictor_args(parser):
 
 def add_pref_interface_args(parser):
     parser.add_argument('--headless', action='store_true')
-    # (The maximum number of segments kept being 5,000 isn't mentioned
-    # in the paper anywhere - it's just something I decided on. This
-    # should be maximum ~ 700 MB.)
     # Maximum number of segments to store from which to generate preferences.
-    # This isn't a parameter specified in the paper.
-    # I guess 1,000 should be a reasonable number.
+    # This isn't a parameter specified in the paper;
+    # I'm just guessing that 1,000 is a reasonable figure.
+    # 1,000 corresponds to about 25,000 frames.
+
     # How much memory does this use?
     # 84 x 84 (pixels per frame) x
     # 4 (frames per stack) x
