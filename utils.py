@@ -175,4 +175,6 @@ def profile_memory(log_path, pid):
     def profile():
         with open(log_path, 'w') as f:
             memory_profiler.memory_usage(pid, stream=f, timeout=99999)
-    Process(target=profile, daemon=True).start()
+    p = Process(target=profile, daemon=True)
+    p.start()
+    return p

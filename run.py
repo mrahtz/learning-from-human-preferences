@@ -129,15 +129,15 @@ def run(general_params, a2c_params, pref_interface_params,
             episode_vid_queue=episode_vid_queue,
             log_dir=general_params['log_dir'],
             a2c_params=a2c_params)
-        profile_memory(general_params['log_dir'] + '/mem_a2c.log',
-                       a2c_proc.pid)
+        m1 = profile_memory(general_params['log_dir'] + '/mem_a2c.log',
+                            a2c_proc.pid)
         pi_proc = start_pref_interface(
             seg_pipe=seg_pipe,
             pref_pipe=pref_pipe,
             log_dir=general_params['log_dir'],
             **pref_interface_params)
-        profile_memory(general_params['log_dir'] + '/mem_pi.log',
-                       pi_proc.pid)
+        m2 = profile_memory(general_params['log_dir'] + '/mem_pi.log',
+                            pi_proc.pid)
         rpt_proc = start_rew_pred_training(
             cluster_dict=cluster_dict,
             make_reward_predictor=make_reward_predictor,
@@ -151,9 +151,13 @@ def run(general_params, a2c_params, pref_interface_params,
             n_initial_epochs=rew_pred_training_params['n_initial_epochs'],
             val_interval=rew_pred_training_params['val_interval'],
             ckpt_interval=rew_pred_training_params['ckpt_interval'])
-        profile_memory(general_params['log_dir'] + '/mem_rpt.log',
-                       rpt_proc.pid)
+        m3 = profile_memory(general_params['log_dir'] + '/mem_rpt.log',
+                            rpt_proc.pid)
+
         a2c_proc.join()
+        m1.terminate()
+        m2.terminate()
+        m3.terminate()
         rpt_proc.terminate()
         pi_proc.terminate()
         ps_proc.terminate()
