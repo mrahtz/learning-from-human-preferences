@@ -492,11 +492,8 @@ class RewardPredictor:
         preds_correct = tf.equal(tf.argmax(mu, 1), tf.argmax(pred, 1))
         accuracy = tf.reduce_mean(tf.cast(preds_correct, tf.float32))
 
-        # Prevent tf.nn.softmax_cross_entropy_with_logits_v2 from propagating
-        # gradients into labels
-        _mu = tf.stop_gradient(mu)
-        _loss = tf.nn.softmax_cross_entropy_with_logits(
-            labels=_mu, logits=rs)
+        _loss = tf.nn.softmax_cross_entropy_with_logits_v2(
+            labels=mu, logits=rs)
         # Shape should be 'batch size'
         c1 = tf.assert_rank(_loss, 1)
         with tf.control_dependencies([c1]):
