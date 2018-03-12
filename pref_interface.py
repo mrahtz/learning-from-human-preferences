@@ -102,25 +102,23 @@ class PrefInterface:
 
         return pref
 
-    def run(self, seg_pipe, pref_pipe, max_segs):
+    def run(self, seg_pipe, pref_pipe):
         tested_pairs = set()
-        segments = []
 
         while True:
-            self.recv_segments(seg_pipe, max_segs)
-            if len(segments) >= 2:
+            self.recv_segments(seg_pipe)
+            if len(self.segments) >= 2:
                 break
             print("Preference interface waiting for segments")
             time.sleep(2.0)
 
-        # TODO label segments
         while True:
             # If we've tested all the possible pairs of segments so far,
             # we might have to wait
             while True:
-                self.recv_segments(seg_pipe, max_segs)
+                self.recv_segments(seg_pipe)
                 try:
-                    s1, s2 = sample_seg_pair(segments,
+                    s1, s2 = sample_seg_pair(self.segments,
                                              tested_pairs=tested_pairs)
                 except IndexError:
                     continue
