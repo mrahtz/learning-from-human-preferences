@@ -120,15 +120,24 @@ def net_conv(s, batchnorm, dropout, training, reuse):
     # nonlinearities (α = 0.01). This is followed by a fully connected layer of
     # size 64 and then a scalar output. All convolutional layers use batch norm
     # and dropout with α = 0.5 to prevent predictor overfitting"
-
     x = tf.cast(s, tf.float32) / 255.0
 
     x = conv_layer(x, 16, 7, 3, batchnorm, training, "c1", reuse, 'relu')
-    x = tf.layers.dropout(x, dropout, training=training)
+    # NB specifying seed is important because both legs of the network should dropout
+    # in the same way.
+    # Also note that we use a noise shape which keeps dropout consistent across all frames
+    # of the batch.
+    noise_shape = [1] + x.shape.as_list()[1:]
+    x = tf.layers.dropout(x, dropout, training=training, seed=0, noise_shape=noise_shape)
+
     x = conv_layer(x, 16, 5, 2, batchnorm, training, "c2", reuse, 'relu')
-    x = tf.layers.dropout(x, dropout, training=training)
+    noise_shape = [1] + x.shape.as_list()[1:]
+    x = tf.layers.dropout(x, dropout, training=training, seed=1, noise_shape=noise_shape)
+
     x = conv_layer(x, 16, 3, 1, batchnorm, training, "c3", reuse, 'relu')
-    x = tf.layers.dropout(x, dropout, training=training)
+    noise_shape = [1] + x.shape.as_list()[1:]
+    x = tf.layers.dropout(x, dropout, training=training, seed=2, noise_shape=noise_shape)
+
     x = conv_layer(x, 16, 3, 1, batchnorm, training, "c4", reuse, 'relu')
 
     w, h, c = x.get_shape()[1:]
