@@ -126,6 +126,7 @@ def net_conv(s, batchnorm, dropout, training, reuse):
     x = conv_layer(x, 16, 7, 3, batchnorm, training, "c1", reuse, 'relu')
     # NB specifying seed is important because both legs of the network should dropout
     # in the same way.
+    # TODO: this still isn't completely right; we should set noise_shape for same dropout on all steps
     x = tf.layers.dropout(x, dropout, training=training, seed=0)
     x = conv_layer(x, 16, 5, 2, batchnorm, training, "c2", reuse, 'relu')
     x = tf.layers.dropout(x, dropout, training=training, seed=1)
