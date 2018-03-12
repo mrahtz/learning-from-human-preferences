@@ -65,7 +65,7 @@ def run(general_params, a2c_params, pref_interface_params, rew_pred_training_par
                                               episode_vid_queue=episode_vid_queue,
                                               log_dir=general_params['log_dir'],
                                               a2c_params=a2c_params)
-        pi_proc = start_pref_interface(seg_pipe=seg_pipe, pref_pipe=pref_pipe,
+        pi_proc = start_pref_interface(seg_pipe=seg_pipe, pref_pipe=pref_pipe, log_dir=general_params['log_dir'],
                                        **pref_interface_params)
         pref_db_train, pref_db_val = get_initial_prefs(pref_pipe=pref_pipe,
                                                        n_initial_prefs=general_params['n_initial_prefs'],
@@ -115,7 +115,7 @@ def run(general_params, a2c_params, pref_interface_params, rew_pred_training_par
                                               episode_vid_queue=episode_vid_queue,
                                               log_dir=general_params['log_dir'],
                                               a2c_params=a2c_params)
-        pi_proc = start_pref_interface(seg_pipe=seg_pipe, pref_pipe=pref_pipe,
+        pi_proc = start_pref_interface(seg_pipe=seg_pipe, pref_pipe=pref_pipe, log_dir=general_params['log_dir'],
                                        **pref_interface_params)
         rpt_proc = start_rew_pred_training(cluster_dict=cluster_dict,
                                            make_reward_predictor=make_reward_predictor,
@@ -243,12 +243,15 @@ def start_policy_training(cluster_dict,
     return env, proc
 
 
-def start_pref_interface(seg_pipe, pref_pipe, max_segs, headless):
+def start_pref_interface(seg_pipe, pref_pipe, max_segs, headless, log_dir):
+    prefs_log_dir = osp.join(log_dir, 'pref_interface')
+    os.makedirs(prefs_log_dir)
     def f():
         # The preference interface needs to get input from stdin.
         # stdin is automatically closed at the beginning of child processes in Python,
         # so this feels like a bit of a hack, but it seems to be fine.
         sys.stdin = os.fdopen(0)
+        easy_tf_log.set_dir(prefs_log_dir)
         pi.run(seg_pipe, pref_pipe, max_segs)
     # Needs to be done in the main process because does GUI work
     pi = PrefInterface(headless=headless, synthetic_prefs=headless)
