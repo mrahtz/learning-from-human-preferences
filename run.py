@@ -86,6 +86,7 @@ def run(general_params, a2c_params, pref_interface_params, rew_pred_training_par
                                            max_prefs=general_params['max_prefs'],
                                            prefs_dir=general_params['prefs_dir'],
                                            ckpt_path=None,
+                                           n_initial_prefs=general_params['n_initial_prefs'],
                                            n_initial_epochs=rew_pred_training_params['n_initial_epochs'],
                                            val_interval=rew_pred_training_params['val_interval'],
                                            ckpt_interval=rew_pred_training_params['ckpt_interval'])
@@ -124,6 +125,7 @@ def run(general_params, a2c_params, pref_interface_params, rew_pred_training_par
                                            max_prefs=general_params['max_prefs'],
                                            prefs_dir=general_params['prefs_dir'],
                                            ckpt_path=None,
+                                           n_initial_prefs=general_params['n_initial_prefs'],
                                            n_initial_epochs=rew_pred_training_params['n_initial_epochs'],
                                            val_interval=rew_pred_training_params['val_interval'],
                                            ckpt_interval=rew_pred_training_params['ckpt_interval'])
@@ -256,7 +258,7 @@ def start_pref_interface(seg_pipe, pref_pipe, max_segs, headless):
 
 
 def start_rew_pred_training(cluster_dict, make_reward_predictor, just_pretrain, pref_pipe,
-                                    start_policy_training_pipe, max_prefs, n_initial_epochs,
+                                    start_policy_training_pipe, max_prefs, n_initial_prefs, n_initial_epochs,
                                     prefs_dir, ckpt_path, val_interval, ckpt_interval):
     def f():
         rew_pred = make_reward_predictor('train', cluster_dict)
@@ -266,7 +268,7 @@ def start_rew_pred_training(cluster_dict, make_reward_predictor, just_pretrain, 
             pref_db_train, pref_db_val = load_pref_db(prefs_dir)
         else:
             pref_db_train, pref_db_val = get_initial_prefs(pref_pipe=pref_pipe,
-                                                           n_initial_prefs=n_initial_epochs,
+                                                           n_initial_prefs=n_initial_prefs,
                                                            max_prefs=max_prefs)
 
         print("Pretraining reward predictor for {} epochs".format(n_initial_epochs))
