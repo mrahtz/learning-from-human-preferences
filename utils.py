@@ -2,7 +2,9 @@ import queue
 import random
 import socket
 import time
+from multiprocessing import Process
 
+import memory_profiler
 import numpy as np
 import pyglet
 
@@ -168,3 +170,9 @@ def get_port_range(start_port, n_ports, random_stagger=False):
             free_range_found = True
 
     return ports
+
+def profile_memory(log_path, pid):
+    def profile():
+        with open(log_path, 'w') as f:
+            memory_profiler.memory_usage(pid, stream=f, timeout=99999)
+    Process(target=profile, daemon=True).start()
