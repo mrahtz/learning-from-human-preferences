@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 import unittest
+from itertools import combinations
+from multiprocessing import Queue
+
 import numpy as np
 
 from pref_db import Segment
-from pref_interface import sample_seg_pair
-from itertools import combinations
+from pref_interface import sample_seg_pair, PrefInterface
 
 
 class TestPrefInterface(unittest.TestCase):
@@ -32,6 +34,22 @@ class TestPrefInterface(unittest.TestCase):
         # indicating that there are no more unique pairs available
         with self.assertRaises(IndexError):
             sample_seg_pair(segments, tested_pairs)
+
+    def testRecvSegments(self):
+        pi = PrefInterface(headless=True, max_segs=5)
+        pipe = Queue()
+        for i in range(5):
+            pipe.put(i)
+            pi.recv_segments(pipe)
+        np.testing.assert_array_equal(pi.segments, [0, 1, 2, 3, 4])
+        for i in range(5, 8):
+            pipe.put(i)
+            pi.recv_segments(pipe)
+        np.testing.assert_array_equal(pi.segments, [5, 6, 7, 3, 4])
+        for i in range(8, 11):
+            pipe.put(i)
+            pi.recv_segments(pipe)
+        np.testing.assert_array_equal(pi.segments, [10, 6, 7, 8, 9])
 
 
 if __name__ == '__main__':
