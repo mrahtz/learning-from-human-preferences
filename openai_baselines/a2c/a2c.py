@@ -170,6 +170,7 @@ class Runner(object):
 
         for step in range(self.nsteps):
             if len(self.segment) == 25:
+                self.segment.finalise()
                 self.seg_pipe.put(self.segment)
                 self.segment = Segment()
                 continue

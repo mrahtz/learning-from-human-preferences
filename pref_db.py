@@ -9,10 +9,18 @@ class Segment:
     def __init__(self):
         self.frames = []
         self.rewards = []
+        self.hash = None
 
     def append(self, frame, reward):
         self.frames.append(frame)
         self.rewards.append(reward)
+
+    def finalise(self, seg_id=None):
+        if seg_id is not None:
+            self.hash = seg_id
+        else:
+            # How expensive is this? About 0.5 ms.
+            self.hash = hash(np.array(self.frames).tostring())
 
     def __len__(self):
         return len(self.frames)
