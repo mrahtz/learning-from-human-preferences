@@ -127,16 +127,13 @@ def net_conv(s, batchnorm, dropout, training, reuse):
     # in the same way.
     # Also note that we use a noise shape which keeps dropout consistent across all frames
     # of the batch.
-    noise_shape = [1] + x.shape.as_list()[1:]
-    x = tf.layers.dropout(x, dropout, training=training, seed=0, noise_shape=noise_shape)
+    x = tf.layers.dropout(x, dropout, training=training, seed=0)
 
     x = conv_layer(x, 16, 5, 2, batchnorm, training, "c2", reuse, 'relu')
-    noise_shape = [1] + x.shape.as_list()[1:]
-    x = tf.layers.dropout(x, dropout, training=training, seed=1, noise_shape=noise_shape)
+    x = tf.layers.dropout(x, dropout, training=training, seed=1)
 
     x = conv_layer(x, 16, 3, 1, batchnorm, training, "c3", reuse, 'relu')
-    noise_shape = [1] + x.shape.as_list()[1:]
-    x = tf.layers.dropout(x, dropout, training=training, seed=2, noise_shape=noise_shape)
+    x = tf.layers.dropout(x, dropout, training=training, seed=2)
 
     x = conv_layer(x, 16, 3, 1, batchnorm, training, "c4", reuse, 'relu')
 
