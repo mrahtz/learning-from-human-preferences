@@ -21,18 +21,13 @@ def update_obs(obs, raw_obs, nc):
 
 
 class TestRewardPredictor(unittest.TestCase):
-    def init_rpn(self, dropout=False):
+    def setUp(self):
         tf.reset_default_graph()
         self.sess = tf.Session()
-        if dropout:
-            dropout_rate = 0.5
-        else:
-            dropout_rate = 0.0
-        self.rpn = RewardPredictor(batchnorm=False, dropout=dropout_rate, lr=7e-4, network='cnn')
+        self.rpn = RewardPredictor(batchnorm=True, dropout=0.5, lr=1e-3, network='cnn')
         self.sess.run(tf.global_variables_initializer())
 
-    def setUp(self):
-        self.init_rpn(dropout=True)
+        print("\n#", self._testMethodName)
 
     def test_batch_iter(self):
         l1 = list(range(16))
@@ -61,19 +56,35 @@ class TestRewardPredictor(unittest.TestCase):
         feed_dict_nontraining = {
             self.rpn.s1: [s],
             self.rpn.s2: [s],
-            self.rpn.training: False
+            self.rpn.training: True
         }
         feed_dict_training = {
             self.rpn.s1: [s],
             self.rpn.s2: [s],
-            self.rpn.training: True
+            self.rpn.training: False
         }
         for feed_dict in [feed_dict_nontraining, feed_dict_training]:
-            for _ in range(3):
+            for _ in range(3):  # to check different dropouts
                 [rs1], [rs2] = self.sess.run([self.rpn.rs1, self.rpn.rs2], feed_dict)
                 # Check rs1 != 0.0
                 assert_raises(AssertionError, assert_array_equal, rs1, 0.0)
                 assert_allclose(rs1, rs2)
+
+    def test_batchnorm_sharing(self):
+        """
+        Check that batchnorm statistics are the same between the two networks.
+        """
+        n_frames = 20
+        s1 = 255 * np.random.normal(loc=1.0, size=(n_frames, 84, 84, 4))
+        s2 = 255 * np.random.normal(loc=-1.0, size=(n_frames, 84, 84, 4))
+        feed_dict = {self.rpn.s1: [s1], self.rpn.s2: [s2], self.rpn.mu: [[0.0, 1.0]], self.rpn.training: True}
+        self.sess.run(self.rpn.train, feed_dict)
+
+        feed_dict = {self.rpn.s1: [s1], self.rpn.s2: [s1], self.rpn.training: False}
+        [rs1], [rs2] = self.sess.run([self.rpn.rs1, self.rpn.rs2], feed_dict)
+        # Check rs1 != 0.0
+        assert_raises(AssertionError, assert_array_equal, rs1, 0.0)
+        assert_allclose(rs1, rs2)
 
     def test_loss(self):
         """
@@ -174,14 +185,17 @@ class TestRewardPredictor(unittest.TestCase):
 
         feed_dict = {
             self.rpn.s1: [s1],
-            self.rpn.s2: [s2],
-            self.rpn.training: True
+            self.rpn.s2: [s2]
         }
 
         mus = [[1.0, 0.0], [0.0, 1.0], [0.5, 0.5]]
         for mu in mus:
+            print("Preference", mu)
             feed_dict[self.rpn.mu] = [mu]
-            for i in range(30):
+            feed_dict[self.rpn.training] = True
+            # Important to reset batch normalization statistics
+            self.sess.run(tf.global_variables_initializer())
+            for i in range(50):
                 [rs1], [rs2], loss = self.sess.run(
                     [self.rpn.rs1, self.rpn.rs2, self.rpn.loss],
                     feed_dict)
@@ -192,8 +206,11 @@ class TestRewardPredictor(unittest.TestCase):
                 #  for the second case, rs2 should become higher;
                 #  for the third case, they should become approximately the
                 #  same.)
-                #print(rs1, rs2, loss)
+                #print(" ".join(3 * ["{:>8.3f}"]).format(rs1, rs2, loss))
             #print()
+
+            feed_dict[self.rpn.training] = False
+            [rs1], [rs2] = self.sess.run([self.rpn.rs1, self.rpn.rs2], feed_dict)
 
             if mu[0] > mu[1]:
                 self.assertGreater(rs1, rs2)
@@ -206,7 +223,6 @@ class TestRewardPredictor(unittest.TestCase):
         """
         Check that after training with a batch of 4 segments, each with their own preferences,
         the predicted preference for each of the segments is as expected.
-        :return:
         """
         n_frames = 20
         s1s = 255 * np.random.normal(loc=1.0, size=(4, n_frames, 84, 84, 4))
@@ -220,7 +236,11 @@ class TestRewardPredictor(unittest.TestCase):
         }
 
         for i in range(100):
+            if i % 10 == 0:
+                print("Training {}/100".format(i))
             self.sess.run(self.rpn.train, feed_dict)
+
+        feed_dict[self.rpn.training] = False
         preds = self.sess.run(self.rpn.pred, feed_dict)
         assert_allclose(preds[0], [1., 0.], atol=1e-1)
         assert_allclose(preds[1], [1., 0.], atol=1e-1)
@@ -243,13 +263,14 @@ class TestRewardPredictor(unittest.TestCase):
             self.rpn.s1: s1s,
             self.rpn.s2: s2s,
             self.rpn.mu: mus,
-            self.rpn.training: False
+            self.rpn.training: True
         }
 
         # Steer away from chance performance
         for i in range(5):
             self.sess.run(self.rpn.train, feed_dict)
 
+        feed_dict[self.rpn.training] = False
         preds = self.sess.run(self.rpn.pred, feed_dict)
         n_correct = 0
         for mu, pred in zip(mus, preds):
