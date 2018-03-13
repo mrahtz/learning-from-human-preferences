@@ -25,7 +25,7 @@ from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble
 from utils import get_port_range, profile_memory, vid_proc
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
+#os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
 
 
 def main():
