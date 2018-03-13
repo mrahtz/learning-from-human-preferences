@@ -116,7 +116,7 @@ def net_conv(s, batchnorm, dropout, training, reuse):
     # nonlinearities (α = 0.01). This is followed by a fully connected layer of
     # size 64 and then a scalar output. All convolutional layers use batch norm
     # and dropout with α = 0.5 to prevent predictor overfitting"
-    x = tf.cast(s, tf.float32) / 255.0
+    x = s / 255.0
 
     x = conv_layer(x, 16, 7, 3, batchnorm, training, "c1", reuse, 'relu')
     # NB specifying seed is important because both legs of the network should dropout
@@ -442,8 +442,8 @@ class RewardPredictor:
 
         # Each element of the batch is one trajectory segment.
         # (Dimensions are n segments x n frames per segment x ...)
-        s1 = tf.placeholder(tf.uint8, shape=(None, None, 84, 84, 4))
-        s2 = tf.placeholder(tf.uint8, shape=(None, None, 84, 84, 4))
+        s1 = tf.placeholder(tf.float32, shape=(None, None, 84, 84, 4))
+        s2 = tf.placeholder(tf.float32, shape=(None, None, 84, 84, 4))
         # For each trajectory segment, there is one human judgement.
         mu = tf.placeholder(tf.float32, shape=(None, 2))
 
