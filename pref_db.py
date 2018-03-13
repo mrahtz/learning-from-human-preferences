@@ -95,7 +95,7 @@ def recv_prefs(pref_pipe, pref_db_train, pref_db_val, max_prefs):
     val_fraction = 0.2
     while True:
         try:
-            s1, s2, mu = pref_pipe.get(timeout=0.1)
+            s1, s2, mu = pref_pipe.get(timeout=0.2)
         except queue.Empty:
             break
 
