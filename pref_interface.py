@@ -107,12 +107,10 @@ class PrefInterface:
     def run(self, seg_pipe, pref_pipe):
         tested_pairs = set()
 
-        while True:
-            self.recv_segments(seg_pipe)
-            if len(self.segments) >= 2:
-                break
+        while len(self.segments) < 2:
             print("Preference interface waiting for segments")
             time.sleep(5.0)
+            self.recv_segments(seg_pipe)
 
         while True:
             # If we've tested all the possible pairs of segments so far,
@@ -124,6 +122,7 @@ class PrefInterface:
                                              tested_pairs=tested_pairs)
                 except IndexError:
                     continue
+                    time.sleep(1.0)
                 else:
                     break
 
