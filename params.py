@@ -68,10 +68,10 @@ def parse_args():
         reward_predictor_training_args['val_interval'] = 1
         # Override arguments
         general_args['n_initial_prefs'] = 1
-        reward_predictor_training_args['n_initial_epochs'] = 2
+        reward_predictor_training_args['n_initial_epochs'] = 1
         reward_predictor_training_args['ckpt_interval'] = 1
         a2c_args['save_interval'] = 10
-        a2c_args['total_timesteps'] = 500
+        a2c_args['total_timesteps'] = 100
     else:
         reward_predictor_training_args['val_interval'] = 50
 
