@@ -289,9 +289,10 @@ def start_pref_interface(seg_pipe, pref_pipe, max_segs, headless, log_dir):
     return proc
 
 
-def start_rew_pred_training(cluster_dict, make_reward_predictor, just_pretrain, pref_pipe,
-                                    start_policy_training_pipe, max_prefs, n_initial_prefs, n_initial_epochs,
-                                    prefs_dir, ckpt_path, val_interval, ckpt_interval):
+def start_rew_pred_training(cluster_dict, make_reward_predictor, just_pretrain,
+                            pref_pipe, start_policy_training_pipe, max_prefs,
+                            n_initial_prefs, n_initial_epochs, prefs_dir,
+                            ckpt_path, val_interval, ckpt_interval):
     def f():
         rew_pred = make_reward_predictor('train', cluster_dict)
         rew_pred.init_network(ckpt_path)
@@ -299,11 +300,13 @@ def start_rew_pred_training(cluster_dict, make_reward_predictor, just_pretrain, 
         if prefs_dir is not None:
             pref_db_train, pref_db_val = load_pref_db(prefs_dir)
         else:
-            pref_db_train, pref_db_val = get_initial_prefs(pref_pipe=pref_pipe,
-                                                           n_initial_prefs=n_initial_prefs,
-                                                           max_prefs=max_prefs)
+            pref_db_train, pref_db_val = get_initial_prefs(
+                pref_pipe=pref_pipe,
+                n_initial_prefs=n_initial_prefs,
+                max_prefs=max_prefs)
 
-        print("Pretraining reward predictor for {} epochs".format(n_initial_epochs))
+        print("Pretraining reward predictor for {} epochs".format(
+            n_initial_epochs))
         for i in range(n_initial_epochs):
             print("Epoch {}".format(i))
             rew_pred.train(pref_db_train, pref_db_val, val_interval)

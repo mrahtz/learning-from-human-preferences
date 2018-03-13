@@ -1,19 +1,13 @@
-import datetime
+import logging
 import os
 import os.path as osp
-import pickle
-import queue
 import time
 
 import numpy as np
 from numpy.testing import assert_equal
 import tensorflow as tf
 
-import params
 from utils import RunningStat
-import logging
-
-
 
 
 def batch_iter(data, batch_size, shuffle=False):
