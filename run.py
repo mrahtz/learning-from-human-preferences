@@ -40,8 +40,8 @@ def main():
 
 def run(general_params, a2c_params, pref_interface_params,
         rew_pred_training_params):
-    seg_pipe = Queue()
-    pref_pipe = Queue()
+    seg_pipe = Queue(maxsize=100)
+    pref_pipe = Queue(maxsize=100)
     start_policy_training_flag = Queue(maxsize=1)
 
     if general_params['render_episodes']:
