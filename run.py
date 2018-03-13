@@ -322,7 +322,7 @@ def start_rew_pred_training(cluster_dict, make_reward_predictor, just_pretrain,
             rew_pred.train(pref_db_train, pref_db_val, val_interval)
             if i and i % ckpt_interval == 0:
                 rew_pred.save()
-            recv_prefs(pref_pipe, pref_db_train, pref_db_val, max_prefs)
+            #recv_prefs(pref_pipe, pref_db_train, pref_db_val, max_prefs)
 
     proc = Process(target=f, daemon=True)
     proc.start()
