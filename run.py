@@ -243,9 +243,6 @@ def start_policy_training(cluster_dict,
 
     configure_a2c_logger(log_dir)
 
-    misc_logs_dir = osp.join(log_dir, 'a2c_misc')
-    os.makedirs(misc_logs_dir)
-
     # Done here because daemonic processes can't have children
     env = make_envs(a2c_params['env_id'], a2c_params['n_envs'], a2c_params['seed'])
     del a2c_params['env_id'], a2c_params['n_envs']
@@ -255,6 +252,7 @@ def start_policy_training(cluster_dict,
             rew_pred = make_reward_predictor('a2c', cluster_dict)
         else:
             rew_pred = None
+        misc_logs_dir = osp.join(log_dir, 'a2c_misc')
         easy_tf_log.set_dir(misc_logs_dir)
         learn(
             policy=policy_fn,
