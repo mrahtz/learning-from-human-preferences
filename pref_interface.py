@@ -141,7 +141,8 @@ class PrefInterface:
 
             if pref is not None:
                 # We don't need the rewards from this point on
-                pref_pipe.put((s1.frames, s2.frames, pref))
+                #pref_pipe.put((s1.frames, s2.frames, pref))
+                pass
 
             tested_pairs.add((s1.hash, s2.hash))
             tested_pairs.add((s2.hash, s1.hash))
