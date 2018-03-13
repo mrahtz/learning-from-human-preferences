@@ -3,6 +3,7 @@ import os
 import os.path as osp
 import time
 
+import easy_tf_log
 import numpy as np
 from numpy.testing import assert_equal
 import tensorflow as tf
@@ -239,6 +240,9 @@ class RewardPredictorEnsemble:
         self.test_writer = tf.summary.FileWriter(
             osp.join(log_dir, 'reward_pred', 'test'), flush_secs=5)
 
+        misc_logs_dir = osp.join(log_dir, 'reward_pred', 'misc')
+        easy_tf_log.set_dir(misc_logs_dir)
+
     def wait_for_init(self):
         while self.sess.run(tf.report_uninitialized_variables()).any():
             print("{} waiting for variable initialization...".format(self.name))
@@ -362,6 +366,8 @@ class RewardPredictorEnsemble:
         print("Training/testing with %d/%d preferences" % (len(prefs_train),
                                                            len(prefs_val)))
 
+        start_steps = self.n_steps
+        start_time = time.time()
         for batch_n, batch in enumerate(
                 batch_iter(prefs_train.prefs, batch_size=32, shuffle=True)):
             # TODO: refactor this so that each can be taken directly from
@@ -411,6 +417,12 @@ class RewardPredictorEnsemble:
 
                 summaries = self.sess.run(self.summaries, feed_dict)
                 self.test_writer.add_summary(summaries, self.n_steps)
+            end_time = time.time()
+            end_steps = self.n_steps
+
+            rate = (end_steps - start_steps) / (end_time - start_time)
+            easy_tf_log.logkv('reward_predictor_training_steps_per_second',
+                              rate)
 
 
 class RewardPredictor:
