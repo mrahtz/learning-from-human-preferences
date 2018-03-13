@@ -174,7 +174,10 @@ def get_port_range(start_port, n_ports, random_stagger=False):
 def profile_memory(log_path, pid):
     def profile():
         with open(log_path, 'w') as f:
-            memory_profiler.memory_usage(pid, stream=f, timeout=99999)
+            # timeout=99999 is necesary because for external processes,
+            # memory_usage otherwise defaults to only returning a single sample
+            memory_profiler.memory_usage(pid, stream=f,
+                                         timeout=99999, interval=10)
     p = Process(target=profile, daemon=True)
     p.start()
     return p
