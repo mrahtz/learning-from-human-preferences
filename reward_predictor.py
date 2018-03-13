@@ -452,8 +452,8 @@ class RewardPredictor:
 
         # Each element of the batch is one trajectory segment.
         # (Dimensions are n segments x n frames per segment x ...)
-        s1 = tf.placeholder(tf.uint8, shape=(None, None, 84, 84, 4))
-        s2 = tf.placeholder(tf.uint8, shape=(None, None, 84, 84, 4))
+        s1 = tf.placeholder(tf.float32, shape=(None, None, 84, 84, 4))
+        s2 = tf.placeholder(tf.float32, shape=(None, None, 84, 84, 4))
         # For each trajectory segment, there is one human judgement.
         mu = tf.placeholder(tf.float32, shape=(None, 2))
 
