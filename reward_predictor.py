@@ -180,6 +180,8 @@ class RewardPredictorEnsemble:
         cluster = tf.train.ClusterSpec(cluster_dict)
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
+        # Let TensorFlow place operations on a CPU if a GPU isn't available
+        config.allow_soft_placement = True
         server = tf.train.Server(cluster, job_name=name, config=config)
         sess = tf.Session(server.target, graph)
 
@@ -442,8 +444,8 @@ class RewardPredictor:
 
         # Each element of the batch is one trajectory segment.
         # (Dimensions are n segments x n frames per segment x ...)
-        s1 = tf.placeholder(tf.float32, shape=(None, None, 84, 84, 4))
-        s2 = tf.placeholder(tf.float32, shape=(None, None, 84, 84, 4))
+        s1 = tf.placeholder(tf.uint8, shape=(None, None, 84, 84, 4))
+        s2 = tf.placeholder(tf.uint8, shape=(None, None, 84, 84, 4))
         # For each trajectory segment, there is one human judgement.
         mu = tf.placeholder(tf.float32, shape=(None, 2))
 
