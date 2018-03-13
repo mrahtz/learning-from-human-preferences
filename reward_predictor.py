@@ -181,7 +181,7 @@ class RewardPredictorEnsemble:
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         # Let TensorFlow place operations on a CPU if a GPU isn't available
-        config.allow_soft_placement = True
+        #config.allow_soft_placement = True
         server = tf.train.Server(cluster, job_name=name, config=config)
         sess = tf.Session(server.target, graph)
 
