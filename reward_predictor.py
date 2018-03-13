@@ -183,6 +183,12 @@ class RewardPredictorEnsemble:
         server = tf.train.Server(cluster, job_name=name, config=config)
         sess = tf.Session(server.target, graph)
 
+        # Why not just use soft device placement? With soft placement,
+        # if we have a bug which prevents an operation being placed on the GPU
+        # (e.g. we're using uint8s for operations that the GPU can't do),
+        # then TensorFlow will be silent and just place the operation on a CPU.
+        # Instead, we want to say: if there's a GPU present, definitely try and
+        # put things on the GPU. If it fails, tell us!
         if tf.test.gpu_device_name():
             worker_device = "/job:{}/task:0/gpu:0".format(name)
         else:
