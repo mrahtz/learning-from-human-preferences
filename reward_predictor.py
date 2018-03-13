@@ -186,7 +186,7 @@ class RewardPredictorEnsemble:
         device_setter = tf.train.replica_device_setter(
             cluster=cluster_dict,
             ps_device="/job:ps/task:0",
-            worker_device="/job:{}/task:0".format(name))
+            worker_device="/job:{}/task:0/gpu:0".format(name))
 
         with graph.as_default():
             for i in range(n_preds):
