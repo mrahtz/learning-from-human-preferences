@@ -125,7 +125,8 @@ class PrefInterface:
                 else:
                     break
 
-            logging.debug("Querying preference for segments", s1.hash, "and", s2.hash)
+            logging.debug("Querying preference for segments %s and %s",
+                          s1.hash, s2.hash)
 
             if not self.synthetic_prefs:
                 pref = self.ask_user(s1, s2)
