@@ -180,15 +180,17 @@ class RewardPredictorEnsemble:
         cluster = tf.train.ClusterSpec(cluster_dict)
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
-        # Let TensorFlow place operations on a CPU if a GPU isn't available
-        #config.allow_soft_placement = True
         server = tf.train.Server(cluster, job_name=name, config=config)
         sess = tf.Session(server.target, graph)
 
+        if tf.test.gpu_device_name():
+            worker_device = "/job:{}/task:0/gpu:0".format(name)
+        else:
+            worker_device = "/job:{}/task:0".format(name)
         device_setter = tf.train.replica_device_setter(
             cluster=cluster_dict,
             ps_device="/job:ps/task:0",
-            worker_device="/job:{}/task:0/gpu:0".format(name))
+            worker_device=worker_device)
 
         with graph.as_default():
             for i in range(n_preds):
