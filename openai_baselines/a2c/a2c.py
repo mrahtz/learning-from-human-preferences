@@ -180,7 +180,7 @@ class Runner(object):
                 # length
                 self.segment = Segment()
                 continue
-            self.segment.append(e0_obs[step], e0_rew[step])
+            self.segment.append(np.copy(e0_obs[step]), np.copy(e0_rew[step]))
 
     def save_episode_frames(self, mb_obs, mb_dones):
         e0_obs = mb_obs[0]
