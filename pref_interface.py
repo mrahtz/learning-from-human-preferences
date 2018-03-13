@@ -74,7 +74,9 @@ class PrefInterface:
         vid = []
         for t in range(seg_len):
             # Show only the most recent frame of the 4-frame stack
-            frame = np.hstack((s1.frames[t][:, :, -1], border, s2.frames[t][:, :, -1]))
+            frame = np.hstack((s1.frames[t][:, :, -1],
+                               border,
+                               s2.frames[t][:, :, -1]))
             frame = zoom(frame, 4)
             vid.append(frame)
         n_pause_frames = 7
