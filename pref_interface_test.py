@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import time
 import unittest
 from itertools import combinations
 from multiprocessing import Queue
@@ -27,7 +26,7 @@ class TestPrefInterface(unittest.TestCase):
                                log_dir='/tmp')
         termcolor.cprint(self._testMethodName, 'red')
 
-    def testSampleSegPair(self):
+    def test_sample_pair(self):
         seg_pipe = Queue()
         n_segments = 5
         send_segments(n_segments, seg_pipe)
@@ -47,7 +46,10 @@ class TestPrefInterface(unittest.TestCase):
         with self.assertRaises(IndexError):
             self.p.sample_seg_pair()
 
-    def testRecvSegments(self):
+    def test_recv_segments(self):
+        """
+        Check that segments are stored correctly in the circular buffer.
+        """
         pi = PrefInterface(synthetic_prefs=True, max_segs=5, log_dir='/tmp')
         pipe = Queue()
         for i in range(5):
