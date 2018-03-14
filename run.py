@@ -309,10 +309,10 @@ def start_rew_pred_training(cluster_dict, make_reward_predictor, just_pretrain,
         for i in range(n_initial_epochs):
             print("Epoch {}".format(i))
             rew_pred.train(pref_db_train, pref_db_val, val_interval)
-
             if i and i % ckpt_interval == 0:
                 rew_pred.save()
         print("Reward predictor pretraining done")
+        rew_pred.save()
 
         if just_pretrain:
             return

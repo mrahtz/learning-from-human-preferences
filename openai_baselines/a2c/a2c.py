@@ -114,7 +114,8 @@ class Model(object):
 
     def save(self, ckpt_path, step_n):
         # TODO put back step_n
-        return self.saver.save(self.sess, ckpt_path)
+        saved_path = self.saver.save(self.sess, ckpt_path)
+        print("Saved policy checkpoint to '{}'".format(saved_path))
 
 
 class Runner(object):
@@ -374,7 +375,7 @@ def learn(policy,
         model.load(ckpt_path)
         print("Loaded policy from checkpoint '{}'".format(ckpt_path))
 
-    ckpt_path = osp.join(ckpt_dir, 'policy')
+    ckpt_path = osp.join(ckpt_dir, 'policy.ckpt')
 
     runner = Runner(
         env=env,
@@ -434,7 +435,7 @@ def learn(policy,
             logger.record_tabular("learning_rate", cur_lr)
             logger.dump_tabular()
 
+        if update != 0 and update % save_interval == 0:
+            model.save(ckpt_path, update)
 
-        if update % save_interval == 0 and update != 0:
-            last_ckpt = model.save(ckpt_path, update)
-            print("Saved policy checkpoint to '{}'".format(last_ckpt))
+    model.save(ckpt_path, update)
