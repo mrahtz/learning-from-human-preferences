@@ -266,7 +266,7 @@ class Runner(object):
             self.save_episode_frames(mb_obs, mb_dones)
 
         # Replace rewards with those from reward predictor
-        logging.debug("Original rewards:\n", mb_rewards)
+        logging.debug("Original rewards:\n%s", mb_rewards)
         if self.reward_predictor:
             orig_rewards = np.copy(mb_rewards)
 
@@ -282,7 +282,7 @@ class Runner(object):
                                     orig_rewards.flatten())
             logger.record_tabular("explained_variance_predicted_rewards", ev)
 
-            logging.debug("Predicted rewards:\n", mb_rewards)
+            logging.debug("Predicted rewards:\n%s", mb_rewards)
 
         # Discount rewards
         mb_obs = mb_obs.reshape(self.batch_ob_shape)
