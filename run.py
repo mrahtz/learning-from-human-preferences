@@ -2,6 +2,7 @@
 
 import logging
 import os
+import queue
 import sys
 import time
 from multiprocessing import Process, Queue
@@ -11,6 +12,7 @@ import easy_tf_log
 import gym
 import gym_moving_dot
 import memory_profiler
+import numpy as np
 
 from openai_baselines import logger
 from openai_baselines.a2c.a2c import learn
@@ -19,7 +21,7 @@ from openai_baselines.common import set_global_seeds
 from openai_baselines.common.atari_wrappers import wrap_deepmind_nomax
 from openai_baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from params import parse_args
-from pref_db import PrefDB, load_pref_db, recv_prefs, save_prefs
+from pref_db import PrefDB
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble
 from utils import get_port_range, profile_memory, vid_proc
@@ -77,11 +79,12 @@ def run(general_params, a2c_params, pref_interface_params,
             pref_pipe=pref_pipe,
             n_initial_prefs=general_params['n_initial_prefs'],
             max_prefs=general_params['max_prefs'])
-        save_prefs(
-            pref_db_train=pref_db_train,
-            pref_db_val=pref_db_val,
-            save_dir=general_params['log_dir'],
-            name='initial')
+        train_path = osp.join(general_params['log_dir'], 'train_initial.pkl')
+        pref_db_train.save(train_path)
+        print("Saved training preferences to '{}'".format(train_path))
+        val_path = osp.join(general_params['log_dir'], 'val_initial.pkl')
+        pref_db_val.save(val_path)
+        print("Saved validation preferences to '{}'".format(val_path))
         pi_proc.terminate()
         a2c_proc.terminate()
         env.close()
@@ -297,7 +300,12 @@ def start_rew_pred_training(cluster_dict, make_reward_predictor, just_pretrain,
         rew_pred.init_network(ckpt_path)
 
         if prefs_dir is not None:
-            pref_db_train, pref_db_val = load_pref_db(prefs_dir)
+            train_path = osp.join(prefs_dir, 'train_initial.pkl')
+            pref_db_train = PrefDB.load(train_path)
+            print("Loaded training preferences from '{}'".format(train_path))
+            val_path = osp.join(prefs_dir, 'val_initial.pkl')
+            pref_db_val = PrefDB.load(val_path)
+            print("Loaded validation preferences from '{}'".format(val_path))
         else:
             pref_db_train, pref_db_val = get_initial_prefs(
                 pref_pipe=pref_pipe,
@@ -340,6 +348,28 @@ def start_episode_renderer():
     proc = Process(target=episode_vid_proc, args=(episode_vid_queue, ),
                    daemon=True).start()
     return episode_vid_queue, proc
+
+
+def recv_prefs(pref_pipe, pref_db_train, pref_db_val, max_prefs):
+    val_fraction = 0.2
+    while True:
+        try:
+            s1, s2, mu = pref_pipe.get(timeout=0.1)
+        except queue.Empty:
+            break
+
+        if np.random.rand() < val_fraction:
+            pref_db_val.append(s1, s2, mu)
+        else:
+            pref_db_train.append(s1, s2, mu)
+
+        if len(pref_db_val) > max_prefs * val_fraction:
+            pref_db_val.del_first()
+        assert len(pref_db_val) <= max_prefs * val_fraction
+
+        if len(pref_db_train) > max_prefs * (1 - val_fraction):
+            pref_db_train.del_first()
+        assert len(pref_db_train) <= max_prefs * (1 - val_fraction)
 
 
 if __name__ == '__main__':

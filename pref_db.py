@@ -1,11 +1,15 @@
 import pickle
-import queue
-from os import path as osp
 
 import numpy as np
 
 
 class Segment:
+    """
+    A short recording of agent's behaviour in the environment,
+    consisting of a number of video frames and the rewards it received
+    during those frames.
+    """
+
     def __init__(self):
         self.frames = []
         self.rewards = []
@@ -19,7 +23,8 @@ class Segment:
         if seg_id is not None:
             self.hash = seg_id
         else:
-            # How expensive is this? About 0.5 ms.
+            # This looks expensive, but don't worry -
+            # it only takes about 0.5 ms.
             self.hash = hash(np.array(self.frames).tostring())
 
     def __len__(self):
@@ -27,12 +32,21 @@ class Segment:
 
 
 class PrefDB:
+    """
+    A database of preferences about pairs of segments.
+
+    For each preference, we store the preference itself
+    (mu in the paper) and the two segments the preference refers to.
+    Segments are stored with deduplication - so that if multiple
+    preferences refer to the same segment, the segment is only stored once.
+    """
+
     def __init__(self):
         self.segments = {}
         self.seg_refs = {}
         self.prefs = []
 
-    def append(self, s1, s2, mu):
+    def append(self, s1, s2, pref):
         k1 = hash(np.array(s1).tostring())
         k2 = hash(np.array(s2).tostring())
 
@@ -43,7 +57,7 @@ class PrefDB:
             else:
                 self.seg_refs[k] += 1
 
-        tup = (k1, k2, mu)
+        tup = (k1, k2, pref)
         self.prefs.append(tup)
 
     def del_first(self):
@@ -64,50 +78,12 @@ class PrefDB:
     def __len__(self):
         return len(self.prefs)
 
+    def save(self, path):
+        with open(path, 'wb') as pkl_file:
+            pickle.dump(self, pkl_file)
 
-def save_pref_db(pref_db, fname):
-    with open(fname, 'wb') as pkl_file:
-        pickle.dump(pref_db, pkl_file)
-
-
-def load_pref_db(pref_dir):
-    train_fname = osp.join(pref_dir, 'train_initial.pkl')
-    with open(train_fname, 'rb') as pkl_file:
-        pref_db_train = pickle.load(pkl_file)
-        print("Loaded training preferences from '{}'".format(train_fname))
-
-    val_fname = osp.join(pref_dir, 'val_initial.pkl')
-    with open(val_fname, 'rb') as pkl_file:
-        pref_db_val = pickle.load(pkl_file)
-        print("Loaded validation preferences from '{}'".format(val_fname))
-
-    return pref_db_train, pref_db_val
-
-
-def save_prefs(pref_db_train, pref_db_val, save_dir, name):
-    fname = osp.join(save_dir, "train_{}.pkl".format(name))
-    save_pref_db(pref_db_train, fname)
-    fname = osp.join(save_dir, "val_{}.pkl".format(name))
-    save_pref_db(pref_db_val, fname)
-
-
-def recv_prefs(pref_pipe, pref_db_train, pref_db_val, max_prefs):
-    val_fraction = 0.2
-    while True:
-        try:
-            s1, s2, mu = pref_pipe.get(timeout=0.1)
-        except queue.Empty:
-            break
-
-        if np.random.rand() < val_fraction:
-            pref_db_val.append(s1, s2, mu)
-        else:
-            pref_db_train.append(s1, s2, mu)
-
-        if len(pref_db_val) > max_prefs * val_fraction:
-            pref_db_val.del_first()
-        assert len(pref_db_val) <= max_prefs * val_fraction
-
-        if len(pref_db_train) > max_prefs * (1 - val_fraction):
-            pref_db_train.del_first()
-        assert len(pref_db_train) <= max_prefs * (1 - val_fraction)
+    @staticmethod
+    def load(path):
+        with open(path, 'rb') as pkl_file:
+            pref_db = pickle.load(pkl_file)
+        return pref_db
