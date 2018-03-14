@@ -101,41 +101,59 @@ def get_most_recent_item(q):
     return item, n_skipped
 
 
-def vid_proc(q, playback_speed=1, zoom_factor=1, mode='restart_on_get'):
-    assert mode == 'restart_on_get' or mode == 'play_through'
-    v = Im()
-    frames = q.get(block=True)
-    t = 0
-    while True:
-        # Add a dot showing progress
-        width = frames[t].shape[1]
-        fraction_played = t / len(frames)
-        frames[t][-1][int(fraction_played * width)] = 255
+class VideoRenderer:
+    pause_cmd = "pause"
 
-        v.imshow(zoom(frames[t], zoom_factor))
+    def __init__(self, vid_queue, zoom_factor=1, playback_speed=1,
+                 mode='restart_on_get'):
+        assert mode == 'restart_on_get' or mode == 'play_through'
+        self.mode = mode
+        self.vid_queue = vid_queue
+        self.zoom_factor = zoom_factor
+        self.playback_speed = playback_speed
+        self.proc = Process(target=self.render)
+        self.proc.start()
 
-        if mode == 'play_through':
-            # Wait until having finished playing the current
-            # set of frames. Then, stop, and get the most recent set of frames.
-            t += playback_speed
-            if t >= len(frames):
-                frames, n_skipped = get_most_recent_item(q)
-                t = 0
-            else:
-                time.sleep(1/60)
-        elif mode == 'restart_on_get':
-            # Always try and get a new set of frames to show.
-            # If there /is/ a new set of frames on the queue,
-            # restart playback with those frames immediately.
-            # Otherwise, just keep looping with the current frames.
-            try:
-                frames = q.get(block=False)
-                if frames == "Pause":
-                    frames = q.get(block=True)
-                t = 0
-            except queue.Empty:
-                t = (t + playback_speed) % len(frames)
-                time.sleep(1/60)
+    def stop(self):
+        self.proc.terminate()
+
+    def render(self):
+        v = Im()
+        frames = self.vid_queue.get(block=True)
+        t = 0
+        while True:
+            # Add a dot showing progress
+            width = frames[t].shape[1]
+            fraction_played = t / len(frames)
+            frames[t][-1][int(fraction_played * width)] = 255
+
+            v.imshow(zoom(frames[t], self.zoom_factor))
+
+            if self.mode == 'play_through':
+                # Wait until having finished playing the current
+                # set of frames. Then, stop, and get the most
+                # recent set of frames.
+                t += self.playback_speed
+                if t >= len(frames):
+                    frames, n_skipped = get_most_recent_item(self.vid_queue)
+                    t = 0
+                else:
+                    time.sleep(1/60)
+            elif self.mode == 'restart_on_get':
+                # Always try and get a new set of frames to show.
+                # If there is a new set of frames on the queue,
+                # restart playback with those frames immediately.
+                # Otherwise, just keep looping with the current frames.
+                try:
+                    item = self.vid_queue.get(block=False)
+                    if item == VideoRenderer.pause_cmd:
+                        frames = self.vid_queue.get(block=True)
+                    else:
+                        frames = item
+                    t = 0
+                except queue.Empty:
+                    t = (t + self.playback_speed) % len(frames)
+                    time.sleep(1/60)
 
 
 def get_port_range(start_port, n_ports, random_stagger=False):

@@ -50,7 +50,7 @@ def parse_args():
     }
 
     pref_interface_args = {
-        'headless': args.headless,
+        'synthetic_prefs': args.synthetic_prefs,
         'max_segs': args.max_segs
     }
 
@@ -167,7 +167,7 @@ def add_reward_predictor_args(parser):
 
 
 def add_pref_interface_args(parser):
-    parser.add_argument('--headless', action='store_true')
+    parser.add_argument('--synthetic_prefs', action='store_true')
     # Maximum number of segments to store from which to generate preferences.
     # This isn't a parameter specified in the paper;
     # I'm just guessing that 1,000 is a reasonable figure.

@@ -1,53 +1,80 @@
 #!/usr/bin/env python
+
+"""
+A simple CLI-based interface for querying the user about segment preferences.
+"""
+
+import logging
 import queue
 import time
 from itertools import combinations
-from multiprocessing import Process, Queue
-import easy_tf_log
+from multiprocessing import Queue
+from random import shuffle
 
+import easy_tf_log
 import numpy as np
 
-from scipy.ndimage import zoom
-
-from utils import vid_proc
-
-import logging
-
-
-def sample_seg_pair(segments, tested_pairs):
-    """
-    Sample a pair of segments which hasn't yet been tested.
-    """
-    possible_pairs = list(combinations(range(len(segments)), 2))
-    # Get a random pair; see if it's already been tested;
-    # if it hasn't, return it; else, remove that pair from the list,
-    # and try again.
-    while True:
-        idx = np.random.choice(range(len(possible_pairs)))
-        i1, i2 = possible_pairs[idx]
-        s1, s2 = segments[i1], segments[i2]
-        if ((s1.hash, s2.hash) not in tested_pairs) and \
-           ((s2.hash, s1.hash) not in tested_pairs):
-            return s1, s2
-        elif len(possible_pairs) > 1:
-            if idx == len(possible_pairs) - 1:
-                possible_pairs.pop()
-            else:
-                possible_pairs[idx] = possible_pairs.pop()
-        else:
-            raise IndexError("No segment pairs yet untested")
+from utils import VideoRenderer
 
 
 class PrefInterface:
 
-    def __init__(self, headless, max_segs, synthetic_prefs=False):
+    def __init__(self, synthetic_prefs, max_segs, log_dir):
         self.vid_q = Queue()
-        if not headless:
-            Process(target=vid_proc, args=(self.vid_q,), daemon=True).start()
+        if not synthetic_prefs:
+            self.renderer = VideoRenderer(vid_queue=self.vid_q, zoom_factor=4)
+        else:
+            self.renderer = None
         self.synthetic_prefs = synthetic_prefs
         self.seg_idx = 0
         self.segments = []
+        self.tested_pairs = set()  # For O(1) lookup
         self.max_segs = max_segs
+        easy_tf_log.set_dir(log_dir)
+
+    def stop_renderer(self):
+        if self.renderer:
+            self.renderer.stop()
+
+    def run(self, seg_pipe, pref_pipe):
+        while len(self.segments) < 2:
+            print("Preference interface waiting for segments")
+            time.sleep(5.0)
+            self.recv_segments(seg_pipe)
+
+        while True:
+            seg_pair = None
+            while seg_pair is None:
+                try:
+                    seg_pair = self.sample_seg_pair()
+                except IndexError:
+                    # If we've tested all possible pairs of segments so far,
+                    # we'll have to wait for more segments
+                    time.sleep(1.0)
+                    self.recv_segments(seg_pipe)
+                else:
+                    break
+            s1, s2 = seg_pair
+
+            logging.debug("Querying preference for segments %s and %s",
+                          s1.hash, s2.hash)
+
+            if not self.synthetic_prefs:
+                pref = self.ask_user(s1, s2)
+            else:
+                if sum(s1.rewards) > sum(s2.rewards):
+                    pref = (1.0, 0.0)
+                elif sum(s1.rewards) < sum(s2.rewards):
+                    pref = (0.0, 1.0)
+                else:
+                    pref = (0.5, 0.5)
+
+            if pref is not None:
+                # We don't need the rewards from this point on, so just send
+                # the frames
+                pref_pipe.put((s1.frames, s2.frames, pref))
+            # If pref is None, the user answered "incomparable" for the segment
+            # pair. The pair has been marked as tested; we just drop it.
 
     def recv_segments(self, seg_pipe):
         """
@@ -64,20 +91,33 @@ class PrefInterface:
             else:
                 self.segments[self.seg_idx] = segment
                 self.seg_idx = (self.seg_idx + 1) % self.max_segs
-
         easy_tf_log.logkv('n_segments', len(self.segments))
 
-    def ask_user(self, s1, s2):
-        border = np.zeros((84, 10), dtype=np.uint8)
+    def sample_seg_pair(self):
+        """
+        Sample a random pair of segments which hasn't yet been tested.
+        """
+        segment_idxs = list(range(len(self.segments)))
+        shuffle(segment_idxs)
+        possible_pairs = combinations(segment_idxs, 2)
+        for i1, i2 in possible_pairs:
+            s1, s2 = self.segments[i1], self.segments[i2]
+            if ((s1.hash, s2.hash) not in self.tested_pairs) and \
+               ((s2.hash, s1.hash) not in self.tested_pairs):
+                self.tested_pairs.add((s1.hash, s2.hash))
+                self.tested_pairs.add((s2.hash, s1.hash))
+                return s1, s2
+        raise IndexError("No segment pairs yet untested")
 
-        seg_len = len(s1)
+    def ask_user(self, s1, s2):
         vid = []
+        seg_len = len(s1)
         for t in range(seg_len):
-            # Show only the most recent frame of the 4-frame stack
+            border = np.zeros((84, 10), dtype=np.uint8)
+            # -1 => show only the most recent frame of the 4-frame stack
             frame = np.hstack((s1.frames[t][:, :, -1],
                                border,
                                s2.frames[t][:, :, -1]))
-            frame = zoom(frame, 4)
             vid.append(frame)
         n_pause_frames = 7
         vid.extend([vid[-1]] * n_pause_frames)
@@ -86,62 +126,24 @@ class PrefInterface:
         while True:
             print("Segments {} and {}: ".format(s1.hash, s2.hash))
             choice = input()
+            # L = "I prefer the left segment"
+            # R = "I prefer the right segment"
+            # E = "I don't have a clear preference between the two segments"
+            # "" = "The segments are incomparable"
             if choice == "L" or choice == "R" or choice == "E" or choice == "":
                 break
             else:
                 print("Invalid choice '{}'".format(choice))
 
         if choice == "L":
-            pref = (1., 0.)
+            pref = (1.0, 0.0)
         elif choice == "R":
-            pref = (0., 1.)
+            pref = (0.0, 1.0)
         elif choice == "E":
             pref = (0.5, 0.5)
         elif choice == "":
             pref = None
 
-        self.vid_q.put("Pause")
+        self.vid_q.put(VideoRenderer.pause_cmd)
 
         return pref
-
-    def run(self, seg_pipe, pref_pipe):
-        tested_pairs = set()
-
-        while len(self.segments) < 2:
-            print("Preference interface waiting for segments")
-            time.sleep(5.0)
-            self.recv_segments(seg_pipe)
-
-        while True:
-            # If we've tested all the possible pairs of segments so far,
-            # we might have to wait
-            while True:
-                self.recv_segments(seg_pipe)
-                try:
-                    s1, s2 = sample_seg_pair(self.segments,
-                                             tested_pairs=tested_pairs)
-                except IndexError:
-                    continue
-                    time.sleep(1.0)
-                else:
-                    break
-
-            logging.debug("Querying preference for segments %s and %s",
-                          s1.hash, s2.hash)
-
-            if not self.synthetic_prefs:
-                pref = self.ask_user(s1, s2)
-            else:
-                if sum(s1.rewards) > sum(s2.rewards):
-                    pref = (1.0, 0.0)
-                elif sum(s1.rewards) < sum(s2.rewards):
-                    pref = (0.0, 1.0)
-                else:
-                    pref = (0.5, 0.5)
-
-            if pref is not None:
-                # We don't need the rewards from this point on
-                pref_pipe.put((s1.frames, s2.frames, pref))
-
-            tested_pairs.add((s1.hash, s2.hash))
-            tested_pairs.add((s2.hash, s1.hash))

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Simple tests to make sure each of the main commands basically runs fine without
+Simple tests to make sure each of the main commands basically run fine without
 any errors.
 """
 
@@ -13,11 +13,13 @@ from os.path import exists, join
 import termcolor
 
 
-def create_initial_prefs(out_dir):
+def create_initial_prefs(out_dir, interactive):
     cmd = ("python3 run.py gather_initial_prefs "
            "PongNoFrameskip-v4 "
-           "--headless --n_initial_prefs 1 "
+           "--n_initial_prefs 1 "
            "--log_dir {}".format(out_dir))
+    if not interactive:
+        cmd += " --synthetic_prefs"
     subprocess.call(cmd.split(' '))
 
 
@@ -27,15 +29,20 @@ class TestRun(unittest.TestCase):
         termcolor.cprint(self._testMethodName, 'red')
 
     def test_gather_prefs(self):
-        # Automatically deletes the directory afterwards :)
-        with tempfile.TemporaryDirectory() as temp_dir:
-            create_initial_prefs(temp_dir)
-            self.assertTrue(exists(join(temp_dir, 'train_initial.pkl')))
-            self.assertTrue(exists(join(temp_dir, 'val_initial.pkl')))
+        for interactive in [True, False]:
+            if interactive:
+                termcolor.cprint('Human preferences', 'green')
+            else:
+                termcolor.cprint('Synthetic preferences', 'green')
+            # Automatically deletes the directory afterwards :)
+            with tempfile.TemporaryDirectory() as temp_dir:
+                create_initial_prefs(temp_dir, interactive)
+                self.assertTrue(exists(join(temp_dir, 'train_initial.pkl')))
+                self.assertTrue(exists(join(temp_dir, 'val_initial.pkl')))
 
     def test_pretrain_reward_predictor(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            create_initial_prefs(temp_dir)
+            create_initial_prefs(temp_dir, interactive=False)
             cmd = ("python3 run.py pretrain_reward_predictor "
                    "PongNoFrameskip-v4 "
                    "--n_initial_epochs 1 "
@@ -50,7 +57,7 @@ class TestRun(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             cmd = ("python3 run.py train_policy_with_preferences "
                    "PongNoFrameskip-v4 "
-                   "--headless "
+                   "--synthetic_prefs "
                    "--million_timesteps 0.0001 "
                    "--n_initial_prefs 1 "
                    "--n_initial_epochs 1 "

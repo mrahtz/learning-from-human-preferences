@@ -1,31 +1,43 @@
 #!/usr/bin/env python3
+import time
 import unittest
 from itertools import combinations
 from multiprocessing import Queue
 
 import numpy as np
+import termcolor
 
 from pref_db import Segment
-from pref_interface import sample_seg_pair, PrefInterface
+from pref_interface import PrefInterface
+
+
+def send_segments(n_segments, seg_pipe):
+    frame_stack = np.zeros((84, 84, 4))
+    for i in range(n_segments):
+        segment = Segment()
+        for _ in range(25):
+            segment.append(frame=frame_stack, reward=0)
+        segment.finalise(seg_id=i)
+        seg_pipe.put(segment)
 
 
 class TestPrefInterface(unittest.TestCase):
-    def testSampleSegPairs(self):
-        # Make a small array of segments
-        segments = []
-        frame_stack = np.zeros((84, 84, 4))
-        for i in range(5):
-            segment = Segment()
-            for _ in range(25):
-                segment.append(frame=frame_stack, reward=0)
-            segment.finalise(seg_id=i)
-            segments.append(segment)
+    def setUp(self):
+        self.p = PrefInterface(synthetic_prefs=True, max_segs=1000,
+                               log_dir='/tmp')
+        termcolor.cprint(self._testMethodName, 'red')
+
+    def testSampleSegPair(self):
+        seg_pipe = Queue()
+        n_segments = 5
+        send_segments(n_segments, seg_pipe)
+        self.p.recv_segments(seg_pipe)
 
         # Check that we get exactly the right number of unique pairs back
-        n_possible_pairs = len(list(combinations(range(len(segments)), 2)))
+        n_possible_pairs = len(list(combinations(range(n_segments), 2)))
         tested_pairs = set()
         for _ in range(n_possible_pairs):
-            s1, s2 = sample_seg_pair(segments, tested_pairs)
+            s1, s2 = self.p.sample_seg_pair()
             tested_pairs.add((s1.hash, s2.hash))
             tested_pairs.add((s2.hash, s1.hash))
         self.assertEqual(len(tested_pairs), 2 * n_possible_pairs)
@@ -33,10 +45,10 @@ class TestPrefInterface(unittest.TestCase):
         # Check that if we try to get just one more, we get an exception
         # indicating that there are no more unique pairs available
         with self.assertRaises(IndexError):
-            sample_seg_pair(segments, tested_pairs)
+            self.p.sample_seg_pair()
 
     def testRecvSegments(self):
-        pi = PrefInterface(headless=True, max_segs=5)
+        pi = PrefInterface(synthetic_prefs=True, max_segs=5, log_dir='/tmp')
         pipe = Queue()
         for i in range(5):
             pipe.put(i)
