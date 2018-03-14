@@ -171,7 +171,13 @@ class Runner(object):
 
         for step in range(self.nsteps):
             if len(self.segment) == 25:
-                self.seg_pipe.put(self.segment)
+                try:
+                    self.seg_pipe.put(self.segment, block=False)
+                except queue.Full:
+                    # If the preference interface has a backlog of segments
+                    # to deal with, don't stop training the agents. Just drop
+                    # the segment and keep on going.
+                    pass
                 self.segment = Segment()
                 continue
             elif e0_dones[step]:
