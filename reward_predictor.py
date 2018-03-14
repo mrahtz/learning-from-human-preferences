@@ -307,7 +307,7 @@ class RewardPredictorEnsemble:
         # Shape should be 'n_preds x n_steps'
         assert_equal(len(ensemble_rs), len(self.rps))
         assert_equal(len(ensemble_rs[0]), n_steps)
-        logging.debug("Unnormalized rewards:", ensemble_rs)
+        logging.debug("Unnormalized rewards:\n%s", ensemble_rs)
 
         # Normalize rewards
 
@@ -341,13 +341,15 @@ class RewardPredictorEnsemble:
         ensemble_rs *= 0.05
         ensemble_rs = ensemble_rs.transpose()
         assert_equal(ensemble_rs.shape, (self.n_preds, n_steps))
-        logging.debug("Reward mean/stddev:", self.r_norm.mean, self.r_norm.std)
-        logging.debug("Normalized rewards:", ensemble_rs)
+        logging.debug("Reward mean/stddev:\n%s %s",
+                      self.r_norm.mean,
+                      self.r_norm.std)
+        logging.debug("Normalized rewards:\n%s", ensemble_rs)
 
         # "...and then averaging the results."
         rs = np.mean(ensemble_rs, axis=0)
         assert_equal(rs.shape, (n_steps, ))
-        logging.debug("After ensemble averaging:", rs)
+        logging.debug("After ensemble averaging:\n%s", rs)
 
         return rs
 

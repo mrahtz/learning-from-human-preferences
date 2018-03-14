@@ -27,7 +27,8 @@ def parse_args():
         'n_initial_prefs': args.n_initial_prefs,
         'max_prefs': args.max_prefs,
         'log_dir': log_dir,
-        'prefs_dir': args.load_prefs_dir
+        'prefs_dir': args.load_prefs_dir,
+        'debug': args.debug
     }
 
     num_timesteps = int(args.million_timesteps * 1e6)

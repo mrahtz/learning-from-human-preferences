@@ -33,6 +33,9 @@ def main():
     general_params, a2c_params, \
         pref_interface_params, rew_pred_training_params = parse_args()
 
+    if general_params['debug']:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     run(general_params,
         a2c_params,
         pref_interface_params,
