@@ -34,7 +34,6 @@ def batch_iter(data, batch_size, shuffle=False):
 
 def conv_layer(x, filters, kernel_size, strides, batchnorm, training, name,
                reuse, activation='relu'):
-    # TODO: L2 loss
     x = tf.layers.conv2d(
         x,
         filters,
@@ -62,8 +61,6 @@ def dense_layer(x,
                 name,
                 reuse,
                 activation=None):
-    # TODO: L2 loss
-
     x = tf.layers.dense(x, units, activation=None, name=name, reuse=reuse)
 
     if activation is None:
@@ -528,13 +525,6 @@ class RewardPredictor:
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
             train = tf.train.AdamOptimizer(learning_rate=lr).minimize(loss)
-
-        # TODO (L2 loss)
-        """
-        reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-        reg_loss = tf.add_n(reg_losses)
-        loss += reg_loss
-        """
 
         self.s1 = s1
         self.s2 = s2
