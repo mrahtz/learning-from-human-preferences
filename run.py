@@ -12,7 +12,6 @@ import gym
 import gym_moving_dot
 import memory_profiler
 
-from enduro_wrapper import EnduroWrapper
 from openai_baselines import logger
 from openai_baselines.a2c.a2c import learn
 from openai_baselines.a2c.policies import CnnPolicy, MlpPolicy
@@ -191,9 +190,11 @@ def make_envs(env_id, n_envs, seed):
         def _thunk():
             env = gym.make(env_id)
             env.seed(seed + rank)
-            # TODO
+
             if env_id == 'EnduroNoFrameskip-v4':
+                from enduro_wrapper import EnduroWrapper
                 env = EnduroWrapper(env)
+
             gym.logger.setLevel(logging.WARN)
             return wrap_deepmind_nomax(env)
         return _thunk
