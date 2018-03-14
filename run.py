@@ -42,8 +42,8 @@ def run(env_id, num_timesteps, seed, lr_scheduler, rp_lr, n_envs,
 
     env = make_envs(env_id, n_envs, seed)
 
-    seg_pipe = Queue()
-    pref_pipe = Queue()
+    seg_pipe = Queue(maxsize=100)
+    pref_pipe = Queue(maxsize=100)
     go_pipe = Queue(maxsize=1)
 
     parts_to_run = ['a2c', 'pref_interface', 'train_reward']
