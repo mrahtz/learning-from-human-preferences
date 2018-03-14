@@ -111,7 +111,7 @@ def main():
         params.params['debug'] = False
         cluster_dict = {'train_reward': ['localhost:2200']}
         reward_predictor = RewardPredictorEnsemble(
-            name='train_reward',
+            cluster_job_name='train_reward',
             cluster_dict=cluster_dict,
             ckpt_path=args.reward_predictor_ckpt,
             log_dir='/tmp')
