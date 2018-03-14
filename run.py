@@ -24,7 +24,7 @@ from params import parse_args
 from pref_db import PrefDB
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble
-from utils import get_port_range, profile_memory, vid_proc
+from utils import get_port_range, profile_memory, VideoRenderer
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
 
@@ -70,7 +70,7 @@ def run(general_params, a2c_params, pref_interface_params,
             episode_vid_queue=episode_vid_queue,
             log_dir=general_params['log_dir'],
             a2c_params=a2c_params)
-        pi_proc = start_pref_interface(
+        pi, pi_proc = start_pref_interface(
             seg_pipe=seg_pipe,
             pref_pipe=pref_pipe,
             log_dir=general_params['log_dir'],
@@ -86,6 +86,7 @@ def run(general_params, a2c_params, pref_interface_params,
         pref_db_val.save(val_path)
         print("Saved validation preferences to '{}'".format(val_path))
         pi_proc.terminate()
+        pi.stop_renderer()
         a2c_proc.terminate()
         env.close()
     elif general_params['mode'] == 'pretrain_reward_predictor':
@@ -133,7 +134,7 @@ def run(general_params, a2c_params, pref_interface_params,
             a2c_params=a2c_params)
         m1 = profile_memory(general_params['log_dir'] + '/mem_a2c.log',
                             a2c_proc.pid)
-        pi_proc = start_pref_interface(
+        pi, pi_proc = start_pref_interface(
             seg_pipe=seg_pipe,
             pref_pipe=pref_pipe,
             log_dir=general_params['log_dir'],
@@ -162,6 +163,7 @@ def run(general_params, a2c_params, pref_interface_params,
         m3.terminate()
         rpt_proc.terminate()
         pi_proc.terminate()
+        pi.stop_renderer()
         ps_proc.terminate()
         env.close()
     else:
@@ -273,22 +275,21 @@ def start_policy_training(cluster_dict,
     return env, proc
 
 
-def start_pref_interface(seg_pipe, pref_pipe, max_segs, headless, log_dir):
-    prefs_log_dir = osp.join(log_dir, 'pref_interface')
-    os.makedirs(prefs_log_dir)
+def start_pref_interface(seg_pipe, pref_pipe, max_segs, synthetic_prefs,
+                         log_dir):
     def f():
         # The preference interface needs to get input from stdin. stdin is
         # automatically closed at the beginning of child processes in Python,
-        # so this feels like a bit of a hack, but it seems to be fine.
+        # so this is a bit of a hack, but it seems to be fine.
         sys.stdin = os.fdopen(0)
-        easy_tf_log.set_dir(prefs_log_dir)
         pi.run(seg_pipe=seg_pipe, pref_pipe=pref_pipe)
-    # Needs to be done in the main process because does GUI work
-    pi = PrefInterface(
-        headless=headless, synthetic_prefs=headless, max_segs=max_segs)
+    # Needs to be done in the main process because does GUI setup work
+    prefs_log_dir = osp.join(log_dir, 'pref_interface')
+    pi = PrefInterface(synthetic_prefs=synthetic_prefs, max_segs=max_segs,
+                       log_dir=prefs_log_dir)
     proc = Process(target=f, daemon=True)
     proc.start()
-    return proc
+    return pi, proc
 
 
 def start_rew_pred_training(cluster_dict, make_reward_predictor, just_pretrain,
@@ -339,14 +340,14 @@ def start_rew_pred_training(cluster_dict, make_reward_predictor, just_pretrain,
 
 
 def start_episode_renderer():
-    def episode_vid_proc():
-        vid_proc(episode_vid_queue,
-                 playback_speed=2,
-                 zoom_factor=2,
-                 mode='play_through')
+    def f():
+        VideoRenderer(
+            episode_vid_queue,
+            playback_speed=2,
+            zoom_factor=2,
+            mode='play_through')
     episode_vid_queue = Queue()
-    proc = Process(target=episode_vid_proc, args=(episode_vid_queue, ),
-                   daemon=True).start()
+    proc = Process(target=f, daemon=True).start()
     return episode_vid_queue, proc
 
 
