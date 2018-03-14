@@ -1,5 +1,4 @@
 import logging
-import os
 import os.path as osp
 import time
 
@@ -47,7 +46,8 @@ def conv_layer(x, filters, kernel_size, strides, batchnorm, training, name,
 
     if batchnorm:
         batchnorm_name = name + "_batchnorm"
-        x = tf.layers.batch_normalization(x, training=training, reuse=reuse, name=batchnorm_name)
+        x = tf.layers.batch_normalization(
+            x, training=training, reuse=reuse, name=batchnorm_name)
 
     if activation == 'relu':
         x = tf.nn.leaky_relu(x, alpha=0.01)
@@ -119,9 +119,10 @@ def net_conv(s, batchnorm, dropout, training, reuse):
     x = s / 255.0
 
     x = conv_layer(x, 16, 7, 3, batchnorm, training, "c1", reuse, 'relu')
-    # NB specifying seed is important because both legs of the network should dropout
-    # in the same way.
-    # TODO: this still isn't completely right; we should set noise_shape for same dropout on all steps
+    # NB specifying seed is important because both legs of the network should
+    # dropout in the same way.
+    # TODO: this still isn't completely right; we should set noise_shape for
+    # same dropout on all steps
     x = tf.layers.dropout(x, dropout, training=training, seed=0)
     x = conv_layer(x, 16, 5, 2, batchnorm, training, "c2", reuse, 'relu')
     x = tf.layers.dropout(x, dropout, training=training, seed=1)
@@ -178,8 +179,7 @@ class RewardPredictorEnsemble:
         graph = tf.Graph()
 
         cluster = tf.train.ClusterSpec(cluster_dict)
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
+        config = tf.ConfigProto(gpu_options={'allow_growth': True})
         server = tf.train.Server(cluster, job_name=name, config=config)
         sess = tf.Session(server.target, graph)
 
@@ -203,7 +203,10 @@ class RewardPredictorEnsemble:
                 with tf.device(device_setter):
                     with tf.variable_scope("pred_%d" % i):
                         rp = RewardPredictor(
-                            network=network, dropout=dropout, batchnorm=batchnorm, lr=lr)
+                            network=network,
+                            dropout=dropout,
+                            batchnorm=batchnorm,
+                            lr=lr)
                 reward_ops.append(rp.r1)
                 pred_ops.append(rp.pred)
                 train_ops.append(rp.train)
@@ -253,18 +256,12 @@ class RewardPredictorEnsemble:
         misc_logs_dir = osp.join(log_dir, 'reward_pred', 'misc')
         easy_tf_log.set_dir(misc_logs_dir)
 
-    def wait_for_init(self):
-        while self.sess.run(tf.report_uninitialized_variables()).any():
-            print("{} waiting for variable initialization...".format(self.name))
-            time.sleep(1.0)
-
     def init_network(self, ckpt_path=None):
         if ckpt_path:
             self.saver.restore(self.sess, ckpt_path)
             print("Loaded reward predictor checkpoint from", ckpt_path)
         else:
             self.sess.run(self.init_op)
-
 
     def raw_rewards(self, obs):
         """
@@ -380,7 +377,7 @@ class RewardPredictorEnsemble:
 
         start_steps = self.n_steps
         start_time = time.time()
-        for batch_n, batch in enumerate(
+        for _, batch in enumerate(
                 batch_iter(prefs_train.prefs, batch_size=32, shuffle=True)):
             # TODO: refactor this so that each can be taken directly from
             # pref_db
@@ -464,10 +461,20 @@ class RewardPredictor:
         s1_unrolled = tf.reshape(s1, [-1, 84, 84, 4], name='a')
         s2_unrolled = tf.reshape(s2, [-1, 84, 84, 4], name='b')
 
-        _r1 = reward_pred_net(network,
-            s1_unrolled, dropout, batchnorm, reuse=None, training=training)
-        _r2 = reward_pred_net(network,
-            s2_unrolled, dropout, batchnorm, reuse=True, training=training)
+        _r1 = reward_pred_net(
+            network,
+            s1_unrolled,
+            dropout,
+            batchnorm,
+            reuse=None,
+            training=training)
+        _r2 = reward_pred_net(
+            network,
+            s2_unrolled,
+            dropout,
+            batchnorm,
+            reuse=True,
+            training=training)
 
         # Shape should be 'unrolled batch size'
         # where 'unrolled batch size' is 'batch size' x 'n frames per segment'
