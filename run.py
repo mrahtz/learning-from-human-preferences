@@ -2,16 +2,14 @@
 
 import logging
 import os
+from os import path as osp
 import queue
-import sys
 import time
 from multiprocessing import Process, Queue
-from os import path as osp
 
 import easy_tf_log
 import gym
 import gym_moving_dot
-import memory_profiler
 import numpy as np
 
 from openai_baselines import logger
@@ -24,7 +22,7 @@ from params import parse_args
 from pref_db import PrefDB
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble
-from utils import get_port_range, profile_memory, VideoRenderer
+from utils import VideoRenderer, get_port_range, profile_memory
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
 
