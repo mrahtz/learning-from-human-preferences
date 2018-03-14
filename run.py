@@ -23,6 +23,7 @@ from pref_db import PrefDB
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble
 from utils import VideoRenderer, get_port_range, profile_memory
+import sys
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
 
@@ -53,13 +54,13 @@ def run(general_params, a2c_params, pref_interface_params,
 
     def make_reward_predictor(name, cluster_dict):
         return RewardPredictorEnsemble(
-            name=name,
+            cluster_job_name=name,
             cluster_dict=cluster_dict,
             log_dir=general_params['log_dir'],
             batchnorm=rew_pred_training_params['batchnorm'],
             dropout=rew_pred_training_params['dropout'],
             lr=rew_pred_training_params['lr'],
-            network=rew_pred_training_params['network'])
+            network_type=rew_pred_training_params['network'])
 
     if general_params['mode'] == 'gather_initial_prefs':
         env, a2c_proc = start_policy_training(
@@ -226,8 +227,9 @@ def get_initial_prefs(pref_pipe, n_initial_prefs, max_prefs):
 
 def start_parameter_server(cluster_dict, make_reward_predictor):
     def f():
-        rew_pred = make_reward_predictor('ps', cluster_dict)
-        rew_pred.server.join()
+        make_reward_predictor('ps', cluster_dict)
+        while True:
+            time.sleep(1.0)
     proc = Process(target=f, daemon=True)
     proc.start()
     return proc

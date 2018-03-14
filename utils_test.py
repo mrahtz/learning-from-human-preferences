@@ -3,9 +3,10 @@
 import socket
 import unittest
 
+import numpy
 import numpy as np
 
-from utils import RunningStat, get_port_range
+from utils import RunningStat, get_port_range, batch_iter
 from pref_db import PrefDB
 
 
@@ -125,6 +126,25 @@ class TestUtils(unittest.TestCase):
         s2.close()
         s1.close()
 
+    def test_batch_iter(self):
+        l1 = list(range(16))
+        l2 = list(range(15))
+
+        for l in [l1, l2]:
+            expected = l
+            actual = []
+            for x in batch_iter(l, batch_size=4, shuffle=False):
+                actual.extend(x)
+            np.testing.assert_array_equal(actual, expected)
+
+            expected = l
+            actual = []
+            for x in batch_iter(l, batch_size=4, shuffle=True):
+                actual.extend(x)
+            actual = np.sort(actual)
+            np.testing.assert_array_equal(actual, expected)
+
 
 if __name__ == '__main__':
     unittest.main()
+

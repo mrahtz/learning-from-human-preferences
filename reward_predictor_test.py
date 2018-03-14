@@ -6,12 +6,9 @@ from numpy import exp, log
 from numpy.testing import (assert_allclose, assert_approx_equal,
                            assert_array_equal, assert_raises)
 
-import gym
-import gym_moving_dot  # noqa: F401 (imported but unused)
-import params
 import tensorflow as tf
-from openai_baselines.common.atari_wrappers import wrap_deepmind_nomax
-from reward_predictor import RewardPredictor, batch_iter, get_position
+from reward_predictor import RewardPredictorNetwork
+import termcolor
 
 
 def update_obs(obs, raw_obs, nc):
@@ -24,28 +21,10 @@ class TestRewardPredictor(unittest.TestCase):
     def setUp(self):
         tf.reset_default_graph()
         self.sess = tf.Session()
-        self.rpn = RewardPredictor(batchnorm=True, dropout=0.5, lr=1e-3, network='cnn')
+        self.rpn = RewardPredictorNetwork(batchnorm=True, dropout=0.5, lr=1e-3, network_type='cnn')
         self.sess.run(tf.global_variables_initializer())
 
-        print("\n#", self._testMethodName)
-
-    def test_batch_iter(self):
-        l1 = list(range(16))
-        l2 = list(range(15))
-
-        for l in [l1, l2]:
-            expected = l
-            actual = []
-            for x in batch_iter(l, batch_size=4, shuffle=False):
-                actual.extend(x)
-            np.testing.assert_array_equal(actual, expected)
-
-            expected = l
-            actual = []
-            for x in batch_iter(l, batch_size=4, shuffle=True):
-                actual.extend(x)
-            actual = np.sort(actual)
-            np.testing.assert_array_equal(actual, expected)
+        termcolor.cprint(self._testMethodName, 'red')
 
     def test_weight_sharing(self):
         """
@@ -77,7 +56,7 @@ class TestRewardPredictor(unittest.TestCase):
         n_frames = 20
         s1 = 255 * np.random.normal(loc=1.0, size=(n_frames, 84, 84, 4))
         s2 = 255 * np.random.normal(loc=-1.0, size=(n_frames, 84, 84, 4))
-        feed_dict = {self.rpn.s1: [s1], self.rpn.s2: [s2], self.rpn.mu: [[0.0, 1.0]], self.rpn.training: True}
+        feed_dict = {self.rpn.s1: [s1], self.rpn.s2: [s2], self.rpn.pref: [[0.0, 1.0]], self.rpn.training: True}
         self.sess.run(self.rpn.train, feed_dict)
 
         feed_dict = {self.rpn.s1: [s1], self.rpn.s2: [s1], self.rpn.training: False}
@@ -107,7 +86,7 @@ class TestRewardPredictor(unittest.TestCase):
 
         mus = [[0.0, 1.0], [1.0, 0.0], [0.5, 0.5]]
         for mu in mus:
-            feed_dict[self.rpn.mu] = [mu]
+            feed_dict[self.rpn.pref] = [mu]
             [rs1], [rs2], loss = self.sess.run(
                 [self.rpn.rs1, self.rpn.rs2, self.rpn.loss], feed_dict)
 
@@ -137,7 +116,7 @@ class TestRewardPredictor(unittest.TestCase):
         feed_dict = {
             self.rpn.s1: s1s,
             self.rpn.s2: s2s,
-            self.rpn.mu: mus,
+            self.rpn.pref: mus,
             self.rpn.training: False
         }
         rs1_batch, rs2_batch, pred_batch, loss_batch = self.sess.run(
@@ -153,7 +132,7 @@ class TestRewardPredictor(unittest.TestCase):
             feed_dict = {
                 self.rpn.s1: [s1s[i]],
                 self.rpn.s2: [s2s[i]],
-                self.rpn.mu: [mus[i]],
+                self.rpn.pref: [mus[i]],
                 self.rpn.training: False
             }
             [rs1], [rs2], [pred], loss = self.sess.run(
@@ -191,7 +170,7 @@ class TestRewardPredictor(unittest.TestCase):
         mus = [[1.0, 0.0], [0.0, 1.0], [0.5, 0.5]]
         for mu in mus:
             print("Preference", mu)
-            feed_dict[self.rpn.mu] = [mu]
+            feed_dict[self.rpn.pref] = [mu]
             feed_dict[self.rpn.training] = True
             # Important to reset batch normalization statistics
             self.sess.run(tf.global_variables_initializer())
@@ -231,7 +210,7 @@ class TestRewardPredictor(unittest.TestCase):
         feed_dict = {
             self.rpn.s1: s1s,
             self.rpn.s2: s2s,
-            self.rpn.mu: mus,
+            self.rpn.pref: mus,
             self.rpn.training: True
         }
 
@@ -262,7 +241,7 @@ class TestRewardPredictor(unittest.TestCase):
         feed_dict = {
             self.rpn.s1: s1s,
             self.rpn.s2: s2s,
-            self.rpn.mu: mus,
+            self.rpn.pref: mus,
             self.rpn.training: True
         }
 

@@ -7,6 +7,7 @@ from multiprocessing import Process
 import memory_profiler
 import numpy as np
 import pyglet
+import tensorflow as tf
 
 from scipy.ndimage import zoom
 
@@ -189,6 +190,7 @@ def get_port_range(start_port, n_ports, random_stagger=False):
 
     return ports
 
+
 def profile_memory(log_path, pid):
     def profile():
         with open(log_path, 'w') as f:
@@ -202,3 +204,38 @@ def profile_memory(log_path, pid):
     p = Process(target=profile, daemon=True)
     p.start()
     return p
+
+
+def batch_iter(data, batch_size, shuffle=False):
+    idxs = list(range(len(data)))
+    if shuffle:
+        # Yes, this really does shuffle in-place
+        np.random.shuffle(idxs)
+
+    start_idx = 0
+    end_idx = 0
+    while end_idx < len(data):
+        end_idx = start_idx + batch_size
+        if end_idx > len(data):
+            end_idx = len(data)
+
+        batch_idxs = idxs[start_idx:end_idx]
+        batch = []
+        for idx in batch_idxs:
+            batch.append(data[idx])
+
+        yield batch
+        start_idx += batch_size
+
+
+def get_dot_position(s):
+    # s is (?, 84, 84, 4)
+    s = s[..., -1]  # select last frame; now (?, 84, 84)
+
+    x = tf.reduce_sum(s, axis=1)  # now (?, 84)
+    x = tf.argmax(x, axis=1)
+
+    y = tf.reduce_sum(s, axis=2)
+    y = tf.argmax(y, axis=1)
+
+    return x, y
