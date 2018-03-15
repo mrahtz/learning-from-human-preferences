@@ -189,19 +189,3 @@ def wrap_deepmind(env, episode_life=True, clip_rewards=True):
     if clip_rewards:
         env = ClipRewardEnv(env)
     return env
-
-def wrap_deepmind_nomax(env, episode_life=True, clip_rewards=True):
-    """Configure environment for DeepMind-style Atari.
-
-    Note: this does not include frame stacking!"""
-    assert 'NoFrameskip' in env.spec.id  # required for DeepMind-style skip
-    if episode_life:
-        env = EpisodicLifeEnv(env)
-    env = NoopResetEnv(env, noop_max=30)
-    env = SkipEnv(env, skip=4)
-    if 'FIRE' in env.unwrapped.get_action_meanings():
-        env = FireResetEnv(env)
-    env = WarpFrame(env)
-    if clip_rewards:
-        env = ClipRewardEnv(env)
-    return env

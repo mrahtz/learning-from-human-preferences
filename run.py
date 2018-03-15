@@ -17,7 +17,7 @@ from openai_baselines import logger
 from openai_baselines.a2c.a2c import learn
 from openai_baselines.a2c.policies import CnnPolicy, MlpPolicy
 from openai_baselines.common import set_global_seeds
-from openai_baselines.common.atari_wrappers import wrap_deepmind_nomax
+from openai_baselines.common.atari_wrappers import wrap_deepmind
 from openai_baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from params import parse_args
 from pref_db import PrefDB
@@ -41,7 +41,9 @@ def main():
         rew_pred_training_params)
 
 
-def run(general_params, a2c_params, pref_interface_params,
+def run(general_params,
+        a2c_params,
+        pref_interface_params,
         rew_pred_training_params):
     seg_pipe = Queue(maxsize=100)
     pref_pipe = Queue(maxsize=100)
@@ -62,11 +64,8 @@ def run(general_params, a2c_params, pref_interface_params,
             lr=rew_pred_training_params['lr'],
             network_type=rew_pred_training_params['network'])
 
-    save_dir = osp.join(general_params['log_dir'],
-                        'reward_predictor_checkpoints')
-    os.makedirs(save_dir)
-    with open(osp.join(save_dir, 'make_reward_predictor.pkl'), 'wb') as fh:
-        fh.write(cloudpickle.dumps(make_reward_predictor))
+    save_make_reward_predictor(general_params['log_dir'],
+                               make_reward_predictor)
 
     if general_params['mode'] == 'gather_initial_prefs':
         env, a2c_proc = start_policy_training(
@@ -100,7 +99,7 @@ def run(general_params, a2c_params, pref_interface_params,
     elif general_params['mode'] == 'pretrain_reward_predictor':
         cluster_dict = create_cluster_dict(['ps', 'train'])
         ps_proc = start_parameter_server(cluster_dict, make_reward_predictor)
-        rpt_proc = start_rew_pred_training(
+        rpt_proc = start_reward_predictor_training(
             cluster_dict=cluster_dict,
             make_reward_predictor=make_reward_predictor,
             just_pretrain=True,
@@ -149,7 +148,7 @@ def run(general_params, a2c_params, pref_interface_params,
             **pref_interface_params)
         m2 = profile_memory(general_params['log_dir'] + '/mem_pi.log',
                             pi_proc.pid)
-        rpt_proc = start_rew_pred_training(
+        rpt_proc = start_reward_predictor_training(
             cluster_dict=cluster_dict,
             make_reward_predictor=make_reward_predictor,
             just_pretrain=False,
@@ -181,9 +180,17 @@ def run(general_params, a2c_params, pref_interface_params,
         episode_renderer.stop()
 
 
+def save_make_reward_predictor(log_dir, make_reward_predictor):
+    save_dir = osp.join(log_dir, 'reward_predictor_checkpoints')
+    os.makedirs(save_dir, exist_ok=True)
+    with open(osp.join(save_dir, 'make_reward_predictor.pkl'), 'wb') as fh:
+        fh.write(cloudpickle.dumps(make_reward_predictor))
+
+
 def create_cluster_dict(jobs):
+    n_ports = len(jobs) + 1
     ports = get_port_range(start_port=2200,
-                           n_ports=len(jobs) + 1,
+                           n_ports=n_ports,
                            random_stagger=True)
     cluster_dict = {}
     for part, port in zip(jobs, ports):
@@ -211,7 +218,7 @@ def make_envs(env_id, n_envs, seed):
                 pass
 
             gym.logger.setLevel(logging.WARN)
-            return wrap_deepmind_nomax(env)
+            return wrap_deepmind(env)
 
         return _thunk
 
@@ -248,10 +255,10 @@ def start_parameter_server(cluster_dict, make_reward_predictor):
 def start_policy_training(cluster_dict, make_reward_predictor, gen_segments,
                           start_policy_training_pipe, seg_pipe,
                           episode_vid_queue, log_dir, a2c_params):
-    if a2c_params['env_id'] == 'MovingDotNoFrameskip-v0':
+    env_id = a2c_params['env_id']
+    if env_id == 'MovingDotNoFrameskip-v0' or env_id == 'MovingDot-v0':
         policy_fn = MlpPolicy
-    elif (a2c_params['env_id'] == 'PongNoFrameskip-v4' or
-          a2c_params['env_id'] == 'EnduroNoFrameskip-v4'):
+    elif env_id == 'PongNoFrameskip-v4' or env_id == 'EnduroNoFrameskip-v4':
         policy_fn = CnnPolicy
     else:
         msg = "Unsure about policy network architecture for {}".format(
@@ -271,9 +278,9 @@ def start_policy_training(cluster_dict, make_reward_predictor, gen_segments,
 
     def f():
         if make_reward_predictor:
-            rew_pred = make_reward_predictor('a2c', cluster_dict)
+            reward_predictor = make_reward_predictor('a2c', cluster_dict)
         else:
-            rew_pred = None
+            reward_predictor = None
         misc_logs_dir = osp.join(log_dir, 'a2c_misc')
         easy_tf_log.set_dir(misc_logs_dir)
         learn(
@@ -282,7 +289,7 @@ def start_policy_training(cluster_dict, make_reward_predictor, gen_segments,
             seg_pipe=seg_pipe,
             start_policy_training_pipe=start_policy_training_pipe,
             episode_vid_queue=episode_vid_queue,
-            reward_predictor=rew_pred,
+            reward_predictor=reward_predictor,
             ckpt_dir=ckpt_dir,
             gen_segments=gen_segments,
             **a2c_params)
@@ -311,10 +318,18 @@ def start_pref_interface(seg_pipe, pref_pipe, max_segs, synthetic_prefs,
     return pi, proc
 
 
-def start_rew_pred_training(cluster_dict, make_reward_predictor, just_pretrain,
-                            pref_pipe, start_policy_training_pipe, max_prefs,
-                            n_initial_prefs, n_initial_epochs, prefs_dir,
-                            load_ckpt_path, val_interval, ckpt_interval):
+def start_reward_predictor_training(cluster_dict,
+                                    make_reward_predictor,
+                                    just_pretrain,
+                                    pref_pipe,
+                                    start_policy_training_pipe,
+                                    max_prefs,
+                                    n_initial_prefs,
+                                    n_initial_epochs,
+                                    prefs_dir,
+                                    load_ckpt_path,
+                                    val_interval,
+                                    ckpt_interval):
     def f():
         rew_pred = make_reward_predictor('train', cluster_dict)
         rew_pred.init_network(load_ckpt_path)

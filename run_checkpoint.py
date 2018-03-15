@@ -18,7 +18,7 @@ import tensorflow as tf
 from matplotlib.ticker import FormatStrFormatter
 
 from enduro_wrapper import EnduroWrapper
-from openai_baselines.common.atari_wrappers import wrap_deepmind_nomax
+from openai_baselines.common.atari_wrappers import wrap_deepmind
 
 
 def main():
@@ -99,7 +99,7 @@ def get_env(env_id):
         env = EnduroWrapper(env)
     elif env_id == 'MovingDot-v0' or env_id == 'MovingDotNoFrameskip-v0':
         pass
-    env = wrap_deepmind_nomax(env)
+    env = wrap_deepmind(env)
     return env
 
 
