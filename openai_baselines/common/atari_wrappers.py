@@ -112,25 +112,6 @@ class MaxAndSkipEnv(gym.Wrapper):
         self._obs_buffer.append(obs)
         return obs
 
-class SkipEnv(gym.Wrapper):
-    def __init__(self, env, skip=4):
-        """Return only every `skip`-th frame"""
-        gym.Wrapper.__init__(self, env)
-        self._skip       = skip
-
-    def _step(self, action):
-        """Repeat action, sum reward, and max over last observations."""
-        total_reward = 0.0
-        done = None
-        for _ in range(self._skip):
-            obs, reward, done, info = self.env.step(action)
-            total_reward += reward
-            if done:
-                break
-
-        return obs, total_reward, done, info
-
-
 class ClipRewardEnv(gym.RewardWrapper):
     def _reward(self, reward):
         """Bin reward to {+1, 0, -1} by its sign."""
