@@ -7,7 +7,7 @@ import numpy as np
 from numpy.testing import assert_equal
 import tensorflow as tf
 
-from reward_predictor_networks import reward_pred_net
+from reward_predictor_core_network import reward_pred_net
 from utils import RunningStat, batch_iter
 
 

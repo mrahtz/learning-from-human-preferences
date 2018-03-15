@@ -1,3 +1,8 @@
+"""
+Core network which predicts rewards from frames,
+for gym-moving-dot and Atari games.
+"""
+
 import tensorflow as tf
 
 from nn_layers import dense_layer, conv_layer
@@ -25,19 +30,19 @@ def net_moving_dot_features(s, reuse):
 
 
 def net_cnn(s, batchnorm, dropout, training, reuse):
-    # Page 15:
+    x = s / 255.0
+    # Page 15: (Atari)
     # "[The] input is fed through 4 convolutional layers of size 7x7, 5x5, 3x3,
     # and 3x3 with strides 3, 2, 1, 1, each having 16 filters, with leaky ReLU
     # nonlinearities (α = 0.01). This is followed by a fully connected layer of
     # size 64 and then a scalar output. All convolutional layers use batch norm
     # and dropout with α = 0.5 to prevent predictor overfitting"
-    x = s / 255.0
-
     x = conv_layer(x, 16, 7, 3, batchnorm, training, "c1", reuse, 'relu')
-    # NB specifying seed is important because both legs of the network should
-    # dropout in the same way.
-    # TODO: this still isn't completely right; we should set noise_shape for
-    # same dropout on all steps
+    # I /think/ that both legs of the network should dropout in the same way
+    # (though I struggle to strongly justify the intuition.)
+    # We therefore set the dropout seeds explicitly.
+    # (But TODO: should we also set noise_shape?
+    #  So that the same dropout mask is used for all steps in each segment?)
     x = tf.layers.dropout(x, dropout, training=training, seed=0)
     x = conv_layer(x, 16, 5, 2, batchnorm, training, "c2", reuse, 'relu')
     x = tf.layers.dropout(x, dropout, training=training, seed=1)
