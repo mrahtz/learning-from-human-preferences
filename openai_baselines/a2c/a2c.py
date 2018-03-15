@@ -142,9 +142,7 @@ class Runner(object):
         self.seg_pipe = seg_pipe
         self.reward_predictor = reward_predictor
         self.episode_vid_queue = episode_vid_queue
-
         self.orig_reward = [0 for _ in range(nenv)]
-        self.sess = tf.Session()
         self.gen_segments = gen_segments
 
     def update_obs(self, obs):
