@@ -357,7 +357,7 @@ def start_episode_renderer():
         VideoRenderer(
             episode_vid_queue,
             playback_speed=2,
-            zoom_factor=2,
+            zoom=2,
             mode='play_through')
     episode_vid_queue = Queue()
     proc = Process(target=f, daemon=True).start()

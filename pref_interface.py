@@ -22,7 +22,7 @@ class PrefInterface:
     def __init__(self, synthetic_prefs, max_segs, log_dir):
         self.vid_q = Queue()
         if not synthetic_prefs:
-            self.renderer = VideoRenderer(vid_queue=self.vid_q, zoom_factor=4)
+            self.renderer = VideoRenderer(vid_queue=self.vid_q, zoom=4)
         else:
             self.renderer = None
         self.synthetic_prefs = synthetic_prefs
