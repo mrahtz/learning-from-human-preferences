@@ -162,7 +162,13 @@ class Runner(object):
         assert_equal(e0_dones.shape, (self.nsteps, ))
 
         for step in range(self.nsteps):
-            if len(self.segment) == 25:
+            self.segment.append(np.copy(e0_obs[step]), np.copy(e0_rew[step]))
+            if len(self.segment) == 25 or e0_dones[step]:
+                while len(self.segment) < 25:
+                    # Pad to 25 steps long so that all segments in the batch
+                    # have the same length.
+                    # TODO only append the last frame
+                    self.segment.append(e0_obs[step], 0)
                 self.segment.finalise()
                 try:
                     self.seg_pipe.put(self.segment, block=False)
@@ -172,14 +178,6 @@ class Runner(object):
                     # the segment and keep on going.
                     pass
                 self.segment = Segment()
-                continue
-            elif e0_dones[step]:
-                # The last segment will probably not be 25 steps long;
-                # drop it, so that all segments in the batch are the same
-                # length
-                self.segment = Segment()
-                continue
-            self.segment.append(np.copy(e0_obs[step]), np.copy(e0_rew[step]))
 
     def update_episode_frame_buffer(self, mb_obs, mb_dones):
         e0_obs = mb_obs[0]
