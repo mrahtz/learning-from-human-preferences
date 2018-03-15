@@ -1,20 +1,14 @@
 #!/usr/bin/env python3
 import unittest
 
+import tensorflow as tf
+import termcolor
 import numpy as np
 from numpy import exp, log
 from numpy.testing import (assert_allclose, assert_approx_equal,
                            assert_array_equal, assert_raises)
 
-import tensorflow as tf
 from reward_predictor import RewardPredictorNetwork
-import termcolor
-
-
-def update_obs(obs, raw_obs, nc):
-    obs = np.roll(obs, shift=-nc, axis=3)
-    obs[:, :, :, -nc:] = raw_obs
-    return obs
 
 
 class TestRewardPredictor(unittest.TestCase):
@@ -28,8 +22,8 @@ class TestRewardPredictor(unittest.TestCase):
 
     def test_weight_sharing(self):
         """
-        Input a trajectory, and test that both networks give the same
-        reward output.
+        Check that both legs of the network give the same reward output
+        for the same segment input.
         """
         s = 255 * np.random.rand(100, 84, 84, 4)
         feed_dict_nontraining = {
@@ -51,12 +45,17 @@ class TestRewardPredictor(unittest.TestCase):
 
     def test_batchnorm_sharing(self):
         """
-        Check that batchnorm statistics are the same between the two networks.
+        Check that batchnorm statistics are the same between the two legs of
+        the network.
         """
         n_frames = 20
         s1 = 255 * np.random.normal(loc=1.0, size=(n_frames, 84, 84, 4))
         s2 = 255 * np.random.normal(loc=-1.0, size=(n_frames, 84, 84, 4))
-        feed_dict = {self.rpn.s1: [s1], self.rpn.s2: [s2], self.rpn.pref: [[0.0, 1.0]], self.rpn.training: True}
+        feed_dict = {
+            self.rpn.s1: [s1],
+            self.rpn.s2: [s2],
+            self.rpn.pref: [[0.0, 1.0]],
+            self.rpn.training: True}
         self.sess.run(self.rpn.train, feed_dict)
 
         feed_dict = {self.rpn.s1: [s1], self.rpn.s2: [s1], self.rpn.training: False}
@@ -67,8 +66,7 @@ class TestRewardPredictor(unittest.TestCase):
 
     def test_loss(self):
         """
-        Input two trajectories, and check that the loss is calculated
-        correctly.
+        Check that the loss is calculated correctly.
         """
         # hack to ensure numerical stability
         rs1 = rs2 = 100
@@ -84,16 +82,16 @@ class TestRewardPredictor(unittest.TestCase):
             [rs1], [rs2] = self.sess.run([self.rpn.rs1, self.rpn.rs2],
                                          feed_dict)
 
-        mus = [[0.0, 1.0], [1.0, 0.0], [0.5, 0.5]]
-        for mu in mus:
-            feed_dict[self.rpn.pref] = [mu]
+        prefs = [[0.0, 1.0], [1.0, 0.0], [0.5, 0.5]]
+        for pref in prefs:
+            feed_dict[self.rpn.pref] = [pref]
             [rs1], [rs2], loss = self.sess.run(
                 [self.rpn.rs1, self.rpn.rs2, self.rpn.loss], feed_dict)
 
             p_s1_s2 = exp(rs1) / (exp(rs1) + exp(rs2))
             p_s2_s1 = exp(rs2) / (exp(rs1) + exp(rs2))
 
-            expected = -(mu[0] * log(p_s1_s2) + mu[1] * log(p_s2_s1))
+            expected = -(pref[0] * log(p_s1_s2) + pref[1] * log(p_s2_s1))
             assert_approx_equal(loss, expected, significant=3)
 
     def test_batches(self):
@@ -103,7 +101,7 @@ class TestRewardPredictor(unittest.TestCase):
         """
         n_segs = 2
         n_frames = 20
-        mus = [[0., 1.], [1., 0.]]
+        prefs = [[0., 1.], [1., 0.]]
         s1s = []
         s2s = []
         for _ in range(n_segs):
@@ -116,7 +114,7 @@ class TestRewardPredictor(unittest.TestCase):
         feed_dict = {
             self.rpn.s1: s1s,
             self.rpn.s2: s2s,
-            self.rpn.pref: mus,
+            self.rpn.pref: prefs,
             self.rpn.training: False
         }
         rs1_batch, rs2_batch, pred_batch, loss_batch = self.sess.run(
@@ -132,7 +130,7 @@ class TestRewardPredictor(unittest.TestCase):
             feed_dict = {
                 self.rpn.s1: [s1s[i]],
                 self.rpn.s2: [s2s[i]],
-                self.rpn.pref: [mus[i]],
+                self.rpn.pref: [prefs[i]],
                 self.rpn.training: False
             }
             [rs1], [rs2], [pred], loss = self.sess.run(
@@ -167,13 +165,13 @@ class TestRewardPredictor(unittest.TestCase):
             self.rpn.s2: [s2]
         }
 
-        mus = [[0.0, 1.0], [1.0, 0.0], [0.5, 0.5]]
-        for mu in mus:
-            print("Preference", mu)
-            feed_dict[self.rpn.pref] = [mu]
+        prefs = [[0.0, 1.0], [1.0, 0.0], [0.5, 0.5]]
+        for pref in prefs:
+            print("Preference", pref)
+            feed_dict[self.rpn.pref] = [pref]
             # Important to reset batch normalization statistics
             self.sess.run(tf.global_variables_initializer())
-            for i in range(150):
+            for _ in range(150):
                 feed_dict[self.rpn.training] = True
                 self.sess.run(self.rpn.train, feed_dict)
                 # Uncomment these for more thorough manual testing.
@@ -193,11 +191,11 @@ class TestRewardPredictor(unittest.TestCase):
             feed_dict[self.rpn.training] = False
             [rs1], [rs2] = self.sess.run([self.rpn.rs1, self.rpn.rs2], feed_dict)
 
-            if mu[0] > mu[1]:
+            if pref[0] > pref[1]:
                 self.assertGreater(rs1 - rs2, 10)
-            elif mu[1] > mu[0]:
+            elif pref[1] > pref[0]:
                 self.assertGreater(rs2 - rs1, 10)
-            elif mu[0] == mu[1]:
+            elif pref[0] == pref[1]:
                 self.assertLess(abs(rs2 - rs1), 2)
 
     def test_training_batches(self):
@@ -208,11 +206,11 @@ class TestRewardPredictor(unittest.TestCase):
         n_frames = 20
         s1s = 255 * np.random.normal(loc=1.0, size=(4, n_frames, 84, 84, 4))
         s2s = 255 * np.random.normal(loc=-1.0, size=(4, n_frames, 84, 84, 4))
-        mus = [[1.0, 0.0], [1.0, 0.0], [0.0, 1.0], [0.0, 1.0]]
+        prefs = [[1.0, 0.0], [1.0, 0.0], [0.0, 1.0], [0.0, 1.0]]
         feed_dict = {
             self.rpn.s1: s1s,
             self.rpn.s2: s2s,
-            self.rpn.pref: mus,
+            self.rpn.pref: prefs,
             self.rpn.training: True
         }
 
@@ -236,27 +234,27 @@ class TestRewardPredictor(unittest.TestCase):
         batch_n = 16
         s1s = 255 * np.random.normal(loc=1.0, size=(batch_n, n_frames, 84, 84, 4))
         s2s = 255 * np.random.normal(loc=-1.0, size=(batch_n, n_frames, 84, 84, 4))
-        possible_mus = [[1.0, 0.0], [0.0, 1.0]]
-        possible_mus = np.array(possible_mus)
-        mus = possible_mus[np.random.choice([0, 1], size=batch_n)]
+        possible_prefs = [[1.0, 0.0], [0.0, 1.0]]
+        possible_prefs = np.array(possible_prefs)
+        prefs = possible_prefs[np.random.choice([0, 1], size=batch_n)]
 
         feed_dict = {
             self.rpn.s1: s1s,
             self.rpn.s2: s2s,
-            self.rpn.pref: mus,
+            self.rpn.pref: prefs,
             self.rpn.training: True
         }
 
         # Steer away from chance performance
-        for i in range(5):
+        for _ in range(5):
             self.sess.run(self.rpn.train, feed_dict)
 
         feed_dict[self.rpn.training] = False
         preds = self.sess.run(self.rpn.pred, feed_dict)
         n_correct = 0
-        for mu, pred in zip(mus, preds):
-            if mu[0] == 1.0 and pred[0] > pred[1] or \
-               mu[1] == 1.0 and pred[1] > pred[0]:
+        for pref, pred in zip(prefs, preds):
+            if pref[0] == 1.0 and pred[0] > pred[1] or \
+               pref[1] == 1.0 and pred[1] > pred[0]:
                 n_correct += 1
         accuracy_expected = n_correct / batch_n
 
