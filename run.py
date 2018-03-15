@@ -208,14 +208,15 @@ def configure_a2c_logger(log_dir):
 def make_envs(env_id, n_envs, seed):
     def make_env(rank):
         def _thunk():
+            if env_id == 'MovingDot-v0' or env_id == 'MovingDotNoFrameskip-v0':
+                import gym_moving_dot
+
             env = gym.make(env_id)
             env.seed(seed + rank)
 
             if env_id == 'EnduroNoFrameskip-v4':
                 from enduro_wrapper import EnduroWrapper
                 env = EnduroWrapper(env)
-            elif env_id == 'MovingDot-v0' or env_id == 'MovingNoFrameskip-v0':
-                pass
 
             gym.logger.setLevel(logging.WARN)
             return wrap_deepmind(env)
