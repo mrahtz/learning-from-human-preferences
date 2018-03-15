@@ -167,17 +167,14 @@ class TestRewardPredictor(unittest.TestCase):
             self.rpn.s2: [s2]
         }
 
-        mus = [[1.0, 0.0], [0.0, 1.0], [0.5, 0.5]]
+        mus = [[0.0, 1.0], [1.0, 0.0], [0.5, 0.5]]
         for mu in mus:
             print("Preference", mu)
             feed_dict[self.rpn.pref] = [mu]
-            feed_dict[self.rpn.training] = True
             # Important to reset batch normalization statistics
             self.sess.run(tf.global_variables_initializer())
-            for i in range(50):
-                [rs1], [rs2], loss = self.sess.run(
-                    [self.rpn.rs1, self.rpn.rs2, self.rpn.loss],
-                    feed_dict)
+            for i in range(150):
+                feed_dict[self.rpn.training] = True
                 self.sess.run(self.rpn.train, feed_dict)
                 # Uncomment these for more thorough manual testing.
                 # (For the first case, rs1 should become higher
@@ -185,18 +182,23 @@ class TestRewardPredictor(unittest.TestCase):
                 #  for the second case, rs2 should become higher;
                 #  for the third case, they should become approximately the
                 #  same.)
-                #print(" ".join(3 * ["{:>8.3f}"]).format(rs1, rs2, loss))
-            #print()
+            """
+                feed_dict[self.rpn.training] = False
+                ops = [self.rpn.rs1, self.rpn.rs2, self.rpn.loss]
+                [rs1], [rs2], loss = self.sess.run(ops, feed_dict)
+                print(" ".join(3 * ["{:>8.3f}"]).format(rs1, rs2, loss))
+            print()
+            """
 
             feed_dict[self.rpn.training] = False
             [rs1], [rs2] = self.sess.run([self.rpn.rs1, self.rpn.rs2], feed_dict)
 
             if mu[0] > mu[1]:
-                self.assertGreater(rs1, rs2)
+                self.assertGreater(rs1 - rs2, 10)
             elif mu[1] > mu[0]:
-                self.assertGreater(rs2, rs1)
+                self.assertGreater(rs2 - rs1, 10)
             elif mu[0] == mu[1]:
-                self.assertLess(abs(rs2 - rs1), 0.5)
+                self.assertLess(abs(rs2 - rs1), 2)
 
     def test_training_batches(self):
         """
