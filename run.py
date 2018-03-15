@@ -2,16 +2,16 @@
 
 import logging
 import os
+from os import path as osp
 import queue
 import sys
 import time
 from multiprocessing import Process, Queue
-from os import path as osp
 
+import numpy as np
 import cloudpickle
 import easy_tf_log
 import gym
-import numpy as np
 
 from openai_baselines import logger
 from openai_baselines.a2c.a2c import learn
@@ -62,7 +62,8 @@ def run(general_params, a2c_params, pref_interface_params,
             lr=rew_pred_training_params['lr'],
             network_type=rew_pred_training_params['network'])
 
-    save_dir = osp.join(general_params['log_dir'], 'reward_predictor_checkpoints')
+    save_dir = osp.join(general_params['log_dir'],
+                        'reward_predictor_checkpoints')
     os.makedirs(save_dir)
     with open(osp.join(save_dir, 'make_reward_predictor.pkl'), 'wb') as fh:
         fh.write(cloudpickle.dumps(make_reward_predictor))
@@ -211,6 +212,7 @@ def make_envs(env_id, n_envs, seed):
 
             gym.logger.setLevel(logging.WARN)
             return wrap_deepmind_nomax(env)
+
         return _thunk
 
     set_global_seeds(seed)
@@ -237,30 +239,31 @@ def start_parameter_server(cluster_dict, make_reward_predictor):
         make_reward_predictor('ps', cluster_dict)
         while True:
             time.sleep(1.0)
+
     proc = Process(target=f, daemon=True)
     proc.start()
     return proc
 
 
-def start_policy_training(cluster_dict,
-                          make_reward_predictor,
-                          gen_segments,
-                          start_policy_training_pipe,
-                          seg_pipe,
-                          episode_vid_queue,
-                          log_dir,
-                          a2c_params):
+def start_policy_training(cluster_dict, make_reward_predictor, gen_segments,
+                          start_policy_training_pipe, seg_pipe,
+                          episode_vid_queue, log_dir, a2c_params):
     if a2c_params['env_id'] == 'MovingDotNoFrameskip-v0':
         policy_fn = MlpPolicy
-    elif a2c_params['env_id'] == 'PongNoFrameskip-v4' or a2c_params['env_id'] == 'EnduroNoFrameskip-v4':
+    elif (a2c_params['env_id'] == 'PongNoFrameskip-v4' or
+          a2c_params['env_id'] == 'EnduroNoFrameskip-v4'):
         policy_fn = CnnPolicy
     else:
-        raise Exception("Unsure about policy network architecture for {}".format(a2c_params['env_id']))
+        msg = "Unsure about policy network architecture for {}".format(
+            a2c_params['env_id'])
+        raise Exception(msg)
 
     configure_a2c_logger(log_dir)
 
     # Done here because daemonic processes can't have children
-    env = make_envs(a2c_params['env_id'], a2c_params['n_envs'], a2c_params['seed'])
+    env = make_envs(a2c_params['env_id'],
+                    a2c_params['n_envs'],
+                    a2c_params['seed'])
     del a2c_params['env_id'], a2c_params['n_envs']
 
     ckpt_dir = osp.join(log_dir, 'policy_checkpoints')
@@ -283,6 +286,7 @@ def start_policy_training(cluster_dict,
             ckpt_dir=ckpt_dir,
             gen_segments=gen_segments,
             **a2c_params)
+
     proc = Process(target=f, daemon=True)
     proc.start()
     return env, proc
@@ -296,9 +300,11 @@ def start_pref_interface(seg_pipe, pref_pipe, max_segs, synthetic_prefs,
         # so this is a bit of a hack, but it seems to be fine.
         sys.stdin = os.fdopen(0)
         pi.run(seg_pipe=seg_pipe, pref_pipe=pref_pipe)
+
     # Needs to be done in the main process because does GUI setup work
     prefs_log_dir = osp.join(log_dir, 'pref_interface')
-    pi = PrefInterface(synthetic_prefs=synthetic_prefs, max_segs=max_segs,
+    pi = PrefInterface(synthetic_prefs=synthetic_prefs,
+                       max_segs=max_segs,
                        log_dir=prefs_log_dir)
     proc = Process(target=f, daemon=True)
     proc.start()
@@ -341,6 +347,7 @@ def start_rew_pred_training(cluster_dict, make_reward_predictor, just_pretrain,
 
         start_policy_training_pipe.put(True)
 
+        i = 0
         while True:
             rew_pred.train(pref_db_train, pref_db_val, val_interval)
             if i and i % ckpt_interval == 0:
