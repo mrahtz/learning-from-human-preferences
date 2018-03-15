@@ -17,12 +17,6 @@ from pref_db import Segment
 import logging
 
 
-"""
-- states: model state (e.g. LSTM state)
-- masks: is only used for stateful models
-"""
-
-
 class Model(object):
     def __init__(self,
                  policy,
