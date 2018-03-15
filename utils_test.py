@@ -8,6 +8,7 @@ import numpy as np
 
 from utils import RunningStat, get_port_range, batch_iter
 from pref_db import PrefDB
+from math import ceil
 
 
 class TestUtils(unittest.TestCase):
@@ -126,23 +127,57 @@ class TestUtils(unittest.TestCase):
         s2.close()
         s1.close()
 
-    def test_batch_iter(self):
+    def test_batch_iter_1(self):
+        """
+        Check that batch_iter gives us exactly the right data back.
+        """
         l1 = list(range(16))
         l2 = list(range(15))
+        l3 = list(range(13))
+        for l in [l1, l2, l3]:
+            for shuffle in [True, False]:
+                expected_data = l
+                actual_data = set()
+                expected_n_batches = ceil(len(l) / 4)
+                actual_n_batches = 0
+                for batch_n, x in enumerate(batch_iter(l, batch_size=4, shuffle=shuffle)):
+                    if batch_n == expected_n_batches - 1 and len(l) % 4 != 0:
+                        self.assertEqual(len(x), len(l) % 4)
+                    else:
+                        self.assertEqual(len(x), 4)
+                    self.assertEqual(len(actual_data.intersection(set(x))), 0)
+                    actual_data = actual_data.union(set(x))
+                    actual_n_batches += 1
+                self.assertEqual(actual_n_batches, expected_n_batches)
+                np.testing.assert_array_equal(list(actual_data), expected_data)
 
-        for l in [l1, l2]:
-            expected = l
-            actual = []
-            for x in batch_iter(l, batch_size=4, shuffle=False):
-                actual.extend(x)
-            np.testing.assert_array_equal(actual, expected)
+    def test_batch_iter_2(self):
+        """
+        Check that shuffle=True returns the same data but in a different order.
+        """
+        expected_data = list(range(16))
+        actual_data = []
+        for x in batch_iter(expected_data, batch_size=4, shuffle=True):
+            actual_data.extend(x)
+        self.assertEqual(len(actual_data), len(expected_data))
+        self.assertEqual(set(actual_data), set(expected_data))
+        with self.assertRaises(AssertionError):
+            np.testing.assert_array_equal(actual_data, expected_data)
 
-            expected = l
-            actual = []
-            for x in batch_iter(l, batch_size=4, shuffle=True):
-                actual.extend(x)
-            actual = np.sort(actual)
-            np.testing.assert_array_equal(actual, expected)
+    def test_batch_iter_3(self):
+        """
+        Check that successive calls shuffle in a different order.
+        """
+        data = list(range(16))
+        out1 = []
+        for x in batch_iter(data, batch_size=4, shuffle=True):
+            out1.extend(x)
+        out2 = []
+        for x in batch_iter(data, batch_size=4, shuffle=True):
+            out2.extend(x)
+        self.assertEqual(set(out1), set(out2))
+        with self.assertRaises(AssertionError):
+            np.testing.assert_array_equal(out1, out2)
 
 
 if __name__ == '__main__':
