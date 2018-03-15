@@ -7,8 +7,6 @@ from multiprocessing import Process
 import memory_profiler
 import numpy as np
 import pyglet
-import tensorflow as tf
-
 from scipy.ndimage import zoom
 
 
@@ -55,6 +53,7 @@ class RunningStat(object):
         return self._M.shape
 
 
+# Based on SimpleImageViewer in OpenAI gym
 class Im(object):
     def __init__(self, display=None):
         self.window = None
@@ -69,11 +68,12 @@ class Im(object):
             self.width = width
             self.height = height
             self.isopen = True
-        assert arr.shape == (
-            self.height,
-            self.width), "You passed in an image with the wrong number shape"
-        image = pyglet.image.ImageData(
-            self.width, self.height, 'L', arr.tobytes(), pitch=-self.width)
+
+        assert arr.shape == (self.height, self.width), \
+            "You passed in an image with the wrong number shape"
+
+        image = pyglet.image.ImageData(self.width, self.height,
+                                       'L', arr.tobytes(), pitch=-self.width)
         self.window.clear()
         self.window.switch_to()
         self.window.dispatch_events()
@@ -89,25 +89,12 @@ class Im(object):
         self.close()
 
 
-def get_most_recent_item(q):
-    # Make sure we at least get something
-    item = q.get(block=True)
-    n_skipped = 0
-    while True:
-        try:
-            item = q.get(block=True, timeout=0.1)
-            n_skipped += 1
-        except queue.Empty:
-            break
-    return item, n_skipped
-
-
 class VideoRenderer:
-    pause_cmd = "pause"
+    play_through_mode = 0
+    restart_on_get_mode = 1
 
-    def __init__(self, vid_queue, zoom=1, playback_speed=1,
-                 mode='restart_on_get'):
-        assert mode == 'restart_on_get' or mode == 'play_through'
+    def __init__(self, vid_queue, mode, zoom=1, playback_speed=1):
+        assert mode == VideoRenderer.restart_on_get_mode or mode == VideoRenderer.play_through_mode
         self.mode = mode
         self.vid_queue = vid_queue
         self.zoom_factor = zoom
@@ -123,38 +110,46 @@ class VideoRenderer:
         frames = self.vid_queue.get(block=True)
         t = 0
         while True:
-            # Add a dot showing progress
+            # Add a grey dot on the last line showing position
             width = frames[t].shape[1]
             fraction_played = t / len(frames)
-            frames[t][-1][int(fraction_played * width)] = 255
+            x = int(fraction_played * width)
+            frames[t][-1][x] = 128
 
-            v.imshow(zoom(frames[t], self.zoom_factor))
+            zoomed_frame = zoom(frames[t], self.zoom_factor)
+            v.imshow(zoomed_frame)
 
-            if self.mode == 'play_through':
+            if self.mode == VideoRenderer.play_through_mode:
                 # Wait until having finished playing the current
                 # set of frames. Then, stop, and get the most
                 # recent set of frames.
                 t += self.playback_speed
                 if t >= len(frames):
-                    frames, n_skipped = get_most_recent_item(self.vid_queue)
+                    frames = self.get_queue_most_recent()
                     t = 0
                 else:
                     time.sleep(1/60)
-            elif self.mode == 'restart_on_get':
+            elif self.mode == VideoRenderer.restart_on_get_mode:
                 # Always try and get a new set of frames to show.
                 # If there is a new set of frames on the queue,
                 # restart playback with those frames immediately.
                 # Otherwise, just keep looping with the current frames.
                 try:
-                    item = self.vid_queue.get(block=False)
-                    if item == VideoRenderer.pause_cmd:
-                        frames = self.vid_queue.get(block=True)
-                    else:
-                        frames = item
+                    frames = self.vid_queue.get(block=False)
                     t = 0
                 except queue.Empty:
                     t = (t + self.playback_speed) % len(frames)
                     time.sleep(1/60)
+
+    def get_queue_most_recent(self):
+        # Make sure we at least get something
+        item = self.vid_queue.get(block=True)
+        while True:
+            try:
+                item = self.vid_queue.get(block=True, timeout=0.1)
+            except queue.Empty:
+                break
+        return item
 
 
 def get_port_range(start_port, n_ports, random_stagger=False):
@@ -194,7 +189,7 @@ def get_port_range(start_port, n_ports, random_stagger=False):
 def profile_memory(log_path, pid):
     def profile():
         with open(log_path, 'w') as f:
-            # timeout=99999 is necesary because for external processes,
+            # timeout=99999 is necessary because for external processes,
             # memory_usage otherwise defaults to only returning a single sample
             # Note that even with interval=1, because memory_profiler only
             # flushes every 50 lines, we still have to wait 50 seconds before
@@ -225,16 +220,3 @@ def batch_iter(data, batch_size, shuffle=False):
 
         yield batch
         start_idx += batch_size
-
-
-def get_dot_position(s):
-    # s is (?, 84, 84, 4)
-    s = s[..., -1]  # select last frame; now (?, 84, 84)
-
-    x = tf.reduce_sum(s, axis=1)  # now (?, 84)
-    x = tf.argmax(x, axis=1)
-
-    y = tf.reduce_sum(s, axis=2)
-    y = tf.argmax(y, axis=1)
-
-    return x, y

@@ -6,7 +6,22 @@ for gym-moving-dot and Atari games.
 import tensorflow as tf
 
 from nn_layers import dense_layer, conv_layer
-from utils import get_dot_position
+
+
+def get_dot_position(s):
+    """
+    Estimate the position of the dot in the gym-moving-dot environment.
+    """
+    # s is (?, 84, 84, 4)
+    s = s[..., -1]  # select last frame; now (?, 84, 84)
+
+    x = tf.reduce_sum(s, axis=1)  # now (?, 84)
+    x = tf.argmax(x, axis=1)
+
+    y = tf.reduce_sum(s, axis=2)
+    y = tf.argmax(y, axis=1)
+
+    return x, y
 
 
 def net_moving_dot_features(s, reuse):

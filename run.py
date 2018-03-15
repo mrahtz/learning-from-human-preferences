@@ -48,9 +48,9 @@ def run(general_params, a2c_params, pref_interface_params,
     start_policy_training_flag = Queue(maxsize=1)
 
     if general_params['render_episodes']:
-        episode_vid_queue, episode_renderer_proc = start_episode_renderer()
+        episode_vid_queue, episode_renderer = start_episode_renderer()
     else:
-        episode_vid_queue = episode_renderer_proc = None
+        episode_vid_queue = episode_renderer = None
 
     def make_reward_predictor(name, cluster_dict):
         return RewardPredictorEnsemble(
@@ -176,8 +176,8 @@ def run(general_params, a2c_params, pref_interface_params,
     else:
         raise Exception("Unknown mode: {}".format(general_params['mode']))
 
-    if episode_renderer_proc:
-        episode_renderer_proc.terminate()
+    if episode_renderer:
+        episode_renderer.stop()
 
 
 def create_cluster_dict(jobs):
@@ -353,15 +353,13 @@ def start_rew_pred_training(cluster_dict, make_reward_predictor, just_pretrain,
 
 
 def start_episode_renderer():
-    def f():
-        VideoRenderer(
-            episode_vid_queue,
-            playback_speed=2,
-            zoom=2,
-            mode='play_through')
     episode_vid_queue = Queue()
-    proc = Process(target=f, daemon=True).start()
-    return episode_vid_queue, proc
+    renderer = VideoRenderer(
+        episode_vid_queue,
+        playback_speed=2,
+        zoom=2,
+        mode=VideoRenderer.play_through_mode)
+    return episode_vid_queue, renderer
 
 
 def recv_prefs(pref_pipe, pref_db_train, pref_db_val, max_prefs):
