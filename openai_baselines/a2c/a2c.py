@@ -151,9 +151,9 @@ class Runner(object):
         self.obs = np.roll(self.obs, shift=-1, axis=3)
         self.obs[:, :, :, -1] = obs[:, :, :, 0]
 
-    def save_segments(self, mb_obs, mb_rewards, mb_dones):
-        # Only generate segments from the first environment
-        # TODO: is this the right choice...?
+    def update_segment_buffer(self, mb_obs, mb_rewards, mb_dones):
+        # Segments are only generated from the first worker.
+        # Empirically, this seems to work fine.
         e0_obs = mb_obs[0]
         e0_rew = mb_rewards[0]
         e0_dones = mb_dones[0]
@@ -181,10 +181,9 @@ class Runner(object):
                 continue
             self.segment.append(np.copy(e0_obs[step]), np.copy(e0_rew[step]))
 
-    def save_episode_frames(self, mb_obs, mb_dones):
+    def update_episode_frame_buffer(self, mb_obs, mb_dones):
         e0_obs = mb_obs[0]
         e0_dones = mb_dones[0]
-
         for step in range(self.nsteps):
             # Append the last frame (the most recent one) from the 4-frame
             # stack
@@ -251,11 +250,11 @@ class Runner(object):
 
         # Generate segments
         if self.gen_segments:
-            self.save_segments(mb_obs, mb_rewards, mb_dones)
+            self.update_segment_buffer(mb_obs, mb_rewards, mb_dones)
 
         # Save frames for episode rendering
         if self.episode_vid_queue is not None:
-            self.save_episode_frames(mb_obs, mb_dones)
+            self.update_episode_frame_buffer(mb_obs, mb_dones)
 
         # Replace rewards with those from reward predictor
         logging.debug("Original rewards:\n%s", mb_rewards)
