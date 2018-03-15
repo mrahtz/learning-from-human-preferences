@@ -316,7 +316,7 @@ def learn(policy,
           seed,
           seg_pipe,
           start_policy_training_pipe,
-          log_dir,
+          ckpt_dir,
           lr_scheduler,
           gen_segments,
           nsteps=5,
@@ -358,8 +358,6 @@ def learn(policy,
             alpha=alpha,
             epsilon=epsilon)
 
-    ckpt_dir = osp.join(log_dir, 'policy_checkpoints')
-    os.makedirs(ckpt_dir)
     with open(osp.join(ckpt_dir, 'make_model.pkl'), 'wb') as fh:
         fh.write(cloudpickle.dumps(make_model))
 

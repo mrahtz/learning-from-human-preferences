@@ -2,14 +2,15 @@
 
 import logging
 import os
-from os import path as osp
 import queue
+import sys
 import time
 from multiprocessing import Process, Queue
+from os import path as osp
 
+import cloudpickle
 import easy_tf_log
 import gym
-import gym_moving_dot
 import numpy as np
 
 from openai_baselines import logger
@@ -23,7 +24,6 @@ from pref_db import PrefDB
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble
 from utils import VideoRenderer, get_port_range, profile_memory
-import sys
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
 
@@ -61,6 +61,11 @@ def run(general_params, a2c_params, pref_interface_params,
             dropout=rew_pred_training_params['dropout'],
             lr=rew_pred_training_params['lr'],
             network_type=rew_pred_training_params['network'])
+
+    save_dir = osp.join(general_params['log_dir'], 'reward_predictor_checkpoints')
+    os.makedirs(save_dir)
+    with open(osp.join(save_dir, 'make_reward_predictor.pkl'), 'wb') as fh:
+        fh.write(cloudpickle.dumps(make_reward_predictor))
 
     if general_params['mode'] == 'gather_initial_prefs':
         env, a2c_proc = start_policy_training(
@@ -102,7 +107,7 @@ def run(general_params, a2c_params, pref_interface_params,
             start_policy_training_pipe=start_policy_training_flag,
             max_prefs=general_params['max_prefs'],
             prefs_dir=general_params['prefs_dir'],
-            ckpt_path=None,
+            load_ckpt_path=None,
             n_initial_prefs=general_params['n_initial_prefs'],
             n_initial_epochs=rew_pred_training_params['n_initial_epochs'],
             val_interval=rew_pred_training_params['val_interval'],
@@ -151,7 +156,7 @@ def run(general_params, a2c_params, pref_interface_params,
             start_policy_training_pipe=start_policy_training_flag,
             max_prefs=general_params['max_prefs'],
             prefs_dir=general_params['prefs_dir'],
-            ckpt_path=None,
+            load_ckpt_path=rew_pred_training_params['ckpt_path'],
             n_initial_prefs=general_params['n_initial_prefs'],
             n_initial_epochs=rew_pred_training_params['n_initial_epochs'],
             val_interval=rew_pred_training_params['val_interval'],
@@ -201,6 +206,8 @@ def make_envs(env_id, n_envs, seed):
             if env_id == 'EnduroNoFrameskip-v4':
                 from enduro_wrapper import EnduroWrapper
                 env = EnduroWrapper(env)
+            elif env_id == 'MovingDot-v0' or env_id == 'MovingNoFrameskip-v0':
+                pass
 
             gym.logger.setLevel(logging.WARN)
             return wrap_deepmind_nomax(env)
@@ -256,6 +263,9 @@ def start_policy_training(cluster_dict,
     env = make_envs(a2c_params['env_id'], a2c_params['n_envs'], a2c_params['seed'])
     del a2c_params['env_id'], a2c_params['n_envs']
 
+    ckpt_dir = osp.join(log_dir, 'policy_checkpoints')
+    os.makedirs(ckpt_dir)
+
     def f():
         if make_reward_predictor:
             rew_pred = make_reward_predictor('a2c', cluster_dict)
@@ -270,7 +280,7 @@ def start_policy_training(cluster_dict,
             start_policy_training_pipe=start_policy_training_pipe,
             episode_vid_queue=episode_vid_queue,
             reward_predictor=rew_pred,
-            log_dir=log_dir,
+            ckpt_dir=ckpt_dir,
             gen_segments=gen_segments,
             **a2c_params)
     proc = Process(target=f, daemon=True)
@@ -298,10 +308,10 @@ def start_pref_interface(seg_pipe, pref_pipe, max_segs, synthetic_prefs,
 def start_rew_pred_training(cluster_dict, make_reward_predictor, just_pretrain,
                             pref_pipe, start_policy_training_pipe, max_prefs,
                             n_initial_prefs, n_initial_epochs, prefs_dir,
-                            ckpt_path, val_interval, ckpt_interval):
+                            load_ckpt_path, val_interval, ckpt_interval):
     def f():
         rew_pred = make_reward_predictor('train', cluster_dict)
-        rew_pred.init_network(ckpt_path)
+        rew_pred.init_network(load_ckpt_path)
 
         if prefs_dir is not None:
             train_path = osp.join(prefs_dir, 'train_initial.pkl')

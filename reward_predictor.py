@@ -67,7 +67,7 @@ class RewardPredictorEnsemble:
         self.n_steps = 0
         self.r_norm = RunningStat(shape=n_preds)
 
-        misc_logs_dir = osp.join(log_dir, 'reward_pred', 'misc')
+        misc_logs_dir = osp.join(log_dir, 'reward_predictor', 'misc')
         easy_tf_log.set_dir(misc_logs_dir)
 
     @staticmethod

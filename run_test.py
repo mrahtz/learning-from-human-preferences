@@ -66,6 +66,9 @@ class TestRun(unittest.TestCase):
             self.assertTrue(exists(join(temp_dir,
                                         'policy_checkpoints',
                                         'policy.ckpt.index')))
+            self.assertTrue(exists(join(temp_dir,
+                                        'reward_predictor_checkpoints',
+                                        'make_reward_predictor.pkl')))
 
 
 if __name__ == '__main__':
