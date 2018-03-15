@@ -14,14 +14,6 @@ from utils import RunningStat, batch_iter
 class RewardPredictorEnsemble:
     """
     An ensemble of reward predictors and associated helper functions.
-
-    Modes:
-    * Predict reward
-      Inputs: one trajectory segment
-      Output: predicted reward
-    * Predict preference
-      Inputs: two trajectory segments
-      Output: preference between the two segments
     """
 
     def __init__(self,
@@ -64,10 +56,6 @@ class RewardPredictorEnsemble:
             self.saver = tf.train.Saver(max_to_keep=1)
             self.summaries = self.add_summary_ops()
 
-        self.reward_ops = [rp.r1 for rp in self.rps]
-        self.pred_ops = [rp.pred for rp in self.rps]
-        self.train_ops = [rp.train for rp in self.rps]
-
         self.checkpoint_file = osp.join(log_dir,
                                         'reward_predictor_checkpoints',
                                         'reward_predictor.ckpt')
@@ -92,27 +80,26 @@ class RewardPredictorEnsemble:
         return graph, sess
 
     def add_summary_ops(self):
-        loss_ops = []
-        acc_ops = []
-        for rp in self.rps:
-            loss_ops.append(rp.loss)
-            acc_ops.append(rp.accuracy)
-        mean_loss = tf.reduce_mean(loss_ops)
-        mean_accuracy = tf.reduce_mean(acc_ops)
-
         summary_ops = []
-        for pred_n in range(self.n_preds):
+
+        for pred_n, rp in enumerate(self.rps):
             name = 'reward_predictor_accuracy_{}'.format(pred_n)
-            op = tf.summary.scalar(name, acc_ops[pred_n])
+            op = tf.summary.scalar(name, rp.accuracy)
             summary_ops.append(op)
             name = 'reward_predictor_loss_{}'.format(pred_n)
-            op = tf.summary.scalar(name, loss_ops[pred_n])
+            op = tf.summary.scalar(name, rp.loss)
             summary_ops.append(op)
+
+        mean_accuracy = tf.reduce_mean([rp.accuracy for rp in self.rps])
         op = tf.summary.scalar('reward_predictor_accuracy_mean', mean_accuracy)
         summary_ops.append(op)
+
+        mean_loss = tf.reduce_mean([rp.loss for rp in self.rps])
         op = tf.summary.scalar('reward_predictor_loss_mean', mean_loss)
         summary_ops.append(op)
+
         summaries = tf.summary.merge(summary_ops)
+
         return summaries
 
     def init_network(self, ckpt_path=None):
@@ -129,60 +116,53 @@ class RewardPredictorEnsemble:
 
     def raw_rewards(self, obs):
         """
-        Return (unnormalized) reward for each frame from each member of the
-        ensemble.
+        Return (unnormalized) reward for each frame of a single segment
+        from each member of the ensemble.
         """
+        assert_equal(obs.shape[1:], (84, 84, 4))
         n_steps = obs.shape[0]
-        assert_equal(obs.shape, (n_steps, 84, 84, 4))
-
         feed_dict = {}
         for rp in self.rps:
             feed_dict[rp.training] = False
-            # reward_ops corresponds to the rewards calculated from the
-            # s1 input
             feed_dict[rp.s1] = [obs]
         # This will return nested lists of sizes n_preds x 1 x nsteps
         # (x 1 because of the batch size of 1)
-        rs = self.sess.run(self.reward_ops, feed_dict)
+        rs = self.sess.run([rp.r1 for rp in self.rps], feed_dict)
         rs = np.array(rs)
         # Get rid of the extra x 1 dimension
         rs = rs[:, 0, :]
         assert_equal(rs.shape, (self.n_preds, n_steps))
-
         return rs
 
     def reward(self, obs):
         """
-        Return (normalized) reward for each frame.
+        Return (normalized) reward for each frame of a single segment.
 
         (Normalization involves normalizing the rewards from each member of the
-        ensemble separately (zero mean and constant standard deviation), then
-        averaging the resulting rewards across all ensemble members.)
+        ensemble separately, then averaging the resulting rewards across all
+        ensemble members.)
         """
+        assert_equal(obs.shape[1:], (84, 84, 4))
         n_steps = obs.shape[0]
-        assert_equal(obs.shape, (n_steps, 84, 84, 4))
 
         # Get unnormalized rewards
 
         ensemble_rs = self.raw_rewards(obs)
-        # Shape should be 'n_preds x n_steps'
-        assert_equal(len(ensemble_rs), self.n_preds)
-        assert_equal(len(ensemble_rs[0]), n_steps)
         logging.debug("Unnormalized rewards:\n%s", ensemble_rs)
 
         # Normalize rewards
 
-        # Note that we don't just implement reward normalization in the network
-        # graph itself because:
+        # Note that we implement this here instead of in the network itself
+        # because:
         # * It's simpler not to do it in TensorFlow
-        # * Preference calculation doesn't need normalized rewards. Only
+        # * Preference prediction doesn't need normalized rewards. Only
         #   rewards sent to the the RL algorithm need to be normalized.
         #   So we can save on computation.
 
         # Page 4:
         # "We normalized the rewards produced by r^ to have zero mean and
         #  constant standard deviation."
-        # Page 15:
+        # Page 15: (Atari)
         # "Since the reward predictor is ultimately used to compare two sums
         #  over timesteps, its scale is arbitrary, and we normalize it to have
         #  a standard deviation of 0.05"
@@ -217,80 +197,76 @@ class RewardPredictorEnsemble:
     def preferences(self, s1s, s2s):
         """
         Predict probability of human preferring one segment over another
-        for each segment in the supplied segment pairs.
+        for each segment in the supplied batch of segment pairs.
         """
         feed_dict = {}
         for rp in self.rps:
             feed_dict[rp.s1] = s1s
             feed_dict[rp.s2] = s2s
             feed_dict[rp.training] = False
-        preds = self.sess.run(self.pred_ops, feed_dict)
+        preds = self.sess.run([rp.pred for rp in self.rps], feed_dict)
         return preds
 
     def train(self, prefs_train, prefs_val, val_interval):
         """
-        Train the ensemble for one full epoch
+        Train all ensemble members for one epoch.
         """
         print("Training/testing with %d/%d preferences" % (len(prefs_train),
                                                            len(prefs_val)))
 
         start_steps = self.n_steps
         start_time = time.time()
-        for _, batch in enumerate(
-                batch_iter(prefs_train.prefs, batch_size=32, shuffle=True)):
-            # TODO: refactor this so that each can be taken directly from
-            # pref_db
-            s1s = []
-            s2s = []
-            prefs = []
-            for k1, k2, pref in batch:
-                s1s.append(prefs_train.segments[k1])
-                s2s.append(prefs_train.segments[k2])
-                prefs.append(pref)
 
-            feed_dict = {}
-            for rp in self.rps:
-                feed_dict[rp.s1] = s1s
-                feed_dict[rp.s2] = s2s
-                feed_dict[rp.pref] = prefs
-                feed_dict[rp.training] = True
-            summaries, _ = self.sess.run([self.summaries, self.train_ops],
-                                         feed_dict)
-            self.train_writer.add_summary(summaries, self.n_steps)
+        for _, batch in enumerate(batch_iter(prefs_train.prefs,
+                                             batch_size=32,
+                                             shuffle=True)):
+            self.train_step(batch, prefs_train)
             self.n_steps += 1
             print("Trained reward predictor for %d steps" % self.n_steps)
 
             if self.n_steps and self.n_steps % val_interval == 0:
-                if len(prefs_val) <= 32:
-                    val_batch = prefs_val.prefs
-                else:
-                    idxs = np.random.choice(
-                        len(prefs_val.prefs), 32, replace=False)
-                    val_batch = []
-                    for idx in idxs:
-                        val_batch.append(prefs_val.prefs[idx])
-                s1s = []
-                s2s = []
-                prefs = []
-                for k1, k2, pref in val_batch:
-                    s1s.append(prefs_val.segments[k1])
-                    s2s.append(prefs_val.segments[k2])
-                    prefs.append(pref)
-                feed_dict = {}
-                for rp in self.rps:
-                    feed_dict[rp.s1] = s1s
-                    feed_dict[rp.s2] = s2s
-                    feed_dict[rp.pref] = prefs
-                    feed_dict[rp.training] = False
+                self.val_step(prefs_val)
 
-                summaries = self.sess.run(self.summaries, feed_dict)
-                self.test_writer.add_summary(summaries, self.n_steps)
-            end_time = time.time()
-            end_steps = self.n_steps
+        end_time = time.time()
+        end_steps = self.n_steps
+        rate = (end_steps - start_steps) / (end_time - start_time)
+        easy_tf_log.logkv('reward_predictor_training_steps_per_second',
+                          rate)
 
-            rate = (end_steps - start_steps) / (end_time - start_time)
-            easy_tf_log.logkv('reward_predictor_training_steps_per_second',
-                              rate)
+    def train_step(self, batch, prefs_train):
+        s1s = [prefs_train.segments[k1] for k1, k2, pref, in batch]
+        s2s = [prefs_train.segments[k2] for k1, k2, pref, in batch]
+        prefs = [pref for k1, k2, pref, in batch]
+        feed_dict = {}
+        for rp in self.rps:
+            feed_dict[rp.s1] = s1s
+            feed_dict[rp.s2] = s2s
+            feed_dict[rp.pref] = prefs
+            feed_dict[rp.training] = True
+        ops = [self.summaries, [rp.train for rp in self.rps]]
+        summaries, _ = self.sess.run(ops, feed_dict)
+        self.train_writer.add_summary(summaries, self.n_steps)
+
+    def val_step(self, prefs_val):
+        val_batch_size = 32
+        if len(prefs_val) <= val_batch_size:
+            batch = prefs_val.prefs
+        else:
+            idxs = np.random.choice(len(prefs_val.prefs),
+                                    val_batch_size,
+                                    replace=False)
+            batch = [prefs_val.prefs[i] for i in idxs]
+        s1s = [prefs_val.segments[k1] for k1, k2, pref, in batch]
+        s2s = [prefs_val.segments[k2] for k1, k2, pref, in batch]
+        prefs = [pref for k1, k2, pref, in batch]
+        feed_dict = {}
+        for rp in self.rps:
+            feed_dict[rp.s1] = s1s
+            feed_dict[rp.s2] = s2s
+            feed_dict[rp.pref] = prefs
+            feed_dict[rp.training] = False
+        summaries = self.sess.run(self.summaries, feed_dict)
+        self.test_writer.add_summary(summaries, self.n_steps)
 
 
 class RewardPredictorNetwork:
