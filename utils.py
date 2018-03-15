@@ -105,12 +105,12 @@ def get_most_recent_item(q):
 class VideoRenderer:
     pause_cmd = "pause"
 
-    def __init__(self, vid_queue, zoom_factor=1, playback_speed=1,
+    def __init__(self, vid_queue, zoom=1, playback_speed=1,
                  mode='restart_on_get'):
         assert mode == 'restart_on_get' or mode == 'play_through'
         self.mode = mode
         self.vid_queue = vid_queue
-        self.zoom_factor = zoom_factor
+        self.zoom_factor = zoom
         self.playback_speed = playback_speed
         self.proc = Process(target=self.render)
         self.proc.start()
