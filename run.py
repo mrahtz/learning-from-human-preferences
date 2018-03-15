@@ -68,10 +68,13 @@ def run(env_id, num_timesteps, seed, lr_scheduler, rp_lr, n_envs,
                                          policy_ckpt_dir=policy_ckpt_dir, episode_vid_queue=episode_vid_queue,
                                          ent_coef=ent_coef, policy_ckpt_interval=policy_ckpt_interval, log_interval=log_interval)
 
+        m1 = profile_memory(log_dir + '/mem_a2c.log', a2c_proc.pid)
+
     if 'pref_interface' in parts_to_run:
         pi_proc = start_pref_interface(cluster_dict=cluster_dict, seg_pipe=seg_pipe, pref_pipe=pref_pipe,
                                        segs_max=segs_max, headless=headless)
 
+        m3 = profile_memory(log_dir + '/mem_pi.log', pi_proc.pid)
     if 'train_reward' in parts_to_run:
         train_proc = start_reward_predictor_training(cluster_dict=cluster_dict,
                                                      log_dir=log_dir,
@@ -81,6 +84,7 @@ def run(env_id, num_timesteps, seed, lr_scheduler, rp_lr, n_envs,
                                                      load_prefs_dir=load_prefs_dir,
                                                      db_max=db_max,
                                                      rp_lr=rp_lr)
+        m2 = profile_memory(log_dir + '/mem_trp.log', train_proc.pid)
 
     if 'train_reward' not in parts_to_run:
         go_pipe.put(True)
