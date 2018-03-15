@@ -209,8 +209,7 @@ def profile_memory(log_path, pid):
 def batch_iter(data, batch_size, shuffle=False):
     idxs = list(range(len(data)))
     if shuffle:
-        # Yes, this really does shuffle in-place
-        np.random.shuffle(idxs)
+        np.random.shuffle(idxs)  # in-place
 
     start_idx = 0
     end_idx = 0
