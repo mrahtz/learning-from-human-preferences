@@ -220,3 +220,18 @@ def get_port_range(start_port, n_ports, random_stagger=False):
             free_range_found = True
 
     return ports
+
+
+def profile_memory(log_path, pid):
+    def profile():
+        with open(log_path, 'w') as f:
+            # timeout=99999 is necesary because for external processes,
+            # memory_usage otherwise defaults to only returning a single sample
+            # Note that even with interval=1, because memory_profiler only
+            # flushes every 50 lines, we still have to wait 50 seconds before
+            # updates.
+            memory_profiler.memory_usage(pid, stream=f,
+                                         timeout=99999, interval=1)
+    p = Process(target=profile, daemon=True)
+    p.start()
+    return p
