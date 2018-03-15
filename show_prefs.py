@@ -26,7 +26,7 @@ def main():
         print("done!")
 
     q = Queue()
-    VideoRenderer(q, zoom=2)
+    VideoRenderer(q, zoom=2, mode=VideoRenderer.restart_on_get_mode)
 
     for k1, k2, pref in prefs.prefs:
         if pref == (0.5, 0.5):

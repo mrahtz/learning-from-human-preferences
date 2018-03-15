@@ -22,7 +22,9 @@ class PrefInterface:
     def __init__(self, synthetic_prefs, max_segs, log_dir):
         self.vid_q = Queue()
         if not synthetic_prefs:
-            self.renderer = VideoRenderer(vid_queue=self.vid_q, zoom=4)
+            self.renderer = VideoRenderer(vid_queue=self.vid_q,
+                                          mode=VideoRenderer.restart_on_get_mode,
+                                          zoom=4)
         else:
             self.renderer = None
         self.synthetic_prefs = synthetic_prefs
@@ -120,7 +122,8 @@ class PrefInterface:
                                s2.frames[t][:, :, -1]))
             vid.append(frame)
         n_pause_frames = 7
-        vid.extend([vid[-1]] * n_pause_frames)
+        for _ in range(n_pause_frames):
+            vid.append(np.copy(vid[-1]))
         self.vid_q.put(vid)
 
         while True:
@@ -144,6 +147,6 @@ class PrefInterface:
         elif choice == "":
             pref = None
 
-        self.vid_q.put(VideoRenderer.pause_cmd)
+        self.vid_q.put([np.zeros(vid[0].shape, dtype=np.uint8)])
 
         return pref
