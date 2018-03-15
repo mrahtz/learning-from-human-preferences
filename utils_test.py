@@ -2,13 +2,12 @@
 
 import socket
 import unittest
+from math import ceil
 
-import numpy
 import numpy as np
 
-from utils import RunningStat, get_port_range, batch_iter
 from pref_db import PrefDB
-from math import ceil
+from utils import RunningStat, get_port_range, batch_iter
 
 
 class TestUtils(unittest.TestCase):
@@ -41,7 +40,7 @@ class TestUtils(unittest.TestCase):
         s2 = np.ones((25, 84, 84, 4))
         s2[12][24][24][2] = 0
         p.append(s1, s2, [1.0, 0.0])
-        self.assertEquals(len(p.segments), 2)
+        self.assertEqual(len(p.segments), 2)
 
     def test_pref_db(self):
         p = PrefDB()
@@ -49,55 +48,55 @@ class TestUtils(unittest.TestCase):
         s1 = np.random.randint(low=-10, high=10, size=(25, 84, 84, 4))
         s2 = np.random.randint(low=-10, high=10, size=(25, 84, 84, 4))
         p.append(s1, s2, [1.0, 0.0])
-        self.assertEquals(len(p.segments), 2)
-        self.assertEquals(len(p.prefs), 1)
+        self.assertEqual(len(p.segments), 2)
+        self.assertEqual(len(p.prefs), 1)
 
         p.append(s1, s2, [0.0, 1.0])
-        self.assertEquals(len(p.segments), 2)
-        self.assertEquals(len(p.prefs), 2)
+        self.assertEqual(len(p.segments), 2)
+        self.assertEqual(len(p.prefs), 2)
 
         s1 = np.random.randint(low=-10, high=10, size=(25, 84, 84, 4))
         p.append(s1, s2, [1.0, 0.0])
-        self.assertEquals(len(p.segments), 3)
-        self.assertEquals(len(p.prefs), 3)
+        self.assertEqual(len(p.segments), 3)
+        self.assertEqual(len(p.prefs), 3)
 
         s2 = np.random.randint(low=-10, high=10, size=(25, 84, 84, 4))
         p.append(s1, s2, [1.0, 0.0])
-        self.assertEquals(len(p.segments), 4)
-        self.assertEquals(len(p.prefs), 4)
+        self.assertEqual(len(p.segments), 4)
+        self.assertEqual(len(p.prefs), 4)
 
         s1 = np.random.randint(low=-10, high=10, size=(25, 84, 84, 4))
         s2 = np.random.randint(low=-10, high=10, size=(25, 84, 84, 4))
         p.append(s1, s2, [1.0, 0.0])
-        self.assertEquals(len(p.segments), 6)
-        self.assertEquals(len(p.prefs), 5)
+        self.assertEqual(len(p.segments), 6)
+        self.assertEqual(len(p.prefs), 5)
 
         prefs_pre = list(p.prefs)
         p.del_first()
-        self.assertEquals(len(p.prefs), 4)
-        self.assertEquals(p.prefs, prefs_pre[1:])
+        self.assertEqual(len(p.prefs), 4)
+        self.assertEqual(p.prefs, prefs_pre[1:])
         # These segments were also used by the second preference,
         # so the number of segments shouldn't have decreased
-        self.assertEquals(len(p.segments), 6)
+        self.assertEqual(len(p.segments), 6)
 
         p.del_first()
-        self.assertEquals(len(p.prefs), 3)
+        self.assertEqual(len(p.prefs), 3)
         # One of the segments just deleted was only used by the first two
         # preferences, so the length should have shrunk by one
-        self.assertEquals(len(p.segments), 5)
+        self.assertEqual(len(p.segments), 5)
 
         p.del_first()
-        self.assertEquals(len(p.prefs), 2)
+        self.assertEqual(len(p.prefs), 2)
         # Another one should bite the dust...
-        self.assertEquals(len(p.segments), 4)
+        self.assertEqual(len(p.segments), 4)
 
         p.del_first()
-        self.assertEquals(len(p.prefs), 1)
-        self.assertEquals(len(p.segments), 2)
+        self.assertEqual(len(p.prefs), 1)
+        self.assertEqual(len(p.segments), 2)
 
         p.del_first()
-        self.assertEquals(len(p.prefs), 0)
-        self.assertEquals(len(p.segments), 0)
+        self.assertEqual(len(p.prefs), 0)
+        self.assertEqual(len(p.segments), 0)
 
     def test_get_port_range(self):
         # Test 1: if we ask for 3 ports starting from port 60000
