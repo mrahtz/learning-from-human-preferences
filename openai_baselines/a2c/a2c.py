@@ -205,7 +205,6 @@ class Runner(object):
             mb_values.append(values)
             mb_dones.append(self.dones)
             # len({obs, rewards, dones}) == nenvs
-            print("Took action", actions)
             obs, rewards, dones, _ = self.env.step(actions)
             self.states = states
             self.dones = dones
@@ -240,7 +239,22 @@ class Runner(object):
                         self.orig_reward[env_n])
                     self.orig_reward[env_n] = 0
 
+        if self.env.env_id == 'MovingDotNoFrameskip-v0':
+            # For MovingDot, reward depends on both current observation and
+            # current action, so encode action in the observations.
+            # (We only need to set this in the most recent frame,
+            # because that's all that the reward predictor for MovingDot
+            # uses.)
+            mb_obs[:, :, 0, 0, -1] = mb_actions[:, :]
+
+        # Generate segments
+        # (For MovingDot, this has to happen _after_ we've encoded the action
+        # in the observations.)
+        if self.gen_segments:
+            self.update_segment_buffer(mb_obs, mb_rewards, mb_dones)
+
         # Replace rewards with those from reward predictor
+        # (Note that this also needs to be done _after_ we've encoded the action.)
         logging.debug("Original rewards:\n%s", mb_rewards)
         if self.reward_predictor:
             orig_rewards = np.copy(mb_rewards)
@@ -258,20 +272,6 @@ class Runner(object):
             logger.record_tabular("explained_variance_predicted_rewards", ev)
 
             logging.debug("Predicted rewards:\n%s", mb_rewards)
-
-        if self.env.env_id == 'MovingDotNoFrameskip-v0':
-            # For MovingDot, reward depends on both current observation and
-            # current action, so encode action in the observations.
-            # (We only need to set this in the most recent frame,
-            # because that's all that the reward predictor for MovingDot
-            # uses.)
-            mb_obs[:, :, 0, 0, -1] = mb_actions[:, :]
-
-        # Generate segments
-        # (For MovingDot, this has to happen _after_ we've encoded the action
-        # in the observations.)
-        if self.gen_segments:
-            self.update_segment_buffer(mb_obs, mb_rewards, mb_dones)
 
         # Save frames for episode rendering
         if self.episode_vid_queue is not None:
