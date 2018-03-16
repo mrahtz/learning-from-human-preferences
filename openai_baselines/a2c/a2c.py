@@ -116,13 +116,13 @@ class Runner(object):
     def __init__(self,
                  env,
                  model,
+                 nsteps,
+                 nstack,
+                 gamma,
                  gen_segments,
                  seg_pipe,
-                 nsteps=5,
-                 nstack=4,
-                 gamma=0.99,
-                 reward_predictor=None,
-                 episode_vid_queue=None):
+                 reward_predictor,
+                 episode_vid_queue):
         self.env = env
         self.model = model
         nh, nw, nc = env.observation_space.shape
@@ -364,16 +364,15 @@ def learn(policy,
 
     ckpt_path = osp.join(ckpt_dir, 'policy.ckpt')
 
-    runner = Runner(
-        env=env,
-        model=model,
-        seg_pipe=seg_pipe,
-        gen_segments=gen_segments,
-        nsteps=nsteps,
-        nstack=nstack,
-        gamma=gamma,
-        reward_predictor=reward_predictor,
-        episode_vid_queue=episode_vid_queue)
+    runner = Runner(env=env,
+                    model=model,
+                    nsteps=nsteps,
+                    nstack=nstack,
+                    gamma=gamma,
+                    gen_segments=gen_segments,
+                    seg_pipe=seg_pipe,
+                    reward_predictor=reward_predictor,
+                    episode_vid_queue=episode_vid_queue)
 
     # nsteps: e.g. 5
     # nenvs: e.g. 16
