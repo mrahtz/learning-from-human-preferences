@@ -23,7 +23,7 @@ from openai_baselines.common.atari_wrappers import wrap_deepmind_nomax
 from openai_baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble, train_reward_predictor
-from utils import vid_proc, get_port_range
+from utils import vid_proc, get_port_range, profile_memory
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
 
