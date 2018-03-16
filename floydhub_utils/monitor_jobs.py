@@ -1,3 +1,10 @@
+#!/usr/bin/env python
+
+"""
+Monitor running FloydHub jobs and send a macOS notification whenever
+one finishes
+"""
+
 import re
 import subprocess
 import time

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Create a FloydHub dataset consisting of files changed by the setup wrapper
+# (e.g. packages dependencies) for quicker launching of jobs
+
 set -o errexit
 
 touch before_file

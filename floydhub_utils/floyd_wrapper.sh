@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Install dependencies, then run whatever was specified in the arguments
+
 set -o errexit
 
 find . | xargs touch
