@@ -362,15 +362,16 @@ def start_reward_predictor_training(cluster_dict,
                 n_initial_prefs=n_initial_prefs,
                 max_prefs=max_prefs)
 
-        print("Pretraining reward predictor for {} epochs".format(
-            n_initial_epochs))
-        for i in range(n_initial_epochs):
-            print("Reward predictor training epoch {}".format(i))
-            rew_pred.train(pref_db_train, pref_db_val, val_interval)
-            if i and i % ckpt_interval == 0:
-                rew_pred.save()
-        print("Reward predictor pretraining done")
-        rew_pred.save()
+        if not load_ckpt_dir:
+            print("Pretraining reward predictor for {} epochs".format(
+                n_initial_epochs))
+            for i in range(n_initial_epochs):
+                print("Reward predictor training epoch {}".format(i))
+                rew_pred.train(pref_db_train, pref_db_val, val_interval)
+                if i and i % ckpt_interval == 0:
+                    rew_pred.save()
+            print("Reward predictor pretraining done")
+            rew_pred.save()
 
         if just_pretrain:
             return
