@@ -9,13 +9,15 @@ from numpy.testing import (assert_allclose, assert_approx_equal,
                            assert_array_equal, assert_raises)
 
 from reward_predictor import RewardPredictorNetwork
+from reward_predictor_core_network import net_cnn
 
 
 class TestRewardPredictor(unittest.TestCase):
     def setUp(self):
         tf.reset_default_graph()
         self.sess = tf.Session()
-        self.rpn = RewardPredictorNetwork(batchnorm=True, dropout=0.5, lr=1e-3, network_type='cnn')
+        self.rpn = RewardPredictorNetwork(batchnorm=True, dropout=0.5, lr=1e-3,
+                                          core_network=net_cnn)
         self.sess.run(tf.global_variables_initializer())
 
         termcolor.cprint(self._testMethodName, 'red')
