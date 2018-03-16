@@ -205,6 +205,7 @@ class Runner(object):
             mb_values.append(values)
             mb_dones.append(self.dones)
             # len({obs, rewards, dones}) == nenvs
+            print("Taking actions", actions)
             obs, rewards, dones, _ = self.env.step(actions)
             self.states = states
             self.dones = dones
@@ -242,7 +243,6 @@ class Runner(object):
         # Replace rewards with those from reward predictor
         logging.debug("Original rewards:\n%s", mb_rewards)
         if self.reward_predictor:
-
             orig_rewards = np.copy(mb_rewards)
 
             assert_equal(mb_obs.shape, (nenvs, self.nsteps, 84, 84, 4))
@@ -266,6 +266,8 @@ class Runner(object):
             # because that's all that the reward predictor for MovingDot
             # uses.)
             mb_obs[:, :, 0, 0, -1] = mb_actions[:, :]
+
+        print(mb_obs[:, :, 0, 0, -1])
 
         # Generate segments
         # (For MovingDot, this has to happen _after_ we've encoded the action
