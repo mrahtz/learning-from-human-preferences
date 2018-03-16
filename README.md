@@ -20,4 +20,4 @@ Code is yet to be cleaned up, so expect mess.
 
 ## Code credits
 
-`a2c` is based on the A2C implementation from (https://github.com/openai/baselines)[OpenAI's baselines], commit (https://github.com/openai/baselines/commit/f8663ea)[`f8663ea`].
+A2C code in [`a2c`](a2c) is based on the implementation from [OpenAI's baselines](https://github.com/openai/baselines), commit [`f8663ea`](https://github.com/openai/baselines/commit/f8663ea).
