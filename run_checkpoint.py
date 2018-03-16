@@ -50,7 +50,7 @@ def run_agent(env, model, reward_predictor, frame_interval_ms):
             model_obs = np.vstack([obs] * model_nenvs)
             [action], _, states = model.step(model_obs, states, [done])
             raw_obs, reward, done, _ = env.step(action)
-            update_obs(obs, raw_obs, nc)
+            obs = update_obs(obs, raw_obs, nc)
             episode_reward += reward
             env.render()
             if reward_predictor is not None:
@@ -66,6 +66,7 @@ def run_agent(env, model, reward_predictor, frame_interval_ms):
 def update_obs(obs, raw_obs, nc):
     obs = np.roll(obs, shift=-nc, axis=3)
     obs[:, :, :, -nc:] = raw_obs
+    return obs
 
 
 def get_reward_predictor(ckpt_dir):
