@@ -348,9 +348,14 @@ def start_reward_predictor_training(cluster_dict,
             train_path = osp.join(prefs_dir, 'train_initial.pkl')
             pref_db_train = PrefDB.load(train_path)
             print("Loaded training preferences from '{}'".format(train_path))
+            n_prefs, n_segs = len(pref_db_train), len(pref_db_train.segments)
+            print("({} preferences, {} segments)".format(n_prefs, n_segs))
+
             val_path = osp.join(prefs_dir, 'val_initial.pkl')
             pref_db_val = PrefDB.load(val_path)
             print("Loaded validation preferences from '{}'".format(val_path))
+            n_prefs, n_segs = len(pref_db_val), len(pref_db_val.segments)
+            print("({} preferences, {} segments)".format(n_prefs, n_segs))
         else:
             pref_db_train, pref_db_val = get_initial_prefs(
                 pref_pipe=pref_pipe,
