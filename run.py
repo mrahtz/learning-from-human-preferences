@@ -365,7 +365,7 @@ def start_reward_predictor_training(cluster_dict,
         print("Pretraining reward predictor for {} epochs".format(
             n_initial_epochs))
         for i in range(n_initial_epochs):
-            print("Epoch {}".format(i))
+            print("Reward predictor training epoch {}".format(i))
             rew_pred.train(pref_db_train, pref_db_val, val_interval)
             if i and i % ckpt_interval == 0:
                 rew_pred.save()
