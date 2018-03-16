@@ -52,7 +52,11 @@ class RewardPredictorEnsemble:
                             lr=lr)
                 self.rps.append(rp)
             self.init_op = tf.global_variables_initializer()
-            self.saver = tf.train.Saver(max_to_keep=1)
+            # Why save_relative_paths=True?
+            # So that the plain-text 'checkpoint' file written uses relative paths,
+            # which seems to be needed in order to avoid confusing saver.restore()
+            # when restoring from FloydHub runs.
+            self.saver = tf.train.Saver(max_to_keep=1, save_relative_paths=True)
             self.summaries = self.add_summary_ops()
 
         self.checkpoint_file = osp.join(log_dir,
@@ -115,13 +119,8 @@ class RewardPredictorEnsemble:
 
     def save(self):
         # TODO put back n_steps
-        # Why save_relative_paths=True?
-        # So that the plain-text 'checkpoint' file written uses relative paths,
-        # which seems to be needed in order to avoid confusing saver.restore()
-        # when restoring from FloydHub runs.
         ckpt_name = self.saver.save(self.sess,
-                                    self.checkpoint_file,
-                                    save_relative_paths=True)
+                                    self.checkpoint_file)
         print("Saved reward predictor checkpoint to '{}'".format(ckpt_name))
 
     def raw_rewards(self, obs):
