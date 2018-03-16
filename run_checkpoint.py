@@ -18,7 +18,7 @@ import tensorflow as tf
 from matplotlib.ticker import FormatStrFormatter
 
 from enduro_wrapper import EnduroWrapper
-from openai_baselines.common.atari_wrappers import wrap_deepmind
+from a2c.common.atari_wrappers import wrap_deepmind
 
 
 def main():

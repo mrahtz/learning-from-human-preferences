@@ -5,7 +5,7 @@ import subprocess
 import sys
 import time
 
-from openai_baselines.a2c.utils import Scheduler
+from a2c.a2c.utils import Scheduler
 
 
 def parse_args():
@@ -45,8 +45,8 @@ def parse_args():
         'ent_coef': args.ent_coef,
         'n_envs': args.n_envs,
         'seed': args.seed,
-        'load_path': args.load_policy_ckpt_dir,
-        'save_interval': args.policy_ckpt_interval,
+        'ckpt_load_dir': args.load_policy_ckpt_dir,
+        'ckpt_save_interval': args.policy_ckpt_interval,
         'total_timesteps': num_timesteps,
         'lr_scheduler': lr_scheduler
     }

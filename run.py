@@ -13,12 +13,12 @@ import easy_tf_log
 import gym
 import numpy as np
 
-from openai_baselines import logger
-from openai_baselines.a2c.a2c import learn
-from openai_baselines.a2c.policies import CnnPolicy, MlpPolicy
-from openai_baselines.common import set_global_seeds
-from openai_baselines.common.atari_wrappers import wrap_deepmind
-from openai_baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
+from a2c import logger
+from a2c.a2c.a2c import learn
+from a2c.a2c.policies import CnnPolicy, MlpPolicy
+from a2c.common import set_global_seeds
+from a2c.common.atari_wrappers import wrap_deepmind
+from a2c.common.vec_env.subproc_vec_env import SubprocVecEnv
 from params import parse_args
 from pref_db import PrefDB
 from pref_interface import PrefInterface
@@ -57,7 +57,7 @@ def run(general_params,
 
     if a2c_params['env_id'] in ['MovingDot-v0', 'MovingDotNoFrameskip-v0']:
         reward_predictor_network = net_moving_dot_features
-    elif a2c_params['env_id'] in ['PongNoFrameskip-v4' 'EnduroNoFrameskip-v4']:
+    elif a2c_params['env_id'] in ['PongNoFrameskip-v4', 'EnduroNoFrameskip-v4']:
         reward_predictor_network = net_cnn
     else:
         raise Exception("Unsure about reward predictor network for {}".format(
