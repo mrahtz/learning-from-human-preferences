@@ -116,7 +116,7 @@ def run(general_params,
             start_policy_training_pipe=start_policy_training_flag,
             max_prefs=general_params['max_prefs'],
             prefs_dir=general_params['prefs_dir'],
-            load_ckpt_path=None,
+            load_ckpt_dir=None,
             n_initial_prefs=general_params['n_initial_prefs'],
             n_initial_epochs=rew_pred_training_params['n_initial_epochs'],
             val_interval=rew_pred_training_params['val_interval'],
@@ -165,7 +165,7 @@ def run(general_params,
             start_policy_training_pipe=start_policy_training_flag,
             max_prefs=general_params['max_prefs'],
             prefs_dir=general_params['prefs_dir'],
-            load_ckpt_path=rew_pred_training_params['ckpt_path'],
+            load_ckpt_dir=rew_pred_training_params['load_ckpt_dir'],
             n_initial_prefs=general_params['n_initial_prefs'],
             n_initial_epochs=rew_pred_training_params['n_initial_epochs'],
             val_interval=rew_pred_training_params['val_interval'],
@@ -337,12 +337,12 @@ def start_reward_predictor_training(cluster_dict,
                                     n_initial_prefs,
                                     n_initial_epochs,
                                     prefs_dir,
-                                    load_ckpt_path,
+                                    load_ckpt_dir,
                                     val_interval,
                                     ckpt_interval):
     def f():
         rew_pred = make_reward_predictor('train', cluster_dict)
-        rew_pred.init_network(load_ckpt_path)
+        rew_pred.init_network(load_ckpt_dir)
 
         if prefs_dir is not None:
             train_path = osp.join(prefs_dir, 'train_initial.pkl')

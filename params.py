@@ -60,7 +60,7 @@ def parse_args():
         'n_initial_epochs': args.n_initial_epochs,
         'dropout': args.dropout,
         'batchnorm': args.batchnorm,
-        'ckpt_path': args.load_reward_predictor_ckpt,
+        'load_ckpt_dir': args.load_reward_predictor_ckpt_dir,
         'ckpt_interval': args.reward_predictor_ckpt_interval,
         'lr': args.reward_predictor_learning_rate
     }
@@ -156,10 +156,9 @@ def add_reward_predictor_args(parser):
     parser.add_argument('--n_initial_epochs', type=int, default=200)
     parser.add_argument('--dropout', type=float, default=0.0)
     parser.add_argument('--batchnorm', action='store_true')
-    parser.add_argument('--load_reward_predictor_ckpt',
-                        help='File to load reward predictor checkpoint from '
-                             '(e.g. runs/foo/reward_predictor_checkpoints/'
-                             'reward_predictor.ckpt-100)')
+    parser.add_argument('--load_reward_predictor_ckpt_dir',
+                        help='Directory to load reward predictor checkpoint from '
+                             '(loads latest checkpoint in the specified directory)')
     parser.add_argument('--reward_predictor_ckpt_interval',
                         type=int, default=1,
                         help='No. training epochs between reward '
