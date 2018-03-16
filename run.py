@@ -10,21 +10,19 @@ from multiprocessing import Process, Queue
 
 import cloudpickle
 import easy_tf_log
-import gym
 import numpy as np
 
 from a2c import logger
 from a2c.a2c.a2c import learn
 from a2c.a2c.policies import CnnPolicy, MlpPolicy
 from a2c.common import set_global_seeds
-from a2c.common.atari_wrappers import wrap_deepmind
 from a2c.common.vec_env.subproc_vec_env import SubprocVecEnv
 from params import parse_args
 from pref_db import PrefDB
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble
 from reward_predictor_core_network import net_cnn, net_moving_dot_features
-from utils import VideoRenderer, get_port_range, profile_memory
+from utils import VideoRenderer, get_port_range, profile_memory, make_env
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
 
@@ -215,26 +213,13 @@ def configure_a2c_logger(log_dir):
 
 
 def make_envs(env_id, n_envs, seed):
-    def make_env(rank):
+    def wrap_make_env(env_id, rank):
         def _thunk():
-            if env_id in ['MovingDot-v0', 'MovingDotNoFrameskip-v0']:
-                import gym_moving_dot
-
-            env = gym.make(env_id)
-            env.seed(seed + rank)
-
-            if env_id == 'EnduroNoFrameskip-v4':
-                from enduro_wrapper import EnduroWrapper
-                env = EnduroWrapper(env)
-
-            gym.logger.setLevel(logging.WARN)
-            return wrap_deepmind(env)
-
+            return make_env(env_id, seed + rank)
         return _thunk
-
     set_global_seeds(seed)
-    env = SubprocVecEnv(env_id, [make_env(i) for i in range(n_envs)])
-
+    env = SubprocVecEnv(env_id, [wrap_make_env(env_id, i)
+                                 for i in range(n_envs)])
     return env
 
 

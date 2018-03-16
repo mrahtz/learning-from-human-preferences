@@ -11,20 +11,18 @@ import time
 from collections import deque
 
 import cloudpickle
-import gym
-import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-from matplotlib.ticker import FormatStrFormatter
 
-from enduro_wrapper import EnduroWrapper
-from a2c.common.atari_wrappers import wrap_deepmind
+import matplotlib.pyplot as plt
+from matplotlib.ticker import FormatStrFormatter
+from utils import make_env
 
 
 def main():
     args = parse_args()
 
-    env = get_env(args.env)
+    env = make_env(args.env)
     model = get_model(args.policy_ckpt_dir)
     if args.reward_predictor_ckpt_dir:
         reward_predictor = get_reward_predictor(args.reward_predictor_ckpt_dir)
@@ -91,16 +89,6 @@ def get_model(ckpt_dir):
     print("Loading checkpoint...")
     model.load(ckpt_file)
     return model
-
-
-def get_env(env_id):
-    env = gym.make(env_id)
-    if env_id == 'EnduroNoFrameskip-v4':
-        env = EnduroWrapper(env)
-    elif env_id == 'MovingDot-v0' or env_id == 'MovingDotNoFrameskip-v0':
-        pass
-    env = wrap_deepmind(env)
-    return env
 
 
 def parse_args():
