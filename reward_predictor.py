@@ -139,8 +139,6 @@ def net_easyfeatures(s, reuse):
     x = tf.stack(features, axis=1)
 
     x = dense_layer(x, 64, "d1", reuse, activation='relu')
-    x = dense_layer(x, 64, "d2", reuse, activation='relu')
-    x = dense_layer(x, 64, "d3", reuse, activation='relu')
     x = dense_layer(x, 1, "d4", reuse, activation=None)
     x = x[:, 0]
 
