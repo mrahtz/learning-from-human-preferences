@@ -29,8 +29,6 @@ def net_moving_dot_features(s, batchnorm, dropout, training, reuse):
     a = s[:, 0, 0, -1]
     a = tf.cast(a, tf.float32) / 4.0
 
-    a = tf.Print(a, [a])
-
     xc, yc = get_dot_position(s)
     xc = tf.cast(xc, tf.float32) / 83.0
     yc = tf.cast(yc, tf.float32) / 83.0

@@ -377,7 +377,7 @@ def start_reward_predictor_training(cluster_dict,
             return
 
         start_policy_training_pipe.put(True)
-
+        
         i = 0
         while True:
             rew_pred.train(pref_db_train, pref_db_val, val_interval)
