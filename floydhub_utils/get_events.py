@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+"""
+Download all TensorFlow event files from the specified jobs' output files.
+"""
+
 import argparse
 import os
 import os.path as osp
@@ -18,24 +22,22 @@ def get(job_id, out_dir):
     for event_file in event_files:
         print("Downloading {}...".format(event_file))
         cmd = "floyd data getfile {}/output {}".format(job_id, event_file)
-        subprocess.check_output(cmd.split())
+        subprocess.call(cmd.split())
 
-        path = '/'.join(event_file[1:].split('/')[:-1])
-        fname = event_file.split('/')[-1]
-
+        path = os.path.dirname(event_file)
+        fname = os.path.basename(event_file)
         full_dir = osp.join(download_dir, path)
         os.makedirs(full_dir, exist_ok=True)
-        cmd = "mv {} {}".format(fname, full_dir)
-        subprocess.check_output(cmd.split())
+        os.rename(fname, osp.join(full_dir, fname))
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("dir")
-    parser.add_argument("ids", nargs='*')
+    parser.add_argument("job_ids", nargs='*')
     args = parser.parse_args()
 
-    for job_id in args.ids:
+    for job_id in args.job_ids:
         Process(target=get, args=(job_id, args.dir)).start()
         time.sleep(0.5)
 
