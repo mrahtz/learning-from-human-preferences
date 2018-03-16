@@ -101,10 +101,11 @@ class RewardPredictorEnsemble:
 
         return summaries
 
-    def init_network(self, ckpt_path=None):
-        if ckpt_path:
-            self.saver.restore(self.sess, ckpt_path)
-            print("Loaded reward predictor checkpoint from '{}'".format(ckpt_path))
+    def init_network(self, load_ckpt_dir=None):
+        if load_ckpt_dir:
+            ckpt_file = tf.train.latest_checkpoint(load_ckpt_dir)
+            self.saver.restore(self.sess, ckpt_file)
+            print("Loaded reward predictor checkpoint from '{}'".format(ckpt_file))
         else:
             self.sess.run(self.init_op)
 
