@@ -50,9 +50,11 @@ def main():
             frame = np.hstack((f1, border, f2))
             vid.append(frame)
         n_pause_frames = 10
-        vid.extend([vid[-1]] * n_pause_frames)
+        for _ in range(n_pause_frames):
+            vid.append(np.copy(vid[-1]))
         q.put(vid)
         input()
+
 
 if __name__ == '__main__':
     main()
