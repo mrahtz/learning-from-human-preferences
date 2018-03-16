@@ -1,10 +1,11 @@
 import argparse
-import time
-from openai_baselines.a2c.utils import Scheduler
-import os.path as osp
-import sys
-import subprocess
 import os
+import os.path as osp
+import subprocess
+import sys
+import time
+
+from openai_baselines.a2c.utils import Scheduler
 
 
 def parse_args():
@@ -56,7 +57,6 @@ def parse_args():
     }
 
     reward_predictor_training_args = {
-        'network': args.network,
         'n_initial_epochs': args.n_initial_epochs,
         'dropout': args.dropout,
         'batchnorm': args.batchnorm,
@@ -152,7 +152,6 @@ def add_a2c_args(parser):
 
 
 def add_reward_predictor_args(parser):
-    parser.add_argument('--network', choices=['moving_dot_features', 'cnn'], default='cnn')
     parser.add_argument('--reward_predictor_learning_rate', type=float, default=2e-4)
     parser.add_argument('--n_initial_epochs', type=int, default=200)
     parser.add_argument('--dropout', type=float, default=0.0)

@@ -8,10 +8,10 @@ import sys
 import time
 from multiprocessing import Process, Queue
 
-import numpy as np
 import cloudpickle
 import easy_tf_log
 import gym
+import numpy as np
 
 from openai_baselines import logger
 from openai_baselines.a2c.a2c import learn
@@ -23,6 +23,7 @@ from params import parse_args
 from pref_db import PrefDB
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble
+from reward_predictor_core_network import net_cnn, net_moving_dot_features
 from utils import VideoRenderer, get_port_range, profile_memory
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
@@ -54,6 +55,14 @@ def run(general_params,
     else:
         episode_vid_queue = episode_renderer = None
 
+    if a2c_params['env_id'] in ['MovingDot-v0', 'MovingDotNoFrameskip-v0']:
+        reward_predictor_network = net_moving_dot_features
+    elif a2c_params['env_id'] in ['PongNoFrameskip-v4' 'EnduroNoFrameskip-v4']:
+        reward_predictor_network = net_cnn
+    else:
+        raise Exception("Unsure about reward predictor network for {}".format(
+            a2c_params['env_id']))
+
     def make_reward_predictor(name, cluster_dict):
         return RewardPredictorEnsemble(
             cluster_job_name=name,
@@ -62,7 +71,7 @@ def run(general_params,
             batchnorm=rew_pred_training_params['batchnorm'],
             dropout=rew_pred_training_params['dropout'],
             lr=rew_pred_training_params['lr'],
-            network_type=rew_pred_training_params['network'])
+            core_network=reward_predictor_network)
 
     save_make_reward_predictor(general_params['log_dir'],
                                make_reward_predictor)
@@ -208,7 +217,7 @@ def configure_a2c_logger(log_dir):
 def make_envs(env_id, n_envs, seed):
     def make_env(rank):
         def _thunk():
-            if env_id == 'MovingDot-v0' or env_id == 'MovingDotNoFrameskip-v0':
+            if env_id in ['MovingDot-v0', 'MovingDotNoFrameskip-v0']:
                 import gym_moving_dot
 
             env = gym.make(env_id)
@@ -257,9 +266,9 @@ def start_policy_training(cluster_dict, make_reward_predictor, gen_segments,
                           start_policy_training_pipe, seg_pipe,
                           episode_vid_queue, log_dir, a2c_params):
     env_id = a2c_params['env_id']
-    if env_id == 'MovingDotNoFrameskip-v0' or env_id == 'MovingDot-v0':
+    if env_id in ['MovingDotNoFrameskip-v0', 'MovingDot-v0']:
         policy_fn = MlpPolicy
-    elif env_id == 'PongNoFrameskip-v4' or env_id == 'EnduroNoFrameskip-v4':
+    elif env_id in ['PongNoFrameskip-v4', 'EnduroNoFrameskip-v4']:
         policy_fn = CnnPolicy
     else:
         msg = "Unsure about policy network architecture for {}".format(
