@@ -267,10 +267,6 @@ class Runner(object):
             mb_rewards = rewards_allenvs.reshape(nenvs, self.nsteps)
             assert_equal(mb_rewards.shape, (nenvs, self.nsteps))
 
-            ev = explained_variance(mb_rewards.flatten(),
-                                    orig_rewards.flatten())
-            logger.record_tabular("explained_variance_predicted_rewards", ev)
-
             logging.debug("Predicted rewards:\n%s", mb_rewards)
 
         # Save frames for episode rendering
