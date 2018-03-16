@@ -7,7 +7,6 @@ import numpy as np
 from numpy.testing import assert_equal
 import tensorflow as tf
 
-from reward_predictor_core_network import reward_pred_net
 from utils import RunningStat, batch_iter
 
 
@@ -18,7 +17,7 @@ class RewardPredictorEnsemble:
 
     def __init__(self,
                  cluster_job_name,
-                 network_type,
+                 core_network,
                  lr=1e-4,
                  cluster_dict=None,
                  batchnorm=False,
@@ -47,7 +46,7 @@ class RewardPredictorEnsemble:
                 with tf.device(device_setter):
                     with tf.variable_scope("pred_{}".format(pred_n)):
                         rp = RewardPredictorNetwork(
-                            network_type=network_type,
+                            core_network=core_network,
                             dropout=dropout,
                             batchnorm=batchnorm,
                             lr=lr)
@@ -284,7 +283,7 @@ class RewardPredictorNetwork:
     - pred      Predicted preference
     """
 
-    def __init__(self, network_type, dropout, batchnorm, lr):
+    def __init__(self, core_network, dropout, batchnorm, lr):
         training = tf.placeholder(tf.bool)
         # Each element of the batch is one trajectory segment.
         # (Dimensions are n segments x n frames per segment x ...)
@@ -294,20 +293,19 @@ class RewardPredictorNetwork:
         pref = tf.placeholder(tf.float32, shape=(None, 2))
 
         # Concatenate trajectory segments so that the first dimension is just
-        # frames (necessary because of conv layer's requirements on input shape)
+        # frames
+        # (necessary because of conv layer's requirements on input shape)
         s1_unrolled = tf.reshape(s1, [-1, 84, 84, 4])
         s2_unrolled = tf.reshape(s2, [-1, 84, 84, 4])
 
         # Predict rewards for each frame in the unrolled batch
-        _r1 = reward_pred_net(
-            network_type,
+        _r1 = core_network(
             s1_unrolled,
             dropout,
             batchnorm,
             reuse=False,
             training=training)
-        _r2 = reward_pred_net(
-            network_type,
+        _r2 = core_network(
             s2_unrolled,
             dropout,
             batchnorm,

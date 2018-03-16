@@ -73,13 +73,3 @@ def net_cnn(s, batchnorm, dropout, training, reuse):
     x = x[:, 0]
 
     return x
-
-
-def reward_pred_net(network, s, dropout, batchnorm, reuse, training):
-    if network == 'moving_dot_features':
-        return net_moving_dot_features(s, reuse)
-    elif network == 'cnn':
-        return net_cnn(s, batchnorm, dropout, training, reuse)
-    else:
-        raise Exception("Unknown reward predictor network architecture",
-                        network)
