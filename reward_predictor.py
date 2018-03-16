@@ -231,7 +231,6 @@ class RewardPredictorEnsemble:
                                              shuffle=True)):
             self.train_step(batch, prefs_train)
             self.n_steps += 1
-            print("Trained reward predictor for %d steps" % self.n_steps)
 
             if self.n_steps and self.n_steps % val_interval == 0:
                 self.val_step(prefs_val)
