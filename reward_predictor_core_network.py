@@ -24,7 +24,7 @@ def get_dot_position(s):
     return x, y
 
 
-def net_moving_dot_features(s, reuse):
+def net_moving_dot_features(s, batchnorm, dropout, training, reuse):
     # Action taken at each time step is encoded in the observations by a2c.py.
     a = s[:, 0, 0, -1]
     a = tf.cast(a, tf.float32) / 4.0

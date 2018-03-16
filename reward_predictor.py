@@ -300,15 +300,15 @@ class RewardPredictorNetwork:
 
         # Predict rewards for each frame in the unrolled batch
         _r1 = core_network(
-            s1_unrolled,
-            dropout,
-            batchnorm,
+            s=s1_unrolled,
+            dropout=dropout,
+            batchnorm=batchnorm,
             reuse=False,
             training=training)
         _r2 = core_network(
-            s2_unrolled,
-            dropout,
-            batchnorm,
+            s=s2_unrolled,
+            dropout=dropout,
+            batchnorm=batchnorm,
             reuse=True,
             training=training)
 
