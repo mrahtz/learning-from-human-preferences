@@ -300,7 +300,7 @@ def start_policy_training(cluster_dict, make_reward_predictor, gen_segments,
             start_policy_training_pipe=start_policy_training_pipe,
             episode_vid_queue=episode_vid_queue,
             reward_predictor=reward_predictor,
-            ckpt_dir=ckpt_dir,
+            ckpt_save_dir=ckpt_dir,
             gen_segments=gen_segments,
             **a2c_params)
 

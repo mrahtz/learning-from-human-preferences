@@ -1,4 +1,4 @@
-import os
+import logging
 import os.path as osp
 import queue
 import time
@@ -14,7 +14,6 @@ from openai_baselines.a2c.utils import (cat_entropy, discount_with_dones,
                                         find_trainable_variables, mse)
 from openai_baselines.common import explained_variance, set_global_seeds
 from pref_db import Segment
-import logging
 
 
 class Model(object):
@@ -137,13 +136,16 @@ class Runner(object):
         self.nsteps = nsteps
         self.states = model.initial_state
         self.dones = [False for _ in range(nenv)]
-        self.segment = Segment()
-        self.episode_frames = []
-        self.seg_pipe = seg_pipe
-        self.reward_predictor = reward_predictor
-        self.episode_vid_queue = episode_vid_queue
-        self.orig_reward = [0 for _ in range(nenv)]
+
         self.gen_segments = gen_segments
+        self.segment = Segment()
+        self.seg_pipe = seg_pipe
+
+        self.orig_reward = [0 for _ in range(nenv)]
+        self.reward_predictor = reward_predictor
+
+        self.episode_frames = []
+        self.episode_vid_queue = episode_vid_queue
 
     def update_obs(self, obs):
         # Do frame-stacking here instead of the FrameStack wrapper to reduce
@@ -167,7 +169,8 @@ class Runner(object):
                 while len(self.segment) < 25:
                     # Pad to 25 steps long so that all segments in the batch
                     # have the same length.
-                    # TODO only append the last frame
+                    # Note that the reward predictor needs the full frame
+                    # stack, so we send all frames.
                     self.segment.append(e0_obs[step], 0)
                 self.segment.finalise()
                 try:
@@ -183,8 +186,9 @@ class Runner(object):
         e0_obs = mb_obs[0]
         e0_dones = mb_dones[0]
         for step in range(self.nsteps):
-            # Append the last frame (the most recent one) from the 4-frame
-            # stack
+            # Here we only need to send the last frame (the most recent one)
+            # from the 4-frame stack, because we're just showing output to
+            # the user.
             self.episode_frames.append(e0_obs[step, :, :, -1])
             if e0_dones[step]:
                 self.episode_vid_queue.put(self.episode_frames)
@@ -254,11 +258,10 @@ class Runner(object):
             self.update_segment_buffer(mb_obs, mb_rewards, mb_dones)
 
         # Replace rewards with those from reward predictor
-        # (Note that this also needs to be done _after_ we've encoded the action.)
+        # (Note that this also needs to be done _after_ we've encoded the
+        # action.)
         logging.debug("Original rewards:\n%s", mb_rewards)
         if self.reward_predictor:
-            orig_rewards = np.copy(mb_rewards)
-
             assert_equal(mb_obs.shape, (nenvs, self.nsteps, 84, 84, 4))
             mb_obs_allenvs = mb_obs.reshape(nenvs * self.nsteps, 84, 84, 4)
 
@@ -303,11 +306,9 @@ class Runner(object):
 def learn(policy,
           env,
           seed,
-          seg_pipe,
           start_policy_training_pipe,
-          ckpt_dir,
+          ckpt_save_dir,
           lr_scheduler,
-          gen_segments,
           nsteps=5,
           nstack=4,
           total_timesteps=int(80e6),
@@ -318,8 +319,10 @@ def learn(policy,
           alpha=0.99,
           gamma=0.99,
           log_interval=100,
-          load_path=None,
-          save_interval=1000,
+          ckpt_save_interval=1000,
+          ckpt_load_dir=None,
+          gen_segments=False,
+          seg_pipe=None,
           reward_predictor=None,
           episode_vid_queue=None):
 
@@ -347,22 +350,22 @@ def learn(policy,
             alpha=alpha,
             epsilon=epsilon)
 
-    with open(osp.join(ckpt_dir, 'make_model.pkl'), 'wb') as fh:
+    with open(osp.join(ckpt_save_dir, 'make_model.pkl'), 'wb') as fh:
         fh.write(cloudpickle.dumps(make_model))
 
     print("Initialising policy...")
-    if load_path is None:
+    if ckpt_load_dir is None:
         model = make_model()
     else:
-        with open(osp.join(load_path, 'make_model.pkl'), 'rb') as fh:
+        with open(osp.join(ckpt_load_dir, 'make_model.pkl'), 'rb') as fh:
             make_model = cloudpickle.loads(fh.read())
         model = make_model()
 
-        ckpt_path = tf.train.latest_checkpoint(load_path)
-        model.load(ckpt_path)
-        print("Loaded policy from checkpoint '{}'".format(ckpt_path))
+        ckpt_load_path = tf.train.latest_checkpoint(ckpt_load_dir)
+        model.load(ckpt_load_path)
+        print("Loaded policy from checkpoint '{}'".format(ckpt_load_path))
 
-    ckpt_path = osp.join(ckpt_dir, 'policy.ckpt')
+    ckpt_save_path = osp.join(ckpt_save_dir, 'policy.ckpt')
 
     runner = Runner(env=env,
                     model=model,
@@ -385,7 +388,7 @@ def learn(policy,
     # Before we're told to start training the policy itself,
     # just generate segments for the reward predictor to be trained with
     while True:
-        obs, states, rewards, masks, actions, values = runner.run()
+        runner.run()
         try:
             start_policy_training_pipe.get(block=False)
         except queue.Empty:
@@ -421,7 +424,7 @@ def learn(policy,
             logger.record_tabular("learning_rate", cur_lr)
             logger.dump_tabular()
 
-        if update != 0 and update % save_interval == 0:
-            model.save(ckpt_path, update)
+        if update != 0 and update % ckpt_save_interval == 0:
+            model.save(ckpt_save_path, update)
 
-    model.save(ckpt_path, update)
+    model.save(ckpt_save_path, update)
