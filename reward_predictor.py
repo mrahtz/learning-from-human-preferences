@@ -104,6 +104,10 @@ class RewardPredictorEnsemble:
     def init_network(self, load_ckpt_dir=None):
         if load_ckpt_dir:
             ckpt_file = tf.train.latest_checkpoint(load_ckpt_dir)
+            if ckpt_file is None:
+                msg = "No reward predictor checkpoint found in '{}'".format(
+                    load_ckpt_dir)
+                raise FileNotFoundError(msg)
             self.saver.restore(self.sess, ckpt_file)
             print("Loaded reward predictor checkpoint from '{}'".format(ckpt_file))
         else:
@@ -111,7 +115,13 @@ class RewardPredictorEnsemble:
 
     def save(self):
         # TODO put back n_steps
-        ckpt_name = self.saver.save(self.sess, self.checkpoint_file)
+        # Why save_relative_paths=True?
+        # So that the plain-text 'checkpoint' file written uses relative paths,
+        # which seems to be needed in order to avoid confusing saver.restore()
+        # when restoring from FloydHub runs.
+        ckpt_name = self.saver.save(self.sess,
+                                    self.checkpoint_file,
+                                    save_relative_paths=True)
         print("Saved reward predictor checkpoint to '{}'".format(ckpt_name))
 
     def raw_rewards(self, obs):
