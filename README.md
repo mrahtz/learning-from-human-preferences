@@ -17,3 +17,7 @@ Code is yet to be cleaned up, so expect mess.
 * Reproduction of Enduro behaviour shown in [OpenAI's blog post](https://blog.openai.com/deep-reinforcement-learning-from-human-preferences/) using human preferences.
 
 ![](images/enduro.gif)
+
+## Code credits
+
+`a2c` is based on the A2C implementation from (https://github.com/openai/baselines)[OpenAI's baselines], commit (https://github.com/openai/baselines/commit/f8663ea)[`f8663ea`].
