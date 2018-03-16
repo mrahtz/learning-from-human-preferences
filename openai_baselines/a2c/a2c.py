@@ -253,7 +253,6 @@ class Runner(object):
             for step_n in range(self.nsteps):
                 self.orig_reward[env_n] += rs[step_n]
                 if dones[step_n]:
-                    print("Orig reward {}".format(self.orig_reward[env_n]))
                     easy_tf_log.logkv(
                         "orig_reward_{}".format(env_n),
                         self.orig_reward[env_n])
