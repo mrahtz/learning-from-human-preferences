@@ -7,17 +7,15 @@ name = "pypi"
 
 [packages]
 
-tensorflow = "*"
+gym = {extras = ["atari"], version = "==0.9.3"}
 scipy = "*"
-joblib = "*"
-gym-moving-dot = {git = 'https://github.com/mrahtz/gym-moving-dot'}
-easy-tf-log = {git = 'https://github.com/mrahtz/easy-tf-log'}
 cloudpickle = "*"
+easy-tf-log = {git = 'https://github.com/mrahtz/easy-tf-log'}
 matplotlib = "*"
-"pyqt5" = "*"
 
 
 [dev-packages]
 
 nose = "*"
 termcolor = "*"
+memory_profiler = "*"
