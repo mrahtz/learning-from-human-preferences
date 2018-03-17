@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "a1625b29e40c16c0a322d09727d4efc2ae97d963978f9d1b56f760973b570dd4"
+            "sha256": "b994e6c71fc96c8e12da82075d4024798cd6cd7e0947381ef232b6baf9b2f2cb"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -66,6 +66,9 @@
             ],
             "index": "pypi",
             "version": "==0.9.3"
+        },
+        "gym-moving-dot": {
+            "git": "https://github.com/mrahtz/gym-moving-dot"
         },
         "idna": {
             "hashes": [
