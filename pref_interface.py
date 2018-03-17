@@ -54,8 +54,6 @@ class PrefInterface:
                     # we'll have to wait for more segments
                     time.sleep(1.0)
                     self.recv_segments(seg_pipe)
-                else:
-                    break
             s1, s2 = seg_pair
 
             logging.debug("Querying preference for segments %s and %s",
@@ -77,6 +75,8 @@ class PrefInterface:
                 pref_pipe.put((s1.frames, s2.frames, pref))
             # If pref is None, the user answered "incomparable" for the segment
             # pair. The pair has been marked as tested; we just drop it.
+
+            self.recv_segments(seg_pipe)
 
     def recv_segments(self, seg_pipe):
         """
