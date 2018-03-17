@@ -93,10 +93,10 @@ def run(general_params,
             pref_pipe=pref_pipe,
             n_initial_prefs=general_params['n_initial_prefs'],
             max_prefs=general_params['max_prefs'])
-        train_path = osp.join(general_params['log_dir'], 'train_initial.pkl')
+        train_path = osp.join(general_params['log_dir'], 'train_initial.pkl.gz')
         pref_db_train.save(train_path)
         print("Saved training preferences to '{}'".format(train_path))
-        val_path = osp.join(general_params['log_dir'], 'val_initial.pkl')
+        val_path = osp.join(general_params['log_dir'], 'val_initial.pkl.gz')
         pref_db_val.save(val_path)
         print("Saved validation preferences to '{}'".format(val_path))
         pi_proc.terminate()
@@ -330,13 +330,13 @@ def start_reward_predictor_training(cluster_dict,
         rew_pred.init_network(load_ckpt_dir)
 
         if prefs_dir is not None:
-            train_path = osp.join(prefs_dir, 'train_initial.pkl')
+            train_path = osp.join(prefs_dir, 'train_initial.pkl.gz')
             pref_db_train = PrefDB.load(train_path)
             print("Loaded training preferences from '{}'".format(train_path))
             n_prefs, n_segs = len(pref_db_train), len(pref_db_train.segments)
             print("({} preferences, {} segments)".format(n_prefs, n_segs))
 
-            val_path = osp.join(prefs_dir, 'val_initial.pkl')
+            val_path = osp.join(prefs_dir, 'val_initial.pkl.gz')
             pref_db_val = PrefDB.load(val_path)
             print("Loaded validation preferences from '{}'".format(val_path))
             n_prefs, n_segs = len(pref_db_val), len(pref_db_val.segments)

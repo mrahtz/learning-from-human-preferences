@@ -1,3 +1,4 @@
+import gzip
 import pickle
 
 import numpy as np
@@ -79,11 +80,11 @@ class PrefDB:
         return len(self.prefs)
 
     def save(self, path):
-        with open(path, 'wb') as pkl_file:
+        with gzip.open(path, 'wb') as pkl_file:
             pickle.dump(self, pkl_file)
 
     @staticmethod
     def load(path):
-        with open(path, 'rb') as pkl_file:
+        with gzip.open(path, 'rb') as pkl_file:
             pref_db = pickle.load(pkl_file)
         return pref_db
