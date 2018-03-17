@@ -387,7 +387,9 @@ def start_episode_renderer():
 
 def recv_prefs(pref_pipe, pref_db_train, pref_db_val, max_prefs):
     val_fraction = 0.2
-    while True:
+    n_recvd = 0
+    max_recv = 100
+    while n_recvd < max_recv:
         try:
             s1, s2, mu = pref_pipe.get(timeout=0.1)
         except queue.Empty:
@@ -405,6 +407,8 @@ def recv_prefs(pref_pipe, pref_db_train, pref_db_val, max_prefs):
         if len(pref_db_train) > max_prefs * (1 - val_fraction):
             pref_db_train.del_first()
         assert len(pref_db_train) <= max_prefs * (1 - val_fraction)
+
+        n_recvd += 1
 
 
 if __name__ == '__main__':
