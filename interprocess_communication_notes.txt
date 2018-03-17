@@ -1,0 +1,103 @@
+There are two pieces of interprocess communication we need to take care of:
+segments being passed from the A2C workers to the preference interface, and
+preferences being passed from the preference interface to the reward predictor.
+We do this using multiprocess-safe queues.
+
+In both cases, ideally we would want the consumers to fetch items in bursts from
+the queues (going away to do something else between bursts) in such a way that
+they consume items faster than the producers can produce them. Then, the natural
+stopping condition for each burst would be e.g. "no more preferences on the
+queue".
+
+Python Queue objects work like this:
+- The producer calls put(item).
+- item is added to an internal buffer, and the internal semaphore count is
+  increased.
+- A background thread running on the producer reads items from the buffer,
+  serializes them, and then puts the serialized bytes onto (on UNIX) a pipe.
+
+Note that pipes have a finite length, on the order of kilobytes.  Each segment
+we're sending is about 1 megabyte. That means that the part where maxsize items
+'float' before being picked up by the producer is /not/ the pipe - it's the
+internal buffer /before/ the serializer.
+
+However, concentrating on preferences for a moment, there are two problems.
+
+The first problem is that if the producer can produce items faster than they can
+be serialized (as is the case if we're running in synthetic preferences mode),
+we'll always be waiting for the serializer and not for the producer. We'll never
+get to a stage where we've got all the preferences that the producer has to
+offer right now; preferences could be queued up to the limit on the producer's
+end while we're waiting for the serializer to do its job.
+
+Diagramatically: buffer (big) -> serializer (slow) -> pipe (small)
+
+The second problem is that because the pipe is so small we'll only be able to
+fetch a single preference from the pipe before we have to wait for the
+serializer to do its job again. If we run with block=False, we'd only get one
+preference at a time - and while we're waiting, the whole preference generation
+process stalls, because the pipe is full.
+
+So what are our options?
+- block=True? No; we need to break at some point to go train the reward
+  predictor some more.
+- block=True, but return after a predefined number of received preferences? That
+  might work for synthetic preferences, but not for human preferences, which are
+  produced at a much slower rate.  We would have to wait for too long between
+  reward predictor training cycles.
+- block=False? Then we only get one preference from the pipe before we return.
+- block=True, with a timeout? Well, if the timeout is less than the
+  serialization interval, we'd be in the same position as block=False. If the
+  timeout is greater than the serialization interval, we're in the same position
+  as block=True.
+- block=True, with a timeout, and a maximum number of gets before returning?
+  That could work. If we set the timeout to be just greater than the
+  serialization interval, then we can get a decent number of preferences on each
+  run in synthetic preferences mode, but we'll hit the timeout and return early
+  if preferences are being produced by a slow human.
+
+I'm assuming that one second is a reasonable upper bound on serialization time
+for, say, 2 MB (2 x 1 MB segments).
+
+OK, but how many should we try and get before calling it quits?  How does that
+number relate to the queue maxsize?
+- If the queue maxsize was 2, that would suck. Reward predictor training runs
+  can take minutes; during that time the human could only give 2 preferences.
+- The the queue maxsize was 1,000 and we only picked off 2 each time, assuming
+  that the human gives more than 2 preferences per reward predictor training
+  run, we'd eventually run into the same situation.
+- If the queue maxsize was 100, and we picked off 100 each time, as long as the
+  human doesn't give more than 100 preferences per reward predictor run, we
+  should be fine.
+- If the queue maxsize was 100, and we tried to pick off 1,000 each time...well,
+  that would also be OK.
+- If the queue masize was 100, and we only picked off 50 each time, then if the
+  human gave more than 50 preferences per reward predictor run, they'd be forced
+  to wait until the reward predictor run had finished before they could give the
+  next 50.
+
+So we want:
+
+min(queue size, no. picked off per run)
+>
+no. preferences human might reasonably be expected to give per reward predictor
+training run
+
+Other than that, I don't think the relative size of the two numbers matters that
+much.
+
+I would guess that each epoch of training takes about 30 minutes with the
+maximum number of preferences. I can answer about 500 preferences an hour. So it
+should be about 250. Let's say 300 to be safe.
+
+OK, that's preferences. What about segments?
+
+segments are produced more slowly than synthetic preferences, but I'm not sure
+we can rely on them being produced slower than they can be serialized. So here,
+too, we have to be careful.
+
+We should make the queue maxsize large enough to fit the maximum number of
+segments that might be reasonably generated between the human giving each
+preference. 16 workers runs at about 500 fps; at 25 frames a segment, that's 20
+segments per second. Let's say the human answers most slowly at about 10 seconds
+per preference. So we should allow room for about 200 segments.

@@ -50,12 +50,12 @@ class PrefInterface:
                 try:
                     seg_pair = self.sample_seg_pair()
                 except IndexError:
+                    print("Preference interface ran out of untested segments;"
+                          "waiting...")
                     # If we've tested all possible pairs of segments so far,
                     # we'll have to wait for more segments
                     time.sleep(1.0)
                     self.recv_segments(seg_pipe)
-                else:
-                    break
             s1, s2 = seg_pair
 
             logging.debug("Querying preference for segments %s and %s",
@@ -78,13 +78,18 @@ class PrefInterface:
             # If pref is None, the user answered "incomparable" for the segment
             # pair. The pair has been marked as tested; we just drop it.
 
+            self.recv_segments(seg_pipe)
+
     def recv_segments(self, seg_pipe):
         """
         Receive segments from `seg_pipe` into circular buffer `segments`.
         """
-        while True:
+        n_recvd = 0
+        # See interprocess_communication_notes.txt
+        max_recv = 200
+        while n_recvd < max_recv:
             try:
-                segment = seg_pipe.get(timeout=0.1)
+                segment = seg_pipe.get(block=True, timeout=1)
             except queue.Empty:
                 break
 
@@ -93,6 +98,8 @@ class PrefInterface:
             else:
                 self.segments[self.seg_idx] = segment
                 self.seg_idx = (self.seg_idx + 1) % self.max_segs
+            
+            n_recvd += 1
         easy_tf_log.logkv('n_segments', len(self.segments))
 
     def sample_seg_pair(self):
