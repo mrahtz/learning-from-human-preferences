@@ -4,6 +4,7 @@ Reproduction of [Deep Reinforcement Learning from Human Preferences](https://arx
 
 Code is yet to be cleaned up, so expect mess.
 
+
 ## Results
 
 * Successful training in a simple moving dot environment using synthetic preferences.
@@ -17,6 +18,34 @@ Code is yet to be cleaned up, so expect mess.
 * Reproduction of Enduro behaviour shown in [OpenAI's blog post](https://blog.openai.com/deep-reinforcement-learning-from-human-preferences/) using human preferences.
 
 ![](images/enduro.gif)
+
+
+## Setup
+
+To set up an isolated environment and install dependencies, install
+[Pipenv](https://github.com/pypa/pipenv), then just run:
+
+`pipenv install`
+
+However, note that the correct version of TensorFlow must be installed
+manually. Either:
+
+`pipenv run pip install tensorflow==1.6.0`
+
+or
+
+`pipenv run pip install tensorflow-gpu==1.6.0`
+
+depending on whether you have a GPU.
+
+If you want to run tests, also run:
+
+`pipenv install --dev`
+
+Finally, before running any of the scripts, enter the environment with:
+
+`pipenv shell`
+
 
 ## Code credits
 
