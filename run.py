@@ -44,8 +44,9 @@ def run(general_params,
         a2c_params,
         pref_interface_params,
         rew_pred_training_params):
-    seg_pipe = Queue(maxsize=100)
-    pref_pipe = Queue(maxsize=100)
+    # See interprocess_communication_notes.txt
+    seg_pipe = Queue(maxsize=200)
+    pref_pipe = Queue(maxsize=300)
     start_policy_training_flag = Queue(maxsize=1)
 
     if general_params['render_episodes']:
@@ -386,12 +387,16 @@ def start_episode_renderer():
 
 
 def recv_prefs(pref_pipe, pref_db_train, pref_db_val, max_prefs):
+    """
+    Get preferences from pref_pipe until there are none left to get.
+    """
     val_fraction = 0.2
     n_recvd = 0
-    max_recv = 100
+    # See interprocess_communication_notes.txt
+    max_recv = 300
     while n_recvd < max_recv:
         try:
-            s1, s2, mu = pref_pipe.get(timeout=0.1)
+            s1, s2, mu = pref_pipe.get(block=True, timeout=1)
         except queue.Empty:
             break
 
