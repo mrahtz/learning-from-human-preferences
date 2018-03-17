@@ -19,3 +19,8 @@ matplotlib = "*"
 nose = "*"
 termcolor = "*"
 memory_profiler = "*"
+
+
+[requires]
+
+python_version = "3"
