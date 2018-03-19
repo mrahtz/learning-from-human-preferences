@@ -88,7 +88,10 @@ class PrefInterface:
         start_time = time.time()
         n_recvd = 0
         while time.time() - start_time < max_wait_seconds:
-            segment = seg_pipe.get(block=True)
+            try:
+                segment = seg_pipe.get(block=True, timeout=max_wait_seconds)
+            except queue.Empty:
+                return
             if len(self.segments) < self.max_segs:
                 self.segments.append(segment)
             else:
