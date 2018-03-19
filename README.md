@@ -19,8 +19,10 @@ Code is yet to be cleaned up, so expect mess.
 
 ![](images/enduro.gif)
 
+## Running
 
-## Setup
+
+### Python setup
 
 To set up an isolated environment and install dependencies, install
 [Pipenv](https://github.com/pypa/pipenv), then just run:
@@ -45,6 +47,31 @@ If you want to run tests, also run:
 Finally, before running any of the scripts, enter the environment with:
 
 `pipenv shell`
+
+
+### Piece-by-piece runs
+
+First, save an initial set of 500 preferences:
+
+`python run.py gather_initial_prefs MovingDotNoFrameskip-v0 --synthetic_prefs --run_name moving_dot-initial_prefs`
+
+
+
+
+### End-to-end runs
+
+To train a simple test environment, [gym-moving-dot](https://github.com/mrahtz/gym-moving-dot), with synthetic preferences:
+
+`python run.py train_policy_with_preferences MovingDotNoFrameskip-v0 --synthetic_prefs --ent_coef 0.02 --million_timesteps 0.15`
+
+To train Pong with synthetic preferences:
+
+`python3 run.py train_policy_with_preferences PongNoFrameskip-v4 --synthetic_prefs --dropout 0.5 --n_envs 16 --million_timesteps 20`
+
+
+### Running checkpoints
+
+`python run_checkpoint.py MovingDotNoFrameskip-v0 runs/moving_dot-end_to_end-synthetic_prefs_bf708da/policy_checkpoints`
 
 
 ## Code credits
