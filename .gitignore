@@ -3,7 +3,6 @@ __pycache__
 log.txt
 .DS_Store
 *.pyc
-*.pkl
 tags
 .floydexpt
 floydruns
