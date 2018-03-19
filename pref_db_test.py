@@ -13,7 +13,7 @@ class TestPrefDB(unittest.TestCase):
         between similar segments
         (i.e. check that its hash function is working as it's supposed to).
         """
-        p = PrefDB()
+        p = PrefDB(maxlen=5)
         s1 = np.ones((25, 84, 84, 4))
         s2 = np.ones((25, 84, 84, 4))
         s2[12][24][24][2] = 0
@@ -25,7 +25,7 @@ class TestPrefDB(unittest.TestCase):
         Do a number of appends/deletes and check that the number of
         preferences and segments is as expected at all times.
         """
-        p = PrefDB()
+        p = PrefDB(maxlen=10)
 
         s1 = np.random.randint(low=-10, high=10, size=(25, 84, 84, 4))
         s2 = np.random.randint(low=-10, high=10, size=(25, 84, 84, 4))
@@ -79,6 +79,25 @@ class TestPrefDB(unittest.TestCase):
         p.del_first()
         self.assertEqual(len(p.prefs), 0)
         self.assertEqual(len(p.segments), 0)
+
+    def test_circular(self):
+        p = PrefDB(maxlen=2)
+
+        p.append(0, 1, 10)
+        self.assertEqual(len(p), 1)
+        p.append(2, 3, 11)
+        self.assertEqual(len(p), 2)
+        p.append(4, 5, 12)
+        self.assertEqual(len(p), 2)
+
+        self.assertEqual(len(p.segments), 4)
+        self.assertIn(2, p.segments.values())
+        self.assertIn(3, p.segments.values())
+        self.assertIn(4, p.segments.values())
+        self.assertIn(5, p.segments.values())
+
+        self.assertEqual(p.prefs[0][2], 11)
+        self.assertEqual(p.prefs[1][2], 12)
 
 
 if __name__ == '__main__':
