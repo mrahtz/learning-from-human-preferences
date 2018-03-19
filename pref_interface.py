@@ -84,22 +84,19 @@ class PrefInterface:
         """
         Receive segments from `seg_pipe` into circular buffer `segments`.
         """
+        max_wait_seconds = 0.5
+        start_time = time.time()
         n_recvd = 0
-        # See interprocess_communication_notes.txt
-        max_recv = 200
-        while n_recvd < max_recv:
-            try:
-                segment = seg_pipe.get(block=True, timeout=1)
-            except queue.Empty:
-                break
-
+        while time.time() - start_time < max_wait_seconds:
+            segment = seg_pipe.get(block=True)
             if len(self.segments) < self.max_segs:
                 self.segments.append(segment)
             else:
                 self.segments[self.seg_idx] = segment
                 self.seg_idx = (self.seg_idx + 1) % self.max_segs
-            
             n_recvd += 1
+        easy_tf_log.logkv('segment_idx', self.seg_idx)
+        easy_tf_log.logkv('n_segments_rcvd', n_recvd)
         easy_tf_log.logkv('n_segments', len(self.segments))
 
     def sample_seg_pair(self):

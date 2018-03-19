@@ -34,7 +34,7 @@ class Segment:
 
 class PrefDB:
     """
-    A database of preferences about pairs of segments.
+    A circular database of preferences about pairs of segments.
 
     For each preference, we store the preference itself
     (mu in the paper) and the two segments the preference refers to.
@@ -42,10 +42,11 @@ class PrefDB:
     preferences refer to the same segment, the segment is only stored once.
     """
 
-    def __init__(self):
+    def __init__(self, maxlen):
         self.segments = {}
         self.seg_refs = {}
         self.prefs = []
+        self.maxlen = maxlen
 
     def append(self, s1, s2, pref):
         k1 = hash(np.array(s1).tostring())
@@ -60,6 +61,9 @@ class PrefDB:
 
         tup = (k1, k2, pref)
         self.prefs.append(tup)
+
+        if len(self.prefs) > self.maxlen:
+            self.del_first()
 
     def del_first(self):
         self.del_pref(0)

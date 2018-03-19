@@ -13,12 +13,12 @@ from os.path import exists, join
 import termcolor
 
 
-def create_initial_prefs(out_dir, interactive):
+def create_initial_prefs(out_dir, synthetic_prefs):
     cmd = ("python3 run.py gather_initial_prefs "
            "PongNoFrameskip-v4 "
            "--n_initial_prefs 1 "
            "--log_dir {}".format(out_dir))
-    if not interactive:
+    if synthetic_prefs:
         cmd += " --synthetic_prefs"
     subprocess.call(cmd.split(' '))
 
@@ -29,20 +29,20 @@ class TestRun(unittest.TestCase):
         termcolor.cprint(self._testMethodName, 'red')
 
     def test_gather_prefs(self):
-        for interactive in [True, False]:
-            if interactive:
-                termcolor.cprint('Human preferences', 'green')
-            else:
+        for synthetic_prefs in [True, False]:
+            if synthetic_prefs:
                 termcolor.cprint('Synthetic preferences', 'green')
+            else:
+                termcolor.cprint('Human preferences', 'green')
             # Automatically deletes the directory afterwards :)
             with tempfile.TemporaryDirectory() as temp_dir:
-                create_initial_prefs(temp_dir, interactive)
+                create_initial_prefs(temp_dir, synthetic_prefs)
                 self.assertTrue(exists(join(temp_dir, 'train_initial.pkl.gz')))
                 self.assertTrue(exists(join(temp_dir, 'val_initial.pkl.gz')))
 
     def test_pretrain_reward_predictor(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            create_initial_prefs(temp_dir, interactive=False)
+            create_initial_prefs(temp_dir, synthetic_prefs=True)
             cmd = ("python3 run.py pretrain_reward_predictor "
                    "PongNoFrameskip-v4 "
                    "--n_initial_epochs 1 "
