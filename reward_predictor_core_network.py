@@ -54,16 +54,11 @@ def net_cnn(s, batchnorm, dropout, training, reuse):
     # size 64 and then a scalar output. All convolutional layers use batch norm
     # and dropout with α = 0.5 to prevent predictor overfitting"
     x = conv_layer(x, 16, 7, 3, batchnorm, training, "c1", reuse, 'relu')
-    # I /think/ that both legs of the network should dropout in the same way
-    # (though I struggle to strongly justify the intuition.)
-    # We therefore set the dropout seeds explicitly.
-    # (But TODO: should we also set noise_shape?
-    #  So that the same dropout mask is used for all steps in each segment?)
-    x = tf.layers.dropout(x, dropout, training=training, seed=0)
+    x = tf.layers.dropout(x, dropout, training=training)
     x = conv_layer(x, 16, 5, 2, batchnorm, training, "c2", reuse, 'relu')
-    x = tf.layers.dropout(x, dropout, training=training, seed=1)
+    x = tf.layers.dropout(x, dropout, training=training)
     x = conv_layer(x, 16, 3, 1, batchnorm, training, "c3", reuse, 'relu')
-    x = tf.layers.dropout(x, dropout, training=training, seed=2)
+    x = tf.layers.dropout(x, dropout, training=training)
     x = conv_layer(x, 16, 3, 1, batchnorm, training, "c4", reuse, 'relu')
 
     w, h, c = x.get_shape()[1:]
