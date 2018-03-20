@@ -49,13 +49,18 @@ Finally, before running any of the scripts, enter the environment with:
 `pipenv shell`
 
 
+### Runs with original rewards
+
+To train Pong:
+
+`python3 run.py train_policy_with_original_rewards PongNoFrameskip-v4 --n_envs 16 --million_timesteps 10`
+
+
 ### Piece-by-piece runs
 
 First, save an initial set of 500 preferences:
 
 `python run.py gather_initial_prefs MovingDotNoFrameskip-v0 --synthetic_prefs --run_name moving_dot-initial_prefs`
-
-
 
 
 ### End-to-end runs
