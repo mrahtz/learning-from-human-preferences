@@ -48,7 +48,8 @@ def run_agent(env, model, reward_predictor, frame_interval_ms):
         done = False
         while not done:
             model_obs = np.vstack([obs] * model_nenvs)
-            [action], _, states = model.step(model_obs, states, [done])
+            actions, _, states = model.step(model_obs, states, [done])
+            action = actions[0]
             raw_obs, reward, done, _ = env.step(action)
             obs = update_obs(obs, raw_obs, nc)
             episode_reward += reward
@@ -75,8 +76,7 @@ def get_reward_predictor(ckpt_dir):
     cluster_dict = {'a2c': ['localhost:2200']}
     print("Initialising reward predictor...")
     reward_predictor = make_reward_predictor(name='a2c', cluster_dict=cluster_dict)
-    ckpt_file = tf.train.latest_checkpoint(ckpt_dir)
-    reward_predictor.init_network(ckpt_file)
+    reward_predictor.init_network(ckpt_dir)
     return reward_predictor
 
 
