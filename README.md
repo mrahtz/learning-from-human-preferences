@@ -112,7 +112,7 @@ workers according to the preferences given by the user.
 
 ### Processes
 
-All components run asynchronously in different processes:
+All components run asynchronously in different subprocesses:
 * A2C workers explore the environment and train the policy.
 * The preference interface queries the user for preference.
 * The reward predictor is trained using preferences given.
@@ -137,6 +137,8 @@ There are three tricky parts to this:
   process maintains its own copy of the network, and parameter updates from
   the reward predictor training process are automatically replicated to the A2C
   worker process's network.
+
+All subproceseses are started and coordinated by [`run.py`](run.py).
 
 ![](images/diagram.png)
 

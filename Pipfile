@@ -13,6 +13,7 @@ matplotlib = "*"
 gym = {extras = ["atari"], version = "==0.9.3"}
 easy-tf-log = {git = 'https://github.com/mrahtz/easy-tf-log'}
 gym-moving-dot = {git = "https://github.com/mrahtz/gym-moving-dot"}
+numpy = "*"
 
 
 [dev-packages]
