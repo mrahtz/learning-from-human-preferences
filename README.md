@@ -1,8 +1,9 @@
 # Deep Reinforcement Learning from Human Preferences
 
 Reproduction of OpenAI and DeepMind's [Deep Reinforcement Learning from Human
-Preferences](https://blog.openai.com/deep-reinforcement-learning-from-human-preferences/)
-([paper](https://arxiv.org/abs/1706.03741)).
+Preferences](https://blog.openai.com/deep-reinforcement-learning-from-human-preferences/).
+
+(Original paper at <https://arxiv.org/abs/1706.03741>.)
 
 
 ## Results
