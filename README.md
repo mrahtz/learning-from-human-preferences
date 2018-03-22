@@ -82,7 +82,7 @@ To train Pong with synthetic preferences:
 ## Architecture notes
 
 There are three main components:
-* The A2C workers ([`a2c/a2c.py`](a2c/a2c.py))
+* The A2C workers ([`a2c/a2c/a2c.py`](a2c/a2c/a2c.py))
 * The preference interface ([`pref_interface.py`](pref_interface.py))
 * The reward predictor ([`reward_predictor.py`](reward_predictor.py))
 
