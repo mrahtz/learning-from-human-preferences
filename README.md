@@ -1,82 +1,117 @@
-# Learning from Human Preferences
+# Deep Reinforcement Learning from Human Preferences
 
-Reproduction of [Deep Reinforcement Learning from Human Preferences](https://arxiv.org/abs/1706.03741).
-
-Code is yet to be cleaned up, so expect mess.
+Reproduction of OpenAI and DeepMind's [Deep Reinforcement Learning from Human
+Preferences](https://blog.openai.com/deep-reinforcement-learning-from-human-preferences/)
+([paper](https://arxiv.org/abs/1706.03741)).
 
 
 ## Results
 
-* Successful training in a simple moving dot environment using synthetic preferences.
+The main milestones of this reproduction were:
+
+* Training an agent to move the dot to the middle in a [simple environment](https://github.com/mrahtz/gym-moving-dot) using synthetic preferences.
 
 ![](images/dot_success.gif)
 
-* Successful training of Pong using synthetic preferences.
+* Training an agent to play Pong using synthetic preferences.
 
 ![](images/pong.gif)
 
-* Reproduction of Enduro behaviour shown in [OpenAI's blog post](https://blog.openai.com/deep-reinforcement-learning-from-human-preferences/) using human preferences.
+* Training an agent to stay alongside other cars in Enduro using *human* preferences.
 
 ![](images/enduro.gif)
 
-## Running
 
+## Usage
 
 ### Python setup
 
 To set up an isolated environment and install dependencies, install
 [Pipenv](https://github.com/pypa/pipenv), then just run:
 
-`pipenv install`
+`$ pipenv install`
 
-However, note that the correct version of TensorFlow must be installed
-manually. Either:
+However, note that TensorFlow must be installed manually. Either:
 
-`pipenv run pip install tensorflow==1.6.0`
+`$ pipenv run pip install tensorflow`
 
 or
 
-`pipenv run pip install tensorflow-gpu==1.6.0`
+`$ pipenv run pip install tensorflow-gpu`
 
-depending on whether you have a GPU.
+depending on whether you have a GPU. (If you run into problems, try installing
+TensorFlow 1.6.0, which was used for development.)
 
 If you want to run tests, also run:
 
-`pipenv install --dev`
+`$ pipenv install --dev`
 
 Finally, before running any of the scripts, enter the environment with:
 
-`pipenv shell`
+`$ pipenv shell`
 
+### Running
 
-### Runs with original rewards
+All training is done using [`run.py`](run.py). Basic usage is:
 
-To train Pong:
+`$ python3 run.py <mode> <environment>`
 
-`python3 run.py train_policy_with_original_rewards PongNoFrameskip-v4 --n_envs 16 --million_timesteps 10`
+Supported environments are
+[`MovingDotNoFrameskip-v0`](https://github.com/mrahtz/gym-moving-dot),
+`PongNoFrameskip-v4`, and `EnduroNoFrameskip-v4`.
 
+### Training with original rewards
+
+To train using the original rewards from the environment rather than rewards
+based on preferences, use the `train_policy_with_original_rewards` mode.
+
+For example, to train Pong:
+
+`$ python3 run.py train_policy_with_original_rewards PongNoFrameskip-v4 --n_envs 16 --million_timesteps 10`
+
+### Training end-to-end with human preferences
+
+Use the `train_policy_with_preferences` mode.
+
+For example, to train `MovingDotNoFrameskip-v0` using *synthetic* preferences:
+
+`$ python3 run.py train_policy_with_preferences MovingDotNoFrameskip-v0 --synthetic_prefs --ent_coef 0.02 --million_timesteps 0.15`
+
+To train Pong using *synthetic* preferences:
+
+`$ python3 run.py train_policy_with_preferences PongNoFrameskip-v4 --synthetic_prefs --dropout 0.5 --n_envs 16 --million_timesteps 20`
+
+To train Enduro: TODO (mentioned `--render_episodes`)
 
 ### Piece-by-piece runs
 
-First, save an initial set of 500 preferences:
+You can also run different parts of the training process separately, saving
+their results for later use:
+* Use the `gather_initial_prefs` mode to gather the initial 500 preferences
+  used for pretraining the reward predictor. This saves preferences to
+  `train_initial.pkl.gz` and `val_initial.pkl.gz` in the run directory.
+* Use `pretrain_reward_predictor` to just pretrain the reward predictor (200
+  epochs). Specify the run directory to load initial preferences from with
+  `--load_prefs_dir`.
+* Load a pretrained reward predictor using the `--load_reward_predictor_ckpt`
+  argument when running in `train_policy_with_preferences` mode.
 
-`python run.py gather_initial_prefs MovingDotNoFrameskip-v0 --synthetic_prefs --run_name moving_dot-initial_prefs`
+For example, to gather synthetic preferences for `MovingDotNoFrameskip-v0`,
+saving to run directory `moving_dot-initial_prefs`:
 
-
-### End-to-end runs
-
-To train a simple test environment, [gym-moving-dot](https://github.com/mrahtz/gym-moving-dot), with synthetic preferences:
-
-`python run.py train_policy_with_preferences MovingDotNoFrameskip-v0 --synthetic_prefs --ent_coef 0.02 --million_timesteps 0.15`
-
-To train Pong with synthetic preferences:
-
-`python3 run.py train_policy_with_preferences PongNoFrameskip-v4 --synthetic_prefs --dropout 0.5 --n_envs 16 --million_timesteps 20`
+`$ python run.py gather_initial_prefs MovingDotNoFrameskip-v0 --synthetic_prefs --run_name moving_dot-initial_prefs`
 
 
 ### Running checkpoints
 
-`python run_checkpoint.py MovingDotNoFrameskip-v0 runs/moving_dot-end_to_end-synthetic_prefs_bf708da/policy_checkpoints`
+To run a trained policy checkpoint so you can see what the agent was doing, use
+[`run_checkpoint.py`](run_checkpoint.py) Basic usage is:
+
+`$ python3 run_checkpoint.py <environment> <policy checkpoint directory>`
+
+For example: TODO
+
+`$ python3 run_checkpoint.py MovingDotNoFrameskip-v0 runs/moving_dot-end_to_end-synthetic_prefs_bf708da/policy_checkpoints`
 
 
 ## Architecture notes
