@@ -1,9 +1,8 @@
 # Deep Reinforcement Learning from Human Preferences
 
 Reproduction of OpenAI and DeepMind's [Deep Reinforcement Learning from Human
-Preferences](https://blog.openai.com/deep-reinforcement-learning-from-human-preferences/).
-
-(Original paper at <https://arxiv.org/abs/1706.03741>.)
+Preferences](https://blog.openai.com/deep-reinforcement-learning-from-human-preferences/),
+based on their paper at <https://arxiv.org/abs/1706.03741>.
 
 
 ## Results
@@ -177,6 +176,36 @@ There are three tricky parts to this:
 All subproceseses are started and coordinated by [`run.py`](run.py).
 
 ![](images/diagram.png)
+
+
+## Changes to the paper's setup
+
+It turned out to be possible to reach the milestones in the results section
+above even without implementing a number of features described in the original
+paper.
+
+* For regularization of the reward predictor network, the paper uses dropout,
+  batchnorm and an adaptive L2 regularization scheme. Here, we only use
+  dropout. (Batchnorm is also supported. L2 reguarlization is not implemented.)
+* In the paper's setup, the rate at which preferences are requested is
+  gradually reduced over time. We just ask for preferences at a constant rate.
+* The paper selects video clips to show the user based on predicted reward
+  uncertainty among an ensemble of reward predictors. Early experiments
+  suggested a higher chance of successful training by just selecting video
+  clips randomly (also noted by the paper in some situations), so we don't do
+  any ensembling. (Ensembling code *is* implemented in
+  [`reward_predictor.py`](reward_predictor.py), but we always operate with only
+  a single-member ensemble, and [`pref_interface.py`](pref_interface.py) just
+  chooses segments randomly.)
+* The preference for each pair of video clips is calculated based on a softmax
+  over the predicted latent reward values for each clip. In the paper,
+  "Rather than applying a softmax directly...we assume there is a 10% chance
+  that the human responds uniformly at random. Conceptually this adjustment is
+  needed because human raters have a constant probability of making an error,
+  which doesn’t decay to 0 as the difference in reward difference becomes
+  extreme." I wasn't sure how to implement this - at least, I couldn't see a
+  way to implement it that would actually affect the gradients - so we just do
+  the softmax directly.
 
 
 ## Code credits
