@@ -1,8 +1,13 @@
 import collections
+import copy
 import gzip
 import pickle
+import queue
+import time
 import zlib
+from threading import Lock, Thread
 
+import easy_tf_log
 import numpy as np
 
 
@@ -118,3 +123,69 @@ class PrefDB:
         with gzip.open(path, 'rb') as pkl_file:
             pref_db = pickle.load(pkl_file)
         return pref_db
+
+
+class PrefBuffer:
+    """
+    A helper class to manage asynchronous receiving of preferences on a
+    background thread.
+    """
+    def __init__(self, db_train, db_val):
+        self.train_db = db_train
+        self.val_db = db_val
+        self.lock = Lock()
+        self.stop_recv = False
+
+    def start_recv_thread(self, pref_pipe):
+        self.stop_recv = False
+        Thread(target=self.recv_prefs, args=(pref_pipe, )).start()
+
+    def stop_recv_thread(self):
+        self.stop_recv = True
+
+    def recv_prefs(self, pref_pipe):
+        n_recvd = 0
+        while not self.stop_recv:
+            try:
+                s1, s2, pref = pref_pipe.get(block=True, timeout=1)
+            except queue.Empty:
+                continue
+            n_recvd += 1
+
+            self.lock.acquire(blocking=True)
+
+            val_fraction = self.val_db.maxlen / (self.val_db.maxlen +
+                                                 self.train_db.maxlen)
+            if np.random.rand() < val_fraction:
+                self.val_db.append(s1, s2, pref)
+                easy_tf_log.logkv('val_db_len', len(self.val_db))
+            else:
+                self.train_db.append(s1, s2, pref)
+                easy_tf_log.logkv('train_db_len', len(self.train_db))
+
+            self.lock.release()
+            easy_tf_log.logkv('n_prefs_recvd', n_recvd)
+
+    def train_db_len(self):
+        return len(self.train_db)
+
+    def val_db_len(self):
+        return len(self.val_db)
+
+    def get_dbs(self):
+        self.lock.acquire(blocking=True)
+        train_copy = copy.deepcopy(self.train_db)
+        val_copy = copy.deepcopy(self.val_db)
+        self.lock.release()
+        return train_copy, val_copy
+
+    def wait_until_len(self, min_len):
+        while True:
+            self.lock.acquire()
+            train_len = len(self.train_db)
+            val_len = len(self.val_db)
+            self.lock.release()
+            if train_len >= min_len and val_len != 0:
+                break
+            print("Waiting for preferences; {} so far".format(train_len))
+            time.sleep(5.0)

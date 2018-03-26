@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
 
-import copy
 import logging
 import os
 from os import path as osp
 import sys
 import time
 from multiprocessing import Process, Queue
-from threading import Lock, Thread
-import queue
-
-import numpy as np
 
 import cloudpickle
 import easy_tf_log
@@ -19,16 +14,14 @@ from a2c.a2c.a2c import learn
 from a2c.a2c.policies import CnnPolicy, MlpPolicy
 from a2c.common import set_global_seeds
 from a2c.common.vec_env.subproc_vec_env import SubprocVecEnv
-from params import parse_args
-from pref_db import PrefDB
+from params import parse_args, PREFS_VAL_FRACTION
+from pref_db import PrefDB, PrefBuffer
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble
 from reward_predictor_core_network import net_cnn, net_moving_dot_features
 from utils import VideoRenderer, get_port_range, make_env, profile_memory
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
-
-VAL_FRACTION = 0.2
 
 
 def main():
@@ -94,8 +87,8 @@ def run(general_params,
             log_dir=general_params['log_dir'],
             **pref_interface_params)
 
-        n_train = general_params['max_prefs'] * (1 - VAL_FRACTION)
-        n_val = general_params['max_prefs'] * VAL_FRACTION
+        n_train = general_params['max_prefs'] * (1 - PREFS_VAL_FRACTION)
+        n_val = general_params['max_prefs'] * PREFS_VAL_FRACTION
         pref_db_train = PrefDB(maxlen=n_train)
         pref_db_val = PrefDB(maxlen=n_val)
         pref_buffer = PrefBuffer(db_train=pref_db_train, db_val=pref_db_val)
@@ -342,8 +335,8 @@ def start_reward_predictor_training(cluster_dict,
             n_prefs, n_segs = len(pref_db_val), len(pref_db_val.segments)
             print("({} preferences, {} segments)".format(n_prefs, n_segs))
         else:
-            n_train = max_prefs * (1 - VAL_FRACTION)
-            n_val = max_prefs * VAL_FRACTION
+            n_train = max_prefs * (1 - PREFS_VAL_FRACTION)
+            n_val = max_prefs * PREFS_VAL_FRACTION
             pref_db_train = PrefDB(maxlen=n_train)
             pref_db_val = PrefDB(maxlen=n_val)
 
@@ -394,70 +387,6 @@ def start_episode_renderer():
         zoom=2,
         mode=VideoRenderer.play_through_mode)
     return episode_vid_queue, renderer
-
-
-class PrefBuffer:
-    """
-    A helper class to manage asynchronous receiving of preferences on a
-    background thread.
-    """
-    def __init__(self, db_train, db_val):
-        self.train_db = db_train
-        self.val_db = db_val
-        self.lock = Lock()
-        self.stop_recv = False
-
-    def start_recv_thread(self, pref_pipe):
-        self.stop_recv = False
-        Thread(target=self.recv_prefs, args=(pref_pipe, )).start()
-
-    def stop_recv_thread(self):
-        self.stop_recv = True
-
-    def recv_prefs(self, pref_pipe):
-        n_recvd = 0
-        while not self.stop_recv:
-            try:
-                s1, s2, pref = pref_pipe.get(block=True, timeout=1)
-            except queue.Empty:
-                continue
-            n_recvd += 1
-
-            self.lock.acquire(blocking=True)
-
-            if np.random.rand() < VAL_FRACTION:
-                self.val_db.append(s1, s2, pref)
-                easy_tf_log.logkv('val_db_len', len(self.val_db))
-            else:
-                self.train_db.append(s1, s2, pref)
-                easy_tf_log.logkv('train_db_len', len(self.train_db))
-
-            self.lock.release()
-            easy_tf_log.logkv('n_prefs_recvd', n_recvd)
-
-    def train_db_len(self):
-        return len(self.train_db)
-
-    def val_db_len(self):
-        return len(self.val_db)
-
-    def get_dbs(self):
-        self.lock.acquire(blocking=True)
-        train_copy = copy.deepcopy(self.train_db)
-        val_copy = copy.deepcopy(self.val_db)
-        self.lock.release()
-        return train_copy, val_copy
-
-    def wait_until_len(self, min_len):
-        while True:
-            self.lock.acquire()
-            train_len = len(self.train_db)
-            val_len = len(self.val_db)
-            self.lock.release()
-            if train_len >= min_len and val_len != 0:
-                break
-            print("Waiting for preferences; {} so far".format(train_len))
-            time.sleep(5.0)
 
 
 if __name__ == '__main__':
