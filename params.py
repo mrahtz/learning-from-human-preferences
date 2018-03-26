@@ -179,3 +179,8 @@ def add_pref_interface_args(parser):
     # 1000
     # = ~ 700 MB
     parser.add_argument('--max_segs', type=int, default=1000)
+
+
+# Fraction of preferences that should be used for reward predictor validation
+# accuracy tests
+PREFS_VAL_FRACTION = 0.2
