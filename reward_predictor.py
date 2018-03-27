@@ -238,7 +238,7 @@ class RewardPredictorEnsemble:
         end_time = time.time()
         end_steps = self.n_steps
         rate = (end_steps - start_steps) / (end_time - start_time)
-        easy_tf_log.logkv('reward_predictor_training_steps_per_second',
+        easy_tf_log.tflog('reward_predictor_training_steps_per_second',
                           rate)
 
     def train_step(self, batch, prefs_train):

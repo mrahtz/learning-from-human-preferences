@@ -158,13 +158,13 @@ class PrefBuffer:
             self.lock.acquire(blocking=True)
             if np.random.rand() < val_fraction:
                 self.val_db.append(s1, s2, pref)
-                easy_tf_log.logkv('val_db_len', len(self.val_db))
+                easy_tf_log.tflog('val_db_len', len(self.val_db))
             else:
                 self.train_db.append(s1, s2, pref)
-                easy_tf_log.logkv('train_db_len', len(self.train_db))
+                easy_tf_log.tflog('train_db_len', len(self.train_db))
             self.lock.release()
 
-            easy_tf_log.logkv('n_prefs_recvd', n_recvd)
+            easy_tf_log.tflog('n_prefs_recvd', n_recvd)
 
     def train_db_len(self):
         return len(self.train_db)
