@@ -4,24 +4,12 @@
 
 set -o errexit
 
+# By default, FloydHub copies files with a timestamp of 0 seconds since epoch,
+# which breaks pip sometimes
 find . | xargs touch
 
-git clone https://github.com/openai/gym
-cd gym
-git reset --hard b5576dc23a5fcad0733042ab2ad440200ebb6209
-pip install .[atari]
-cd ..
+pip install pipenv
+# --site-packages so that we pick up the system TensorFlow
+pipenv --site-packages install
 
-git clone https://github.com/mrahtz/gym-moving-dot
-cd gym-moving-dot
-pip install .
-cd ..
-
-git clone https://github.com/mrahtz/easy-tf-log
-cd easy-tf-log
-pip install .
-cd ..
-
-pip install --upgrade cython cloudpickle joblib azure==1.0.3 mpi4py
-
-$*
+pipenv run $*
