@@ -28,6 +28,23 @@ class TestRun(unittest.TestCase):
     def setUp(self):
         termcolor.cprint(self._testMethodName, 'red')
 
+    def test_end_to_end(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cmd = ("python3 run.py train_policy_with_preferences "
+                   "PongNoFrameskip-v4 "
+                   "--synthetic_prefs "
+                   "--million_timesteps 0.0001 "
+                   "--n_initial_prefs 1 "
+                   "--n_initial_epochs 1 "
+                   "--log_dir {0}".format(temp_dir))
+            subprocess.call(cmd.split(' '))
+            self.assertTrue(exists(join(temp_dir,
+                                        'policy_checkpoints',
+                                        'policy.ckpt-20.index')))
+            self.assertTrue(exists(join(temp_dir,
+                                        'reward_predictor_checkpoints',
+                                        'make_reward_predictor.pkl')))
+
     def test_gather_prefs(self):
         for synthetic_prefs in [True, False]:
             if synthetic_prefs:
@@ -51,24 +68,7 @@ class TestRun(unittest.TestCase):
             subprocess.call(cmd.split(' '))
             self.assertTrue(exists(join(temp_dir,
                                         'reward_predictor_checkpoints',
-                                        'reward_predictor.ckpt.index')))
-
-    def test_end_to_end(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            cmd = ("python3 run.py train_policy_with_preferences "
-                   "PongNoFrameskip-v4 "
-                   "--synthetic_prefs "
-                   "--million_timesteps 0.0001 "
-                   "--n_initial_prefs 1 "
-                   "--n_initial_epochs 1 "
-                   "--log_dir {0}".format(temp_dir))
-            subprocess.call(cmd.split(' '))
-            self.assertTrue(exists(join(temp_dir,
-                                        'policy_checkpoints',
-                                        'policy.ckpt.index')))
-            self.assertTrue(exists(join(temp_dir,
-                                        'reward_predictor_checkpoints',
-                                        'make_reward_predictor.pkl')))
+                                        'reward_predictor.ckpt-105.index')))
 
 
 if __name__ == '__main__':
