@@ -19,7 +19,7 @@ from pref_db import PrefDB, PrefBuffer
 from pref_interface import PrefInterface
 from reward_predictor import RewardPredictorEnsemble
 from reward_predictor_core_network import net_cnn, net_moving_dot_features
-from utils import VideoRenderer, get_port_range, make_env, profile_memory
+from utils import VideoRenderer, get_port_range, make_env
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # filter out INFO messages
 
@@ -152,15 +152,11 @@ def run(general_params,
             episode_vid_queue=episode_vid_queue,
             log_dir=general_params['log_dir'],
             a2c_params=a2c_params)
-        m1 = profile_memory(general_params['log_dir'] + '/mem_a2c.log',
-                            a2c_proc.pid)
         pi, pi_proc = start_pref_interface(
             seg_pipe=seg_pipe,
             pref_pipe=pref_pipe,
             log_dir=general_params['log_dir'],
             **pref_interface_params)
-        m2 = profile_memory(general_params['log_dir'] + '/mem_pi.log',
-                            pi_proc.pid)
         rpt_proc = start_reward_predictor_training(
             cluster_dict=cluster_dict,
             make_reward_predictor=make_reward_predictor,
@@ -174,13 +170,9 @@ def run(general_params,
             n_initial_epochs=rew_pred_training_params['n_initial_epochs'],
             val_interval=rew_pred_training_params['val_interval'],
             ckpt_interval=rew_pred_training_params['ckpt_interval'])
-        m3 = profile_memory(general_params['log_dir'] + '/mem_rpt.log',
-                            rpt_proc.pid)
-
+        # We wait for A2C to complete the specified number of policy training
+        # steps
         a2c_proc.join()
-        m1.terminate()
-        m2.terminate()
-        m3.terminate()
         rpt_proc.terminate()
         pi_proc.terminate()
         pi.stop_renderer()
@@ -249,8 +241,7 @@ def start_policy_training(cluster_dict, make_reward_predictor, gen_segments,
     elif env_id in ['PongNoFrameskip-v4', 'EnduroNoFrameskip-v4']:
         policy_fn = CnnPolicy
     else:
-        msg = "Unsure about policy network architecture for {}".format(
-            a2c_params['env_id'])
+        msg = "Unsure about policy network for {}".format(a2c_params['env_id'])
         raise Exception(msg)
 
     configure_a2c_logger(log_dir)

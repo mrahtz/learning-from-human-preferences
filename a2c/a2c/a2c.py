@@ -106,8 +106,7 @@ class Model(object):
         self.saver.restore(self.sess, ckpt_path)
 
     def save(self, ckpt_path, step_n):
-        # TODO put back step_n
-        saved_path = self.saver.save(self.sess, ckpt_path)
+        saved_path = self.saver.save(self.sess, ckpt_path, step_n)
         print("Saved policy checkpoint to '{}'".format(saved_path))
 
 
@@ -383,7 +382,7 @@ def learn(policy,
     fps_tstart = time.time()
     fps_nsteps = 0
 
-    print("Starting agent(s)")
+    print("Starting workers")
 
     # Before we're told to start training the policy itself,
     # just generate segments for the reward predictor to be trained with

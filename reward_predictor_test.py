@@ -13,20 +13,32 @@ from reward_predictor_core_network import net_cnn
 
 
 class TestRewardPredictor(unittest.TestCase):
+
     def setUp(self):
+        self.create_reward_predictor(dropout=0.5, batchnorm=True)
+        termcolor.cprint(self._testMethodName, 'red')
+
+    def create_reward_predictor(self, dropout, batchnorm):
         tf.reset_default_graph()
         self.sess = tf.Session()
-        self.rpn = RewardPredictorNetwork(batchnorm=True, dropout=0.5, lr=1e-3,
+        self.rpn = RewardPredictorNetwork(batchnorm=batchnorm, dropout=dropout,
+                                          lr=1e-3,
                                           core_network=net_cnn)
         self.sess.run(tf.global_variables_initializer())
-
-        termcolor.cprint(self._testMethodName, 'red')
 
     def test_weight_sharing(self):
         """
         Check that both legs of the network give the same reward output
         for the same segment input.
         """
+
+        # We deliberately /don't/ use the same dropout for each leg of the
+        # network. (If we do use the same dropout, without batchnorm,
+        # Pong doesn't train successfully. If we use different dropout, Pong
+        # does train successfully. I haven't tried training Pong with
+        # batchnorm.) So we disable dropout for this test.
+        self.create_reward_predictor(dropout=0.0, batchnorm=True)
+
         s = 255 * np.random.rand(100, 84, 84, 4)
         feed_dict_nontraining = {
             self.rpn.s1: [s],

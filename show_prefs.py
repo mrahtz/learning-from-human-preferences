@@ -7,6 +7,7 @@ and the more-preferred segment on the right)
 """
 
 import argparse
+import gzip
 import pickle
 from multiprocessing import Queue
 
@@ -17,10 +18,10 @@ from utils import VideoRenderer
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("prefs")
+    parser.add_argument("prefs", help=".pkl.gz file")
     args = parser.parse_args()
 
-    with open(args.prefs, 'rb') as pkl_file:
+    with gzip.open(args.prefs, 'rb') as pkl_file:
         print("Loading preferences from '{}'...".format(args.prefs), end="")
         prefs = pickle.load(pkl_file)
         print("done!")

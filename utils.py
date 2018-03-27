@@ -5,7 +5,6 @@ import time
 from multiprocessing import Process
 
 import gym
-import memory_profiler
 import numpy as np
 import pyglet
 
@@ -190,6 +189,7 @@ def get_port_range(start_port, n_ports, random_stagger=False):
 
 
 def profile_memory(log_path, pid):
+    import memory_profiler
     def profile():
         with open(log_path, 'w') as f:
             # timeout=99999 is necessary because for external processes,
@@ -234,60 +234,3 @@ def make_env(env_id, seed=0):
         from enduro_wrapper import EnduroWrapper
         env = EnduroWrapper(env)
     return wrap_deepmind(env)
-
-class PrefDB:
-    """
-    A database of preferences about pairs of segments.
-
-    For each preference, we store the preference itself
-    (mu in the paper) and the two segments the preference refers to.
-    Segments are stored with deduplication - so that if multiple
-    preferences refer to the same segment, the segment is only stored once.
-    """
-
-    def __init__(self):
-        self.segments = {}
-        self.seg_refs = {}
-        self.prefs = []
-
-    def append(self, s1, s2, pref):
-        k1 = hash(np.array(s1).tostring())
-        k2 = hash(np.array(s2).tostring())
-
-        for k, s in zip([k1, k2], [s1, s2]):
-            if k not in self.segments.keys():
-                self.segments[k] = s
-                self.seg_refs[k] = 1
-            else:
-                self.seg_refs[k] += 1
-
-        tup = (k1, k2, pref)
-        self.prefs.append(tup)
-
-    def del_first(self):
-        self.del_pref(0)
-
-    def del_pref(self, n):
-        if n >= len(self.prefs):
-            raise IndexError("Preference {} doesn't exist".format(n))
-        k1, k2, _ = self.prefs[n]
-        for k in [k1, k2]:
-            if self.seg_refs[k] == 1:
-                del self.segments[k]
-                del self.seg_refs[k]
-            else:
-                self.seg_refs[k] -= 1
-        del self.prefs[n]
-
-    def __len__(self):
-        return len(self.prefs)
-
-    def save(self, path):
-        with gzip.open(path, 'wb') as pkl_file:
-            pickle.dump(self, pkl_file)
-
-    @staticmethod
-    def load(path):
-        with gzip.open(path, 'rb') as pkl_file:
-            pref_db = pickle.load(pkl_file)
-        return pref_db

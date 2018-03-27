@@ -118,9 +118,9 @@ class RewardPredictorEnsemble:
             self.sess.run(self.init_op)
 
     def save(self):
-        # TODO put back n_steps
         ckpt_name = self.saver.save(self.sess,
-                                    self.checkpoint_file)
+                                    self.checkpoint_file,
+                                    self.n_steps)
         print("Saved reward predictor checkpoint to '{}'".format(ckpt_name))
 
     def raw_rewards(self, obs):

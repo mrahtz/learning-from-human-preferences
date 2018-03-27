@@ -102,6 +102,17 @@ saving to run directory `moving_dot-initial_prefs`:
 `$ python run.py gather_initial_prefs MovingDotNoFrameskip-v0 --synthetic_prefs --run_name moving_dot-initial_prefs`
 
 
+### Running on FloydHub
+
+To run on [FloydHub](https://www.floydhub.com) (a cloud platform for
+ running ML jobs), use something like:
+
+`floyd run --follow --env tensorflow-1.5 --tensorboard
+'bash floydhub_utils/floyd_wrapper.sh python run.py
+--log_dir /output --synthetic_prefs
+train_policy_with_preferences PongNoFrameskip-v4'`
+
+
 ### Running checkpoints
 
 To run a trained policy checkpoint so you can see what the agent was doing, use
