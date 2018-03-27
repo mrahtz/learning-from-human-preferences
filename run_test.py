@@ -54,8 +54,8 @@ class TestRun(unittest.TestCase):
             # Automatically deletes the directory afterwards :)
             with tempfile.TemporaryDirectory() as temp_dir:
                 create_initial_prefs(temp_dir, synthetic_prefs)
-                self.assertTrue(exists(join(temp_dir, 'train_initial.pkl.gz')))
-                self.assertTrue(exists(join(temp_dir, 'val_initial.pkl.gz')))
+                self.assertTrue(exists(join(temp_dir, 'train.pkl.gz')))
+                self.assertTrue(exists(join(temp_dir, 'val.pkl.gz')))
 
     def test_pretrain_reward_predictor(self):
         with tempfile.TemporaryDirectory() as temp_dir:
