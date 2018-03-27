@@ -26,6 +26,8 @@ def main():
         prefs = pickle.load(pkl_file)
         print("done!")
 
+    print("{} preferences found".format(len(prefs)))
+
     q = Queue()
     VideoRenderer(q, zoom=2, mode=VideoRenderer.restart_on_get_mode)
 

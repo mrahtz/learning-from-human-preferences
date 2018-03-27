@@ -96,12 +96,7 @@ def run(general_params,
         pref_buffer.wait_until_len(general_params['n_initial_prefs'])
         pref_db_train, pref_db_val = pref_buffer.get_dbs()
 
-        train_path = osp.join(general_params['log_dir'], 'train_initial.pkl.gz')
-        pref_db_train.save(train_path)
-        print("Saved training preferences to '{}'".format(train_path))
-        val_path = osp.join(general_params['log_dir'], 'val_initial.pkl.gz')
-        pref_db_val.save(val_path)
-        print("Saved validation preferences to '{}'".format(val_path))
+        save_prefs(general_params['log_dir'], pref_db_train, pref_db_val)
 
         pi_proc.terminate()
         pi.stop_renderer()
@@ -124,7 +119,8 @@ def run(general_params,
             n_initial_prefs=general_params['n_initial_prefs'],
             n_initial_epochs=rew_pred_training_params['n_initial_epochs'],
             val_interval=rew_pred_training_params['val_interval'],
-            ckpt_interval=rew_pred_training_params['ckpt_interval'])
+            ckpt_interval=rew_pred_training_params['ckpt_interval'],
+            log_dir=general_params['log_dir'])
         rpt_proc.join()
         ps_proc.terminate()
     elif general_params['mode'] == 'train_policy_with_original_rewards':
@@ -169,7 +165,8 @@ def run(general_params,
             n_initial_prefs=general_params['n_initial_prefs'],
             n_initial_epochs=rew_pred_training_params['n_initial_epochs'],
             val_interval=rew_pred_training_params['val_interval'],
-            ckpt_interval=rew_pred_training_params['ckpt_interval'])
+            ckpt_interval=rew_pred_training_params['ckpt_interval'],
+            log_dir=general_params['log_dir'])
         # We wait for A2C to complete the specified number of policy training
         # steps
         a2c_proc.join()
@@ -183,6 +180,15 @@ def run(general_params,
 
     if episode_renderer:
         episode_renderer.stop()
+
+
+def save_prefs(log_dir, pref_db_train, pref_db_val):
+    train_path = osp.join(log_dir, 'train.pkl.gz')
+    pref_db_train.save(train_path)
+    print("Saved training preferences to '{}'".format(train_path))
+    val_path = osp.join(log_dir, 'val.pkl.gz')
+    pref_db_val.save(val_path)
+    print("Saved validation preferences to '{}'".format(val_path))
 
 
 def save_make_reward_predictor(log_dir, make_reward_predictor):
@@ -308,19 +314,20 @@ def start_reward_predictor_training(cluster_dict,
                                     prefs_dir,
                                     load_ckpt_dir,
                                     val_interval,
-                                    ckpt_interval):
+                                    ckpt_interval,
+                                    log_dir):
     def f():
         rew_pred = make_reward_predictor('train', cluster_dict)
         rew_pred.init_network(load_ckpt_dir)
 
         if prefs_dir is not None:
-            train_path = osp.join(prefs_dir, 'train_initial.pkl.gz')
+            train_path = osp.join(prefs_dir, 'train.pkl.gz')
             pref_db_train = PrefDB.load(train_path)
             print("Loaded training preferences from '{}'".format(train_path))
             n_prefs, n_segs = len(pref_db_train), len(pref_db_train.segments)
             print("({} preferences, {} segments)".format(n_prefs, n_segs))
 
-            val_path = osp.join(prefs_dir, 'val_initial.pkl.gz')
+            val_path = osp.join(prefs_dir, 'val.pkl.gz')
             pref_db_val = PrefDB.load(val_path)
             print("Loaded validation preferences from '{}'".format(val_path))
             n_prefs, n_segs = len(pref_db_val), len(pref_db_val.segments)
@@ -361,6 +368,7 @@ def start_reward_predictor_training(cluster_dict,
         i = 0
         while True:
             pref_db_train, pref_db_val = pref_buffer.get_dbs()
+            save_prefs(log_dir, pref_db_train, pref_db_val)
             rew_pred.train(pref_db_train, pref_db_val, val_interval)
             if i and i % ckpt_interval == 0:
                 rew_pred.save()
