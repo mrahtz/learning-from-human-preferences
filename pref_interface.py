@@ -98,9 +98,9 @@ class PrefInterface:
                 self.segments[self.seg_idx] = segment
                 self.seg_idx = (self.seg_idx + 1) % self.max_segs
             n_recvd += 1
-        easy_tf_log.logkv('segment_idx', self.seg_idx)
-        easy_tf_log.logkv('n_segments_rcvd', n_recvd)
-        easy_tf_log.logkv('n_segments', len(self.segments))
+        easy_tf_log.tflog('segment_idx', self.seg_idx)
+        easy_tf_log.tflog('n_segments_rcvd', n_recvd)
+        easy_tf_log.tflog('n_segments', len(self.segments))
 
     def sample_seg_pair(self):
         """
