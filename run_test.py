@@ -68,7 +68,7 @@ class TestRun(unittest.TestCase):
             subprocess.call(cmd.split(' '))
             self.assertTrue(exists(join(temp_dir,
                                         'reward_predictor_checkpoints',
-                                        'reward_predictor.ckpt-105.index')))
+                                        'reward_predictor.ckpt-1.index')))
 
 
 if __name__ == '__main__':
