@@ -11,14 +11,12 @@ The main milestones of this reproduction were:
 
 * Training an agent to move the dot to the middle in a [simple environment](https://github.com/mrahtz/gym-moving-dot) using synthetic preferences.
 
-![](images/moving-dot.gif)
-
 * Training an agent to play Pong using synthetic preferences.
-
-![](images/pong.gif)
 
 * Training an agent to stay alongside other cars in Enduro using *human* preferences.
 
+![](images/moving-dot.gif)
+![](images/pong.gif)
 ![](images/enduro.gif)
 
 
