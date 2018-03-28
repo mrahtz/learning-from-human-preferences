@@ -69,7 +69,7 @@ For example, to train Pong:
 
 `$ python3 run.py train_policy_with_original_rewards PongNoFrameskip-v4 --n_envs 16 --million_timesteps 10`
 
-### Training end-to-end with human preferences
+### Training end-to-end with preferences
 
 Use the `train_policy_with_preferences` mode.
 
