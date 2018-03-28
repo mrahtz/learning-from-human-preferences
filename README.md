@@ -104,6 +104,12 @@ policy, then half an hour to pretrain the reward predictor using those 500
 preferences, then an hour to train the policy (while still collecting
 preferences.)
 
+The bottleneck is mainly labelling speed, so to train Enduro using saved human preferences:
+
+`$ python3 run.py train_policy_with_preferences EnduroNoFrameskip-v4 --n_envs 16 --render_episodes --load_prefs_dir runs/enduro_8471d5d --n_initial_epochs 10`
+
+This only takes about half an hour.
+
 ### Piece-by-piece runs
 
 You can also run different parts of the training process separately, saving
