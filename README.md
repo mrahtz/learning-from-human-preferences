@@ -11,7 +11,7 @@ The main milestones of this reproduction were:
 
 * Training an agent to move the dot to the middle in a [simple environment](https://github.com/mrahtz/gym-moving-dot) using synthetic preferences.
 
-![](images/dot_success.gif)
+![](images/moving-dot.gif)
 
 * Training an agent to play Pong using synthetic preferences.
 
@@ -77,9 +77,17 @@ For example, to train `MovingDotNoFrameskip-v0` using *synthetic* preferences:
 
 `$ python3 run.py train_policy_with_preferences MovingDotNoFrameskip-v0 --synthetic_prefs --ent_coef 0.02 --million_timesteps 0.15`
 
+On a machine with a GPU, this takes about an hour. TensorBoard logs should look something like:
+
+![](images/moving-dot-graphs.png)
+
 To train Pong using *synthetic* preferences:
 
 `$ python3 run.py train_policy_with_preferences PongNoFrameskip-v4 --synthetic_prefs --dropout 0.5 --n_envs 16 --million_timesteps 20`
+
+On a 16-core machine without GPU, this takes about 13 hours. TensorBoard logs should look something like:
+
+![](images/pong-graphs.png)
 
 To train Enduro: TODO (mentioned `--render_episodes`)
 
@@ -122,7 +130,9 @@ To run a trained policy checkpoint so you can see what the agent was doing, use
 
 For example: TODO
 
-`$ python3 run_checkpoint.py MovingDotNoFrameskip-v0 runs/moving_dot-end_to_end-synthetic_prefs_bf708da/policy_checkpoints`
+`$ python3 run_checkpoint.py MovingDotNoFrameskip-v0 runs/moving-dot_45cb953/policy_checkpoints`
+
+`$ python3 run_checkpoint.py PongNoFrameskip-v4 runs/pong_45cb953/policy_checkpoints`
 
 
 ## Architecture notes
