@@ -4,13 +4,12 @@ import socket
 import time
 from multiprocessing import Process
 
-import memory_profiler
+import gym
 import numpy as np
 import pyglet
 
+from a2c.common.atari_wrappers import wrap_deepmind
 from scipy.ndimage import zoom
-from multiprocessing import Process
-import memory_profiler
 
 
 # https://github.com/joschu/modular_rl/blob/master/modular_rl/running_stat.py
@@ -56,58 +55,7 @@ class RunningStat(object):
         return self._M.shape
 
 
-class Segment:
-    def __init__(self):
-        self.frames = []
-        self.rewards = []
-
-    def append(self, frame, reward):
-        self.frames.append(frame)
-        self.rewards.append(reward)
-
-    def __len__(self):
-        return len(self.frames)
-
-
-class PrefDB:
-    def __init__(self):
-        self.segments = {}
-        self.seg_refs = {}
-        self.prefs = []
-
-    def append(self, s1, s2, mu):
-        k1 = hash(np.array(s1).tostring())
-        k2 = hash(np.array(s2).tostring())
-
-        for k, s in zip([k1, k2], [s1, s2]):
-            if k not in self.segments.keys():
-                self.segments[k] = s
-                self.seg_refs[k] = 1
-            else:
-                self.seg_refs[k] += 1
-
-        tup = (k1, k2, mu)
-        self.prefs.append(tup)
-
-    def del_first(self):
-        self.del_pref(0)
-
-    def del_pref(self, n):
-        if n >= len(self.prefs):
-            raise IndexError("Preference {} doesn't exist".format(n))
-        k1, k2, _ = self.prefs[n]
-        for k in [k1, k2]:
-            if self.seg_refs[k] == 1:
-                del self.segments[k]
-                del self.seg_refs[k]
-            else:
-                self.seg_refs[k] -= 1
-        del self.prefs[n]
-
-    def __len__(self):
-        return len(self.prefs)
-
-
+# Based on SimpleImageViewer in OpenAI gym
 class Im(object):
     def __init__(self, display=None):
         self.window = None
@@ -122,11 +70,12 @@ class Im(object):
             self.width = width
             self.height = height
             self.isopen = True
-        assert arr.shape == (
-            self.height,
-            self.width), "You passed in an image with the wrong number shape"
-        image = pyglet.image.ImageData(
-            self.width, self.height, 'L', arr.tobytes(), pitch=-self.width)
+
+        assert arr.shape == (self.height, self.width), \
+            "You passed in an image with the wrong number shape"
+
+        image = pyglet.image.ImageData(self.width, self.height,
+                                       'L', arr.tobytes(), pitch=-self.width)
         self.window.clear()
         self.window.switch_to()
         self.window.dispatch_events()
@@ -142,54 +91,67 @@ class Im(object):
         self.close()
 
 
-def get_most_recent_item(q):
-    # Make sure we at least get something
-    item = q.get(block=True)
-    n_skipped = 0
-    while True:
-        try:
-            item = q.get(block=True, timeout=0.1)
-            n_skipped += 1
-        except queue.Empty:
-            break
-    return item, n_skipped
+class VideoRenderer:
+    play_through_mode = 0
+    restart_on_get_mode = 1
 
+    def __init__(self, vid_queue, mode, zoom=1, playback_speed=1):
+        assert mode == VideoRenderer.restart_on_get_mode or mode == VideoRenderer.play_through_mode
+        self.mode = mode
+        self.vid_queue = vid_queue
+        self.zoom_factor = zoom
+        self.playback_speed = playback_speed
+        self.proc = Process(target=self.render)
+        self.proc.start()
 
-def vid_proc(q, playback_speed=1, zoom_factor=1, mode='restart_on_get'):
-    assert mode == 'restart_on_get' or mode == 'play_through'
-    v = Im()
-    frames = q.get(block=True)
-    t = 0
-    while True:
-        # Add a dot showing progress
-        width = frames[t].shape[1]
-        fraction_played = t / len(frames)
-        frames[t][-1][int(fraction_played * width)] = 255
+    def stop(self):
+        self.proc.terminate()
 
-        v.imshow(zoom(frames[t], zoom_factor))
+    def render(self):
+        v = Im()
+        frames = self.vid_queue.get(block=True)
+        t = 0
+        while True:
+            # Add a grey dot on the last line showing position
+            width = frames[t].shape[1]
+            fraction_played = t / len(frames)
+            x = int(fraction_played * width)
+            frames[t][-1][x] = 128
 
-        if mode == 'play_through':
-            # Wait until having finished playing the current
-            # set of frames. Then, stop, and get the most recent set of frames.
-            t += playback_speed
-            if t >= len(frames):
-                frames, n_skipped = get_most_recent_item(q)
-                t = 0
-            else:
-                time.sleep(1/60)
-        elif mode == 'restart_on_get':
-            # Always try and get a new set of frames to show.
-            # If there /is/ a new set of frames on the queue,
-            # restart playback with those frames immediately.
-            # Otherwise, just keep looping with the current frames.
+            zoomed_frame = zoom(frames[t], self.zoom_factor)
+            v.imshow(zoomed_frame)
+
+            if self.mode == VideoRenderer.play_through_mode:
+                # Wait until having finished playing the current
+                # set of frames. Then, stop, and get the most
+                # recent set of frames.
+                t += self.playback_speed
+                if t >= len(frames):
+                    frames = self.get_queue_most_recent()
+                    t = 0
+                else:
+                    time.sleep(1/60)
+            elif self.mode == VideoRenderer.restart_on_get_mode:
+                # Always try and get a new set of frames to show.
+                # If there is a new set of frames on the queue,
+                # restart playback with those frames immediately.
+                # Otherwise, just keep looping with the current frames.
+                try:
+                    frames = self.vid_queue.get(block=False)
+                    t = 0
+                except queue.Empty:
+                    t = (t + self.playback_speed) % len(frames)
+                    time.sleep(1/60)
+
+    def get_queue_most_recent(self):
+        # Make sure we at least get something
+        item = self.vid_queue.get(block=True)
+        while True:
             try:
-                frames = q.get(block=False)
-                if frames == "Pause":
-                    frames = q.get(block=True)
-                t = 0
+                item = self.vid_queue.get(block=True, timeout=0.1)
             except queue.Empty:
-                t = (t + playback_speed) % len(frames)
-                time.sleep(1/60)
+                break
+        return item
 
 
 def get_port_range(start_port, n_ports, random_stagger=False):
@@ -227,9 +189,10 @@ def get_port_range(start_port, n_ports, random_stagger=False):
 
 
 def profile_memory(log_path, pid):
+    import memory_profiler
     def profile():
         with open(log_path, 'w') as f:
-            # timeout=99999 is necesary because for external processes,
+            # timeout=99999 is necessary because for external processes,
             # memory_usage otherwise defaults to only returning a single sample
             # Note that even with interval=1, because memory_profiler only
             # flushes every 50 lines, we still have to wait 50 seconds before
@@ -239,3 +202,35 @@ def profile_memory(log_path, pid):
     p = Process(target=profile, daemon=True)
     p.start()
     return p
+
+
+def batch_iter(data, batch_size, shuffle=False):
+    idxs = list(range(len(data)))
+    if shuffle:
+        np.random.shuffle(idxs)  # in-place
+
+    start_idx = 0
+    end_idx = 0
+    while end_idx < len(data):
+        end_idx = start_idx + batch_size
+        if end_idx > len(data):
+            end_idx = len(data)
+
+        batch_idxs = idxs[start_idx:end_idx]
+        batch = []
+        for idx in batch_idxs:
+            batch.append(data[idx])
+
+        yield batch
+        start_idx += batch_size
+
+
+def make_env(env_id, seed=0):
+    if env_id in ['MovingDot-v0', 'MovingDotNoFrameskip-v0']:
+        import gym_moving_dot
+    env = gym.make(env_id)
+    env.seed(seed)
+    if env_id == 'EnduroNoFrameskip-v4':
+        from enduro_wrapper import EnduroWrapper
+        env = EnduroWrapper(env)
+    return wrap_deepmind(env)

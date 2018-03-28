@@ -1,0 +1,561 @@
+This is a diff beween the original code from OpenAI baselines, commit f8663ea,
+to the current code.
+
+View me with `cat` or `less -R`.
+
+---
+
+[1mdiff --git a/baselines/a2c/a2c.py b/baselines/a2c/a2c.py[m
+[1mindex 56d5430..b4b6461 100644[m
+[1m--- a/baselines/a2c/a2c.py[m
+[1m+++ b/baselines/a2c/a2c.py[m
+[36m@@ -1,83 +1,88 @@[m
+[32mimport logging[m
+import os.path as osp[m
+import [31mgym[m[32mqueue[m
+import time[m
+
+import [31mjoblib[m[32mcloudpickle[m
+import [31mlogging[m[32measy_tf_log[m
+import numpy as np[m
+[32mfrom numpy.testing import assert_equal[m
+import tensorflow as tf[m
+[31mfrom baselines import logger[m
+
+from [31mbaselines.common[m[32ma2c[m import [31mset_global_seeds, explained_variance[m[32mlogger[m
+from [31mbaselines.common.vec_env.subproc_vec_env[m[32ma2c.a2c.utils[m import [31mSubprocVecEnv[m[32m(cat_entropy, discount_with_dones,[m
+[32m                           find_trainable_variables, mse)[m
+from [31mbaselines.common.atari_wrappers[m[32ma2c.common[m import [31mwrap_deepmind[m[32mexplained_variance, set_global_seeds[m
+[32mfrom pref_db import Segment[m
+
+[31mfrom baselines.a2c.utils import discount_with_dones[m
+[31mfrom baselines.a2c.utils import Scheduler, make_path, find_trainable_variables[m
+[31mfrom baselines.a2c.policies import CnnPolicy[m
+[31mfrom baselines.a2c.utils import cat_entropy, mse[m
+
+class Model(object):[m
+    def __init__(self,
+                 policy,
+                 ob_space,
+                 ac_space,
+                 nenvs,
+                 nsteps,
+                 nstack,
+                 num_procs,
+                 [32mlr_scheduler,[m
+                 ent_coef=0.01,
+                 vf_coef=0.5,
+                 max_grad_norm=0.5,[31mlr=7e-4,[m
+                 alpha=0.99,
+                 [31mepsilon=1e-5, total_timesteps=int(80e6), lrschedule='linear'):[m[32mepsilon=1e-5):[m
+        config = [31mtf.ConfigProto(allow_soft_placement=True,[m[32mtf.ConfigProto([m
+[32m            allow_soft_placement=True,[m
+            intra_op_parallelism_threads=num_procs,
+            inter_op_parallelism_threads=num_procs)
+        config.gpu_options.allow_growth = True[m
+        sess = tf.Session(config=config)[m
+[31mnact = ac_space.n[m        nbatch = [31mnenvs*nsteps[m[32mnenvs * nsteps[m
+
+        A = tf.placeholder(tf.int32, [nbatch])[m
+        ADV = tf.placeholder(tf.float32, [nbatch])[m
+        R = tf.placeholder(tf.float32, [nbatch])[m
+        LR = tf.placeholder(tf.float32, [])[m
+
+        step_model = [31mpolicy(sess,[m[32mpolicy([m
+[32m            sess,[m ob_space, ac_space, nenvs, 1, nstack, reuse=False)
+        train_model = [31mpolicy(sess,[m[32mpolicy([m
+[32m            sess,[m ob_space, ac_space, nenvs, nsteps, nstack, reuse=True)
+
+        neglogpac = [31mtf.nn.sparse_softmax_cross_entropy_with_logits(logits=train_model.pi,[m[32mtf.nn.sparse_softmax_cross_entropy_with_logits([m
+[32m            logits=train_model.pi,[m labels=A)
+        pg_loss = tf.reduce_mean(ADV * neglogpac)[m
+        vf_loss = tf.reduce_mean(mse(tf.squeeze(train_model.vf), R))[m
+        entropy = tf.reduce_mean(cat_entropy(train_model.pi))[m
+        loss = pg_loss - [31mentropy*ent_coef[m[32mentropy * ent_coef[m + vf_loss * vf_coef
+
+        params = find_trainable_variables("model")[m
+        grads = tf.gradients(loss, params)[m
+        if max_grad_norm is not None:[m
+            grads, grad_norm = tf.clip_by_global_norm(grads, max_grad_norm)[m
+        grads = list(zip(grads, params))[m
+        trainer = [31mtf.train.RMSPropOptimizer(learning_rate=LR,[m[32mtf.train.RMSPropOptimizer([m
+[32m            learning_rate=LR,[m decay=alpha, epsilon=epsilon)
+        _train = trainer.apply_gradients(grads)[m
+
+[31m        lr = Scheduler(v=lr, nvalues=total_timesteps, schedule=lrschedule)[m
+
+        def train(obs, states, rewards, masks, actions, values):[m
+            advs = rewards - values[m
+            [32mn_steps = len(obs)[m
+            for [31mstep[m[32m_[m in [31mrange(len(obs)):[m[32mrange(n_steps):[m
+                cur_lr = [31mlr.value()[m[32mlr_scheduler.value()[m
+            td_map = [31m{train_model.X:obs, A:actions, ADV:advs, R:rewards, LR:cur_lr}[m[32m{[m
+[32m                train_model.X: obs,[m
+[32m                A: actions,[m
+[32m                ADV: advs,[m
+[32m                R: rewards,[m
+[32m                LR: cur_lr[m
+[32m            }[m
+            if states != []:[m
+                td_map[train_model.S] = states[m
+                td_map[train_model.M] = masks[m
+            policy_loss, value_loss, policy_entropy, _ = sess.run([m
+                [pg_loss, vf_loss, entropy, _train], [31mtd_map[m
+[31m            )[m[32mtd_map)[m
+            return policy_loss, value_loss, [31mpolicy_entropy[m
+
+[31m        def save(save_path):[m
+[31m            ps = sess.run(params)[m
+[31m            make_path(save_path)[m
+[31m            joblib.dump(ps, save_path)[m
+
+[31m        def load(load_path):[m
+[31m            loaded_params = joblib.load(load_path)[m
+[31m            restores = [][m
+[31m            for p, loaded_p in zip(params, loaded_params):[m
+[31m                restores.append(p.assign(loaded_p))[m
+[31m            ps = sess.run(restores)[m[32mpolicy_entropy, cur_lr[m
+
+        self.train = train[m
+        self.train_model = train_model[m
+[36m@@ -85,19 +90,45 @@[m [mclass Model(object):[m
+        self.step = step_model.step[m
+        self.value = step_model.value[m
+        self.initial_state = step_model.initial_state[m
+        [31mself.save[m[32mself.sess[m = [32msess[m
+[32m        # Why var_list=params?[m
+[32m        # Otherwise we'll also[m save [31mself.load[m[32moptimizer parameters,[m
+[32m        # which take up a /lot/ of space.[m
+[32m        # Why save_relative_paths=True?[m
+[32m        # So that the plain-text 'checkpoint' file written uses relative paths,[m
+[32m        # which seems to be needed in order to avoid confusing saver.restore()[m
+[32m        # when restoring from FloydHub runs.[m
+[32m        self.saver[m = [31mload[m[32mtf.train.Saver([m
+[32m            max_to_keep=1, var_list=params, save_relative_paths=True)[m
+        tf.global_variables_initializer().run(session=sess)[m
+
+    [31mclass Runner(object):[m[32mdef load(self, ckpt_path):[m
+[32m        self.saver.restore(self.sess, ckpt_path)[m
+
+    def [32msave(self, ckpt_path, step_n):[m
+[32m        saved_path = self.saver.save(self.sess, ckpt_path, step_n)[m
+[32m        print("Saved policy checkpoint to '{}'".format(saved_path))[m
+
+
+[32mclass Runner(object):[m
+[32m    def[m __init__(self,
+                 env,
+                 model,
+                 [31mnsteps=5, nstack=4, gamma=0.99):[m[32mnsteps,[m
+[32m                 nstack,[m
+[32m                 gamma,[m
+[32m                 gen_segments,[m
+[32m                 seg_pipe,[m
+[32m                 reward_predictor,[m
+[32m                 episode_vid_queue):[m
+        self.env = env[m
+        self.model = model[m
+        nh, nw, nc = env.observation_space.shape[m
+        nenv = env.num_envs[m
+        self.batch_ob_shape = [31m(nenv*nsteps,[m[32m(nenv * nsteps,[m nh, nw, [31mnc*nstack)[m[32mnc * nstack)[m
+        self.obs = np.zeros((nenv, nh, nw, [31mnc*nstack),[m[32mnc * nstack),[m dtype=np.uint8)
+        [32m# The first stack of 4 frames: the first 3 frames are zeros,[m
+[32m        # with the last frame coming from env.reset().[m
+        obs = env.reset()[m
+        self.update_obs(obs)[m
+        self.gamma = gamma[m
+[36m@@ -105,83 +136,294 @@[m [mclass Runner(object):[m
+        self.states = model.initial_state[m
+        self.dones = [False for _ in range(nenv)][m
+
+        [32mself.gen_segments = gen_segments[m
+[32m        self.segment = Segment()[m
+[32m        self.seg_pipe = seg_pipe[m
+
+[32m        self.orig_reward = [0 for _ in range(nenv)][m
+[32m        self.reward_predictor = reward_predictor[m
+
+[32m        self.episode_frames = [][m
+[32m        self.episode_vid_queue = episode_vid_queue[m
+
+    def update_obs(self, obs):[m
+        # Do frame-stacking here instead of the FrameStack wrapper to reduce[m
+        # IPC overhead[m
+        self.obs = np.roll(self.obs, shift=-1, axis=3)[m
+        self.obs[:, :, :, -1] = obs[:, :, :, 0][m
+
+    [32mdef update_segment_buffer(self, mb_obs, mb_rewards, mb_dones):[m
+[32m        # Segments are only generated from the first worker.[m
+[32m        # Empirically, this seems to work fine.[m
+[32m        e0_obs = mb_obs[0][m
+[32m        e0_rew = mb_rewards[0][m
+[32m        e0_dones = mb_dones[0][m
+[32m        assert_equal(e0_obs.shape, (self.nsteps, 84, 84, 4))[m
+[32m        assert_equal(e0_rew.shape, (self.nsteps, ))[m
+[32m        assert_equal(e0_dones.shape, (self.nsteps, ))[m
+
+[32m        for step in range(self.nsteps):[m
+[32m            self.segment.append(np.copy(e0_obs[step]), np.copy(e0_rew[step]))[m
+[32m            if len(self.segment) == 25 or e0_dones[step]:[m
+[32m                while len(self.segment) < 25:[m
+[32m                    # Pad to 25 steps long so that all segments in the batch[m
+[32m                    # have the same length.[m
+[32m                    # Note that the reward predictor needs the full frame[m
+[32m                    # stack, so we send all frames.[m
+[32m                    self.segment.append(e0_obs[step], 0)[m
+[32m                self.segment.finalise()[m
+[32m                try:[m
+[32m                    self.seg_pipe.put(self.segment, block=False)[m
+[32m                except queue.Full:[m
+[32m                    # If the preference interface has a backlog of segments[m
+[32m                    # to deal with, don't stop training the agents. Just drop[m
+[32m                    # the segment and keep on going.[m
+[32m                    pass[m
+[32m                self.segment = Segment()[m
+
+[32m    def update_episode_frame_buffer(self, mb_obs, mb_dones):[m
+[32m        e0_obs = mb_obs[0][m
+[32m        e0_dones = mb_dones[0][m
+[32m        for step in range(self.nsteps):[m
+[32m            # Here we only need to send the last frame (the most recent one)[m
+[32m            # from the 4-frame stack, because we're just showing output to[m
+[32m            # the user.[m
+[32m            self.episode_frames.append(e0_obs[step, :, :, -1])[m
+[32m            if e0_dones[step]:[m
+[32m                self.episode_vid_queue.put(self.episode_frames)[m
+[32m                self.episode_frames = [][m
+
+    def run(self):[m
+        [32mnenvs = len(self.env.remotes)[m
+        mb_obs, mb_rewards, mb_actions, mb_values, mb_dones = [31m[],[],[],[],[][m[32m\[m
+[32m            [], [], [], [], [][m
+        mb_states = self.states[m
+
+        [32m# Run[m for [31mn[m[32mnsteps steps in the environment[m
+[32m        for _[m in range(self.nsteps):
+            actions, values, states = self.model.step(self.obs, self.states,
+                                                      self.dones)
+            mb_obs.append(np.copy(self.obs))[m
+            mb_actions.append(actions)[m
+            mb_values.append(values)[m
+            mb_dones.append(self.dones)[m
+            [32m# len({obs, rewards, dones}) == nenvs[m
+            obs, rewards, dones, _ = self.env.step(actions)[m
+            self.states = states[m
+            self.dones = dones[m
+            for n, done in enumerate(dones):[m
+                if done:[m
+                    self.obs[n] = [31mself.obs[n]*0[m[32mself.obs[n] * 0[m
+[32m            # SubprocVecEnv automatically resets when done[m
+            self.update_obs(obs)[m
+            mb_rewards.append(rewards)[m
+        mb_dones.append(self.dones)[m
+        [31m#batch[m[32m# batch[m of steps to batch of rollouts
+        [32m# i.e. from nsteps, nenvs to nenvs, nsteps[m
+        mb_obs = np.asarray(mb_obs, dtype=np.uint8).swapaxes(1, [31m0).reshape(self.batch_ob_shape)[m[32m0)[m
+        mb_rewards = np.asarray(mb_rewards, dtype=np.float32).swapaxes(1, 0)[m
+        mb_actions = np.asarray(mb_actions, dtype=np.int32).swapaxes(1, 0)[m
+        mb_values = np.asarray(mb_values, dtype=np.float32).swapaxes(1, 0)[m
+        mb_dones = np.asarray(mb_dones, dtype=np.bool).swapaxes(1, 0)[m
+        mb_masks = mb_dones[:, :-1][m
+        [32m# The first entry was just the init state of 'dones' (all False),[m
+[32m        # before we'd actually run any steps, so drop it.[m
+        mb_dones = mb_dones[:, 1:][m
+
+        [32m# Log original rewards[m
+[32m        for env_n, (rs, dones) in enumerate(zip(mb_rewards, mb_dones)):[m
+[32m            assert_equal(rs.shape, (self.nsteps, ))[m
+[32m            assert_equal(dones.shape, (self.nsteps, ))[m
+[32m            for step_n in range(self.nsteps):[m
+[32m                self.orig_reward[env_n] += rs[step_n][m
+[32m                if dones[step_n]:[m
+[32m                    easy_tf_log.logkv([m
+[32m                        "orig_reward_{}".format(env_n),[m
+[32m                        self.orig_reward[env_n])[m
+[32m                    self.orig_reward[env_n] = 0[m
+
+[32m        if self.env.env_id == 'MovingDotNoFrameskip-v0':[m
+[32m            # For MovingDot, reward depends on both current observation and[m
+[32m            # current action, so encode action in the observations.[m
+[32m            # (We only need to set this in the most recent frame,[m
+[32m            # because that's all that the reward predictor for MovingDot[m
+[32m            # uses.)[m
+[32m            mb_obs[:, :, 0, 0, -1] = mb_actions[:, :][m
+
+[32m        # Generate segments[m
+[32m        # (For MovingDot, this has to happen _after_ we've encoded the action[m
+[32m        # in the observations.)[m
+[32m        if self.gen_segments:[m
+[32m            self.update_segment_buffer(mb_obs, mb_rewards, mb_dones)[m
+
+[32m        # Replace rewards with those from reward predictor[m
+[32m        # (Note that this also needs to be done _after_ we've encoded the[m
+[32m        # action.)[m
+[32m        logging.debug("Original rewards:\n%s", mb_rewards)[m
+[32m        if self.reward_predictor:[m
+[32m            assert_equal(mb_obs.shape, (nenvs, self.nsteps, 84, 84, 4))[m
+[32m            mb_obs_allenvs = mb_obs.reshape(nenvs * self.nsteps, 84, 84, 4)[m
+
+[32m            rewards_allenvs = self.reward_predictor.reward(mb_obs_allenvs)[m
+[32m            assert_equal(rewards_allenvs.shape, (nenvs * self.nsteps, ))[m
+[32m            mb_rewards = rewards_allenvs.reshape(nenvs, self.nsteps)[m
+[32m            assert_equal(mb_rewards.shape, (nenvs, self.nsteps))[m
+
+[32m            logging.debug("Predicted rewards:\n%s", mb_rewards)[m
+
+[32m        # Save frames for episode rendering[m
+[32m        if self.episode_vid_queue is not None:[m
+[32m            self.update_episode_frame_buffer(mb_obs, mb_dones)[m
+
+[32m        # Discount rewards[m
+[32m        mb_obs = mb_obs.reshape(self.batch_ob_shape)[m
+        last_values = self.model.value(self.obs, self.states,
+                                       self.dones).tolist()
+        [31m#discount/bootstrap[m[32m# discount/bootstrap[m off value fn
+        for n, (rewards, dones, value) in [31menumerate(zip(mb_rewards,[m[32menumerate([m
+[32m                zip(mb_rewards,[m mb_dones, last_values)):
+            rewards = rewards.tolist()[m
+            dones = dones.tolist()[m
+            if dones[-1] == 0:[m
+                [32m# Make sure that the first iteration of the loop inside[m
+[32m                # discount_with_dones picks up 'value' as the initial[m
+[32m                # value of r[m
+                rewards = [31mdiscount_with_dones(rewards+[value], dones+[0],[m[32mdiscount_with_dones(rewards + [value],[m
+[32m                                              dones + [0],[m
+                                              self.gamma)[:-1]
+            else:[m
+                rewards = discount_with_dones(rewards, dones, self.gamma)[m
+            mb_rewards[n] = rewards[m
+
+        mb_rewards = mb_rewards.flatten()[m
+        mb_actions = mb_actions.flatten()[m
+        mb_values = mb_values.flatten()[m
+        mb_masks = mb_masks.flatten()[m
+        return mb_obs, mb_states, mb_rewards, mb_masks, mb_actions, mb_values[m
+
+
+def learn(policy,
+          env,
+          seed,
+          [32mstart_policy_training_pipe,[m
+[32m          ckpt_save_dir,[m
+[32m          lr_scheduler,[m
+          nsteps=5,
+          nstack=4,
+          total_timesteps=int(80e6),
+          vf_coef=0.5,
+          ent_coef=0.01,
+          max_grad_norm=0.5,[31mlr=7e-4, lrschedule='linear',[m
+          epsilon=1e-5,
+          alpha=0.99,
+          gamma=0.99,
+          [31mlog_interval=100):[m[32mlog_interval=100,[m
+[32m          ckpt_save_interval=1000,[m
+[32m          ckpt_load_dir=None,[m
+[32m          gen_segments=False,[m
+[32m          seg_pipe=None,[m
+[32m          reward_predictor=None,[m
+[32m          episode_vid_queue=None):[m
+
+    tf.reset_default_graph()[m
+    set_global_seeds(seed)[m
+
+    nenvs = env.num_envs[m
+    ob_space = env.observation_space[m
+    ac_space = env.action_space[m
+    num_procs = len(env.remotes)  # HACK
+
+    [31mmodel = Model(policy=policy,[m[32mdef make_model():[m
+[32m        return Model([m
+[32m            policy=policy,[m
+            ob_space=ob_space,
+            ac_space=ac_space,
+            nenvs=nenvs,
+            nsteps=nsteps,
+            nstack=nstack,
+            num_procs=num_procs,
+            ent_coef=ent_coef,
+            vf_coef=vf_coef,
+            max_grad_norm=max_grad_norm,
+            [31mlr=lr,[m[32mlr_scheduler=lr_scheduler,[m
+            alpha=alpha,
+            [31mepsilon=epsilon, total_timesteps=total_timesteps, lrschedule=lrschedule)[m[32mepsilon=epsilon)[m
+
+[32m    with open(osp.join(ckpt_save_dir, 'make_model.pkl'), 'wb') as fh:[m
+[32m        fh.write(cloudpickle.dumps(make_model))[m
+
+[32m    print("Initialising policy...")[m
+[32m    if ckpt_load_dir is None:[m
+[32m        model = make_model()[m
+[32m    else:[m
+[32m        with open(osp.join(ckpt_load_dir, 'make_model.pkl'), 'rb') as fh:[m
+[32m            make_model = cloudpickle.loads(fh.read())[m
+[32m        model = make_model()[m
+
+[32m        ckpt_load_path = tf.train.latest_checkpoint(ckpt_load_dir)[m
+[32m        model.load(ckpt_load_path)[m
+[32m        print("Loaded policy from checkpoint '{}'".format(ckpt_load_path))[m
+
+[32m    ckpt_save_path = osp.join(ckpt_save_dir, 'policy.ckpt')[m
+
+    runner = [31mRunner(env, model,[m[32mRunner(env=env,[m
+[32m                    model=model,[m
+                    nsteps=nsteps,
+                    nstack=nstack,
+                    [31mgamma=gamma)[m[32mgamma=gamma,[m
+[32m                    gen_segments=gen_segments,[m
+[32m                    seg_pipe=seg_pipe,[m
+[32m                    reward_predictor=reward_predictor,[m
+[32m                    episode_vid_queue=episode_vid_queue)[m
+
+[32m    # nsteps: e.g. 5[m
+[32m    # nenvs: e.g. 16[m
+    nbatch = [31mnenvs*nsteps[m
+[31m    tstart[m[32mnenvs * nsteps[m
+[32m    fps_tstart[m = time.time()
+    [32mfps_nsteps = 0[m
+
+[32m    print("Starting workers")[m
+
+[32m    # Before we're told to start training the policy itself,[m
+[32m    # just generate segments for the reward predictor to be trained with[m
+[32m    while True:[m
+[32m        runner.run()[m
+[32m        try:[m
+[32m            start_policy_training_pipe.get(block=False)[m
+[32m        except queue.Empty:[m
+[32m            continue[m
+[32m        else:[m
+[32m            break[m
+
+[32m    print("Starting policy training")[m
+
+    for update in range(1, [31mtotal_timesteps//nbatch+1):[m[32mtotal_timesteps // nbatch + 1):[m
+[32m        # Run for nsteps[m
+        obs, states, rewards, masks, actions, values = runner.run()[m
+
+        policy_loss, value_loss, [31mpolicy_entropy[m[32mpolicy_entropy, cur_lr[m = [31mmodel.train(obs,[m[32mmodel.train([m
+[32m            obs,[m states, rewards, masks, actions, values)
+
+        [31mnseconds = time.time()-tstart[m
+[31m        fps = int((update*nbatch)/nseconds)[m[32mprint("Trained policy for {} time steps".format((update + 1) * nbatch))[m
+
+[32m        fps_nsteps += nbatch[m
+
+        if update % log_interval == 0 [31mor[m[32mand[m update [31m== 1:[m[32m!= 0:[m
+[32m            fps = fps_nsteps / (time.time() - fps_tstart)[m
+[32m            fps_nsteps = 0[m
+[32m            fps_tstart = time.time()[m
+
+            ev = explained_variance(values, rewards)[m
+            logger.record_tabular("nupdates", update)[m
+            logger.record_tabular("total_timesteps", [31mupdate*nbatch)[m[32mupdate * nbatch)[m
+            logger.record_tabular("fps", fps)[m
+            logger.record_tabular("policy_entropy", float(policy_entropy))[m
+            logger.record_tabular("value_loss", float(value_loss))[m
+            logger.record_tabular("explained_variance", float(ev))[m
+            [32mlogger.record_tabular("learning_rate", cur_lr)[m
+            logger.dump_tabular()[m
+[31m    env.close()[m
+
+        if [31m__name__[m[32mupdate != 0 and update % ckpt_save_interval[m == [31m'__main__':[m
+[31m    main()[m[32m0:[m
+[32m            model.save(ckpt_save_path, update)[m
+
+[32m    model.save(ckpt_save_path, update)[m
+[1mdiff --git a/baselines/a2c/policies.py b/baselines/a2c/policies.py[m
+[1mindex d58a32b..c098265 100644[m
+[1m--- a/baselines/a2c/policies.py[m
+[1m+++ b/baselines/a2c/policies.py[m
+[36m@@ -1,9 +1,6 @@[m
+import numpy as np[m
+import tensorflow as tf[m
+from [31mbaselines.a2c.utils[m[32ma2c.a2c.utils[m import conv, fc, conv_to_fc, batch_to_seq, seq_to_batch, lstm, lnlstm, [31msample, check_shape[m
+[31mfrom baselines.common.distributions import make_pdtype[m
+[31mimport baselines.common.tf_util as U[m
+[31mimport gym[m[32msample[m
+
+class LnLstmPolicy(object):[m
+    def __init__(self, sess, ob_space, ac_space, nenv, nsteps, nstack, nlstm=256, reuse=False):[m
+[36m@@ -121,3 +118,50 @@[m [mclass CnnPolicy(object):[m
+        self.vf = vf[m
+        self.step = step[m
+        self.value = value[m
+
+
+[32mclass MlpPolicy(object):[m
+
+[32m    def __init__(self,[m
+[32m                 sess,[m
+[32m                 ob_space,[m
+[32m                 ac_space,[m
+[32m                 nenv,[m
+[32m                 nsteps,[m
+[32m                 nstack,[m
+[32m                 reuse=False):[m
+[32m        nbatch = nenv*nsteps[m
+[32m        nh, nw, nc = ob_space.shape[m
+[32m        ob_shape = (nbatch, nh, nw, nc*nstack)[m
+[32m        nact = ac_space.n[m
+[32m        X = tf.placeholder(tf.uint8, ob_shape)  # obs[m
+[32m        with tf.variable_scope("model", reuse=reuse):[m
+[32m            x = tf.cast(X, tf.float32)/255.[m
+
+[32m            # Only look at the most recent frame[m
+[32m            x = x[:, :, :, -1][m
+
+[32m            w, h = x.get_shape()[1:][m
+[32m            x = tf.reshape(x, [-1, int(w * h)])[m
+[32m            x = fc(x, 'fc1', nh=2048, init_scale=np.sqrt(2))[m
+[32m            x = fc(x, 'fc2', nh=1024, init_scale=np.sqrt(2))[m
+[32m            x = fc(x, 'fc3', nh=512,  init_scale=np.sqrt(2))[m
+[32m            pi = fc(x, 'pi', nact, act=lambda x: x)[m
+[32m            vf = fc(x, 'v', 1, act=lambda x: x)[m
+
+[32m        v0 = vf[:, 0][m
+[32m        a0 = sample(pi)[m
+[32m        self.initial_state = []  # not stateful[m
+
+[32m        def step(ob, *_args, **_kwargs):[m
+[32m            a, v = sess.run([a0, v0], {X: ob})[m
+[32m            return a, v, []  # dummy state[m
+
+[32m        def value(ob, *_args, **_kwargs):[m
+[32m            return sess.run(v0, {X: ob})[m
+
+[32m        self.X = X[m
+[32m        self.pi = pi[m
+[32m        self.vf = vf[m
+[32m        self.step = step[m
+[32m        self.value = value[m
+[1mdiff --git a/baselines/a2c/utils.py b/baselines/a2c/utils.py[m
+[1mindex a836071..2a5ef25 100644[m
+[1m--- a/baselines/a2c/utils.py[m
+[1m+++ b/baselines/a2c/utils.py[m
+[36m@@ -1,8 +1,6 @@[m
+import os[m
+[31mimport gym[m
+import numpy as np[m
+import tensorflow as tf[m
+[31mfrom gym import spaces[m
+from collections import deque[m
+
+def sample(logits):[m
+[36m@@ -10,9 +8,9 @@[m [mdef sample(logits):[m
+    return tf.argmax(logits - tf.log(-tf.log(noise)), 1)[m
+
+def cat_entropy(logits):[m
+    a0 = logits - tf.reduce_max(logits, 1, [31mkeep_dims=True)[m[32mkeepdims=True)[m
+    ea0 = tf.exp(a0)[m
+    z0 = tf.reduce_sum(ea0, 1, [31mkeep_dims=True)[m[32mkeepdims=True)[m
+    p0 = ea0 / z0[m
+    return tf.reduce_sum(p0 * (tf.log(z0) - a0), 1)[m
+
+[36m@@ -145,7 +143,7 @@[m [mdef discount_with_dones(rewards, dones, gamma):[m
+    discounted = [][m
+    r = 0[m
+    for reward, done in zip(rewards[::-1], dones[::-1]):[m
+        r = reward + [31mgamma*r*(1.-done)[m[32mgamma * r * (1. - done)[m  # fixed off by one bug
+        discounted.append(r)[m
+    return discounted[::-1][m
+
