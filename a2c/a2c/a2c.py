@@ -404,14 +404,14 @@ def learn(policy,
         policy_loss, value_loss, policy_entropy, cur_lr = model.train(
             obs, states, rewards, masks, actions, values)
 
-        print("Trained policy for {} time steps".format((update + 1) * nbatch))
-
         fps_nsteps += nbatch
 
         if update % log_interval == 0 and update != 0:
             fps = fps_nsteps / (time.time() - fps_tstart)
             fps_nsteps = 0
             fps_tstart = time.time()
+
+            print("Trained policy for {} time steps".format(update * nbatch))
 
             ev = explained_variance(values, rewards)
             logger.record_tabular("nupdates", update)
