@@ -1,499 +1,177 @@
-import datetime
-import os
+import logging
 import os.path as osp
-import pickle
-import queue
 import time
 
+import easy_tf_log
 import numpy as np
 from numpy.testing import assert_equal
 import tensorflow as tf
 
-import params
-from utils import PrefDB, RunningStat
-
-VAL_FRACTION = 0.2
-
-
-def batch_iter(data, batch_size, shuffle=False):
-    idxs = list(range(len(data)))
-    if shuffle:
-        # Yes, this really does shuffle in-place
-        np.random.shuffle(idxs)
-
-    start_idx = 0
-    end_idx = 0
-    while end_idx < len(data):
-        end_idx = start_idx + batch_size
-        if end_idx > len(data):
-            end_idx = len(data)
-
-        batch_idxs = idxs[start_idx:end_idx]
-        batch = []
-        for idx in batch_idxs:
-            batch.append(data[idx])
-
-        yield batch
-        start_idx += batch_size
-
-
-def conv_layer(x, filters, kernel_size, strides, batchnorm, training, name,
-               reuse, activation='relu'):
-    # TODO: L2 loss
-    x = tf.layers.conv2d(
-        x,
-        filters,
-        kernel_size,
-        strides,
-        activation=None,
-        name=name,
-        reuse=reuse)
-
-    if batchnorm:
-        x = tf.layers.batch_normalization(x, training=training)
-
-    if activation == 'relu':
-        x = tf.nn.leaky_relu(x, alpha=0.01)
-    else:
-        raise Exception("Unkown activation for conv_layer", activation)
-
-    return x
-
-
-def dense_layer(x,
-                units,
-                name,
-                reuse,
-                activation=None):
-    # TODO: L2 loss
-
-    x = tf.layers.dense(x, units, activation=None, name=name, reuse=reuse)
-
-    if activation is None:
-        pass
-    elif activation == 'relu':
-        x = tf.nn.leaky_relu(x, alpha=0.01)
-    else:
-        raise Exception("Unknown activation for dense_layer", activation)
-
-    return x
-
-
-def get_position(s):
-    # s is (?, 84, 84, 4)
-    s = s[..., -1]  # select last frame; now (?, 84, 84)
-
-    x = tf.reduce_sum(s, axis=1)  # now (?, 84)
-    x = tf.argmax(x, axis=1)
-
-    y = tf.reduce_sum(s, axis=2)
-    y = tf.argmax(y, axis=1)
-
-    return x, y
-
-
-def net_handcrafted(s):
-    xc, yc = get_position(s)
-    a = s[:, 0, 0, -1] - 100
-
-    a1 = tf.cast(tf.equal(a, 1), tf.int64)
-    a2 = tf.cast(tf.equal(a, 2), tf.int64)
-    a3 = tf.cast(tf.equal(a, 3), tf.int64)
-    a4 = tf.cast(tf.equal(a, 4), tf.int64)
-
-    c1 = tf.sign(41 - yc)  # a = 1 (down)
-    c2 = tf.sign(41 - xc)  # a = 2 (right)
-    c3 = tf.sign(yc - 43)  # a = 3 (up)
-    c4 = tf.sign(xc - 43)  # a = 4 (left)
-
-    r = a1 * c1 + \
-        a2 * c2 + \
-        a3 * c3 + \
-        a4 * c4
-
-    c5 = tf.cast(tf.equal(xc, 0), tf.int64)
-    c7 = tf.cast(tf.equal(yc, 0), tf.int64)
-    # When the dot is right at the edge, it registers as about 82
-    c6 = tf.cast(xc >= 82, tf.int64)
-    c8 = tf.cast(yc >= 82, tf.int64)
-
-    against_wall = a1 * c8 + a2 * c6 + a3 * c7 + a4 * c5
-
-    r *= 1 - against_wall
-
-    # so that we have something trainable
-    r = tf.cast(r, tf.float32) + 0.0 * tf.Variable(0.0)
-
-    return r
-
-
-def net_easyfeatures(s, reuse):
-    a = s[:, 0, 0, -1] - 100
-    a = tf.cast(a, tf.float32) / 4.0
-
-    xc, yc = get_position(s)
-    xc = tf.cast(xc, tf.float32) / 83.0
-    yc = tf.cast(yc, tf.float32) / 83.0
-
-    features = [a, xc, yc]
-    x = tf.stack(features, axis=1)
-
-    x = dense_layer(x, 64, "d1", reuse, activation='relu')
-    x = dense_layer(x, 64, "d2", reuse, activation='relu')
-    x = dense_layer(x, 64, "d3", reuse, activation='relu')
-    x = dense_layer(x, 1, "d4", reuse, activation=None)
-    x = x[:, 0]
-
-    return x
-
-
-def net_conv(s, batchnorm, dropout, training, reuse):
-    # Page 15:
-    # "[The] input is fed through 4 convolutional layers of size 7x7, 5x5, 3x3,
-    # and 3x3 with strides 3, 2, 1, 1, each having 16 filters, with leaky ReLU
-    # nonlinearities (α = 0.01). This is followed by a fully connected layer of
-    # size 64 and then a scalar output. All convolutional layers use batch norm
-    # and dropout with α = 0.5 to prevent predictor overfitting"
-
-    x = tf.cast(s, tf.float32) / 255.0
-
-    x = conv_layer(x, 16, 7, 3, batchnorm, training, "c1", reuse, 'relu')
-    x = tf.layers.dropout(x, dropout, training=training)
-    x = conv_layer(x, 16, 5, 2, batchnorm, training, "c2", reuse, 'relu')
-    x = tf.layers.dropout(x, dropout, training=training)
-    x = conv_layer(x, 16, 3, 1, batchnorm, training, "c3", reuse, 'relu')
-    x = tf.layers.dropout(x, dropout, training=training)
-    x = conv_layer(x, 16, 3, 1, batchnorm, training, "c4", reuse, 'relu')
-
-    w, h, c = x.get_shape()[1:]
-    x = tf.reshape(x, [-1, int(w * h * c)])
-
-    x = dense_layer(x, 64, "d1", reuse, activation='relu')
-    x = dense_layer(x, 1, "d2", reuse, activation=None)
-    x = x[:, 0]
-
-    return x
-
-
-def reward_pred_net(s, dropout, batchnorm, reuse, training):
-    if params.params['network'] == 'handcrafted':
-        return net_handcrafted(s)
-    elif params.params['network'] == 'easyfeatures':
-        return net_easyfeatures(s, reuse)
-    elif params.params['network'] == 'conv':
-        return net_conv(s, batchnorm, dropout, training, reuse)
-    else:
-        raise Exception("Unknown reward predictor network architecture",
-                        params.params['network'])
-
-
-def recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max):
-    n_recvd = 0
-    while True:
-        try:
-            s1, s2, mu = pref_pipe.get(timeout=0.1)
-            n_recvd += 1
-        except queue.Empty:
-            break
-
-        if np.random.rand() < VAL_FRACTION:
-            pref_db_val.append(s1, s2, mu)
-        else:
-            pref_db_train.append(s1, s2, mu)
-
-        if len(pref_db_val) > db_max * VAL_FRACTION:
-            pref_db_val.del_first()
-        assert len(pref_db_val) <= db_max * VAL_FRACTION
-
-        if len(pref_db_train) > db_max * (1 - VAL_FRACTION):
-            pref_db_train.del_first()
-        assert len(pref_db_train) <= db_max * (1 - VAL_FRACTION)
-    if params.params['debug']:
-        print("{} preferences received".format(n_recvd))
-
-
-def save_prefs(log_dir, name, pref_db_train, pref_db_val):
-    fname = osp.join(log_dir, "train_{}.pkl".format(name))
-    save_pref_db(pref_db_train, fname)
-    fname = osp.join(log_dir, "val_{}.pkl".format(name))
-    save_pref_db(pref_db_val, fname)
-
-
-def train_reward_predictor(reward_predictor, pref_pipe, go_pipe,
-                           load_prefs_dir, log_dir, db_max):
-    pref_db_train, pref_db_val = get_initial_prefs(db_max, load_prefs_dir, log_dir, pref_pipe)
-
-    if params.params['just_prefs']:
-        return
-
-    if not params.params['no_pretrain']:
-        print("Training for %d epochs..." % params.params['n_initial_epochs'])
-        # Page 14: "In the Atari domain we also pretrain the reward predictor
-        # for 200 epochs before beginning RL training, to reduce the likelihood
-        # of irreversibly learning a bad policy based on an untrained
-        # predictor."
-        for i in range(params.params['n_initial_epochs']):
-            print("Epoch %d" % i)
-            reward_predictor.train(pref_db_train, pref_db_val)
-            recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
-        reward_predictor.save()
-        print("=== Finished initial training at", str(datetime.datetime.now()))
-
-    if params.params['save_pretrain']:
-        print("Saving preferences...")
-        fname = osp.join(log_dir, "train_postpretrain.pkl")
-        save_pref_db(pref_db_train, fname)
-        fname = osp.join(log_dir, "val_postpretrain.pkl")
-        save_pref_db(pref_db_val, fname)
-    if params.params['just_pretrain']:
-        return
-
-    print("=== Starting RL training at", str(datetime.datetime.now()))
-    # Start RL training
-    go_pipe.put(True)
-
-    step = 0
-    prev_save_step = None
-    while True:
-        reward_predictor.train(pref_db_train, pref_db_val)
-        recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
-
-        if params.params['save_prefs'] and \
-                step % params.params['prefs_save_interval'] == 0:
-            print("=== Saving preferences...")
-            fname = osp.join(log_dir, "train_%d.pkl" % step)
-            save_pref_db(pref_db_train, fname)
-            fname = osp.join(log_dir, "val_%d.pkl" % step)
-            save_pref_db(pref_db_val, fname)
-            if prev_save_step is not None:
-                os.remove(osp.join(log_dir, "train_%d.pkl" % prev_save_step))
-                os.remove(osp.join(log_dir, "val_%d.pkl" % prev_save_step))
-            prev_save_step = step
-
-        step += 1
-
-
-def get_initial_prefs(db_max, load_prefs_dir, log_dir, pref_pipe):
-    if load_prefs_dir:
-        print("Loading preferences...")
-        # TODO make this more flexible
-        pref_db_train, pref_db_val = load_pref_db(load_prefs_dir)
-    else:
-        pref_db_val = PrefDB()
-        pref_db_train = PrefDB()
-
-    # Page 15: "We collect 500 comparisons from a randomly initialized policy
-    # network at the beginning of training"
-    if not params.params['skip_prefs']:
-        while True:
-            if len(pref_db_train) >= params.params['n_initial_prefs'] and len(pref_db_val):
-                break
-            print("Waiting for preferences; %d so far" % len(pref_db_train))
-            recv_prefs(pref_pipe, pref_db_train, pref_db_val, db_max)
-            time.sleep(5.0)
-
-    if params.params['just_prefs'] or params.params['save_initial_prefs']:
-        save_prefs(log_dir, 'initial', pref_db_train, pref_db_val)
-
-    print("Finished accumulating initial preferences at",
-          str(datetime.datetime.now()))
-    print("({} preferences over {} segments)".format(
-        len(pref_db_train.prefs), len(pref_db_train.segments)))
-
-    return pref_db_train, pref_db_val
-
-
-def save_pref_db(pref_db, fname):
-    with open(fname, 'wb') as pkl_file:
-        pickle.dump(pref_db, pkl_file)
-
-
-def load_pref_db(pref_dir):
-    train_fname = osp.join(pref_dir, 'train_postpretrain.pkl')
-    if not os.path.isfile(train_fname):
-        train_fname = osp.join(pref_dir, 'train_initial.pkl')
-    with open(train_fname, 'rb') as pkl_file:
-        print("Loading training preferences from '{}'".format(train_fname))
-        pref_db_train = pickle.load(pkl_file)
-
-    val_fname = osp.join(pref_dir, 'val_postpretrain.pkl')
-    if not os.path.isfile(val_fname):
-        val_fname = osp.join(pref_dir, 'val_initial.pkl')
-    with open(val_fname, 'rb') as pkl_file:
-        print("Loading validation preferences from '{}'".format(val_fname))
-        pref_db_val = pickle.load(pkl_file)
-
-    return pref_db_train, pref_db_val
+from utils import RunningStat, batch_iter
 
 
 class RewardPredictorEnsemble:
     """
-    Modes:
-    * Predict reward
-      Inputs: one trajectory segment
-      Output: predicted reward
-    * Predict preference
-      Inputs: two trajectory segments
-      Output: preference between the two segments
+    An ensemble of reward predictors and associated helper functions.
     """
 
     def __init__(self,
-                 name,
+                 cluster_job_name,
+                 core_network,
                  lr=1e-4,
                  cluster_dict=None,
-                 ckpt_path=None,
-                 dropout=0.5,
+                 batchnorm=False,
+                 dropout=0.0,
+                 n_preds=1,
                  log_dir=None):
-        rps = []
-        reward_ops = []
-        pred_ops = []
-        train_ops = []
-        loss_ops = []
-        acc_ops = []
-        graph = tf.Graph()
-
-        cluster = tf.train.ClusterSpec(cluster_dict)
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        server = tf.train.Server(cluster, job_name=name, config=config)
-        sess = tf.Session(server.target, graph)
-
+        self.n_preds = n_preds
+        graph, self.sess = self.init_sess(cluster_dict, cluster_job_name)
+        # Why not just use soft device placement? With soft placement,
+        # if we have a bug which prevents an operation being placed on the GPU
+        # (e.g. we're using uint8s for operations that the GPU can't do),
+        # then TensorFlow will be silent and just place the operation on a CPU.
+        # Instead, we want to say: if there's a GPU present, definitely try and
+        # put things on the GPU. If it fails, tell us!
+        if tf.test.gpu_device_name():
+            worker_device = "/job:{}/task:0/gpu:0".format(cluster_job_name)
+        else:
+            worker_device = "/job:{}/task:0".format(cluster_job_name)
         device_setter = tf.train.replica_device_setter(
             cluster=cluster_dict,
             ps_device="/job:ps/task:0",
-            worker_device="/job:{}/task:0".format(name))
-
-        # TODO pass these instead of getting them from global params
-        batchnorm = params.params['batchnorm']
-        dropout = params.params['dropout']
-        n_preds = params.params['n_preds']
+            worker_device=worker_device)
+        self.rps = []
         with graph.as_default():
-            for i in range(n_preds):
+            for pred_n in range(n_preds):
                 with tf.device(device_setter):
-                    with tf.variable_scope("pred_%d" % i):
-                        rp = RewardPredictor(
-                            dropout=dropout, batchnorm=batchnorm, lr=lr)
-                reward_ops.append(rp.r1)
-                pred_ops.append(rp.pred)
-                train_ops.append(rp.train)
-                loss_ops.append(rp.loss)
-                acc_ops.append(rp.accuracy)
-                rps.append(rp)
+                    with tf.variable_scope("pred_{}".format(pred_n)):
+                        rp = RewardPredictorNetwork(
+                            core_network=core_network,
+                            dropout=dropout,
+                            batchnorm=batchnorm,
+                            lr=lr)
+                self.rps.append(rp)
+            self.init_op = tf.global_variables_initializer()
+            # Why save_relative_paths=True?
+            # So that the plain-text 'checkpoint' file written uses relative paths,
+            # which seems to be needed in order to avoid confusing saver.restore()
+            # when restoring from FloydHub runs.
+            self.saver = tf.train.Saver(max_to_keep=1, save_relative_paths=True)
+            self.summaries = self.add_summary_ops()
 
-            mean_loss = tf.reduce_mean(loss_ops)
-            mean_accuracy = tf.reduce_mean(acc_ops)
+        self.checkpoint_file = osp.join(log_dir,
+                                        'reward_predictor_checkpoints',
+                                        'reward_predictor.ckpt')
+        self.train_writer = tf.summary.FileWriter(
+            osp.join(log_dir, 'reward_predictor', 'train'), flush_secs=5)
+        self.test_writer = tf.summary.FileWriter(
+            osp.join(log_dir, 'reward_predictor', 'test'), flush_secs=5)
 
-            # Only the reward predictor training process should initialize/save
-            # the network
-            if name != 'train_reward':
-                while sess.run(tf.report_uninitialized_variables()).any():
-                    print("%s waiting for variable initialization..." % name)
-                    time.sleep(1.0)
-            else:
-                if log_dir is None:
-                    raise ValueError("Must supply log_dir for train_reward")
-                self.saver = tf.train.Saver(max_to_keep=1)
-                self.checkpoint_file = osp.join(log_dir,
-                                                'reward_predictor_checkpoints',
-                                                'reward_predictor.ckpt')
-                if ckpt_path is None:
-                    sess.run(tf.global_variables_initializer())
-                else:
-                    print("Loading reward predictor checkpoint from",
-                          ckpt_path)
-                    self.saver.restore(sess, ckpt_path)
-                    print("Reard predictor checkpoint loaded!")
-
-                self.train_writer = tf.summary.FileWriter(
-                    osp.join(log_dir, 'reward_pred', 'train'), flush_secs=5)
-                self.test_writer = tf.summary.FileWriter(
-                    osp.join(log_dir, 'reward_pred', 'test'), flush_secs=5)
-
-        if name == 'ps':
-            server.join()
-
-        summary_ops = []
-        op = tf.summary.scalar('reward_predictor_accuracy_mean', mean_accuracy)
-        summary_ops.append(op)
-        op = tf.summary.scalar('reward_predictor_loss_mean', mean_loss)
-        summary_ops.append(op)
-        for i in range(n_preds):
-            name = 'reward_predictor_accuracy_{}'.format(i)
-            op = tf.summary.scalar(name, acc_ops[i])
-            summary_ops.append(op)
-            name = 'reward_predictor_loss_{}'.format(i)
-            op = tf.summary.scalar(name, loss_ops[i])
-            summary_ops.append(op)
-        self.summaries = tf.summary.merge(summary_ops)
-
-        self.sess = sess
-        self.rps = rps
-        self.reward_ops = reward_ops
-        self.train_ops = train_ops
-        self.loss_ops = loss_ops
-        self.acc_ops = acc_ops
-        self.pred_ops = pred_ops
-        self.n_preds = n_preds
         self.n_steps = 0
         self.r_norm = RunningStat(shape=n_preds)
 
+        misc_logs_dir = osp.join(log_dir, 'reward_predictor', 'misc')
+        easy_tf_log.set_dir(misc_logs_dir)
+
+    @staticmethod
+    def init_sess(cluster_dict, cluster_job_name):
+        graph = tf.Graph()
+        cluster = tf.train.ClusterSpec(cluster_dict)
+        config = tf.ConfigProto(gpu_options={'allow_growth': True})
+        server = tf.train.Server(cluster, job_name=cluster_job_name, config=config)
+        sess = tf.Session(server.target, graph)
+        return graph, sess
+
+    def add_summary_ops(self):
+        summary_ops = []
+
+        for pred_n, rp in enumerate(self.rps):
+            name = 'reward_predictor_accuracy_{}'.format(pred_n)
+            op = tf.summary.scalar(name, rp.accuracy)
+            summary_ops.append(op)
+            name = 'reward_predictor_loss_{}'.format(pred_n)
+            op = tf.summary.scalar(name, rp.loss)
+            summary_ops.append(op)
+
+        mean_accuracy = tf.reduce_mean([rp.accuracy for rp in self.rps])
+        op = tf.summary.scalar('reward_predictor_accuracy_mean', mean_accuracy)
+        summary_ops.append(op)
+
+        mean_loss = tf.reduce_mean([rp.loss for rp in self.rps])
+        op = tf.summary.scalar('reward_predictor_loss_mean', mean_loss)
+        summary_ops.append(op)
+
+        summaries = tf.summary.merge(summary_ops)
+
+        return summaries
+
+    def init_network(self, load_ckpt_dir=None):
+        if load_ckpt_dir:
+            ckpt_file = tf.train.latest_checkpoint(load_ckpt_dir)
+            if ckpt_file is None:
+                msg = "No reward predictor checkpoint found in '{}'".format(
+                    load_ckpt_dir)
+                raise FileNotFoundError(msg)
+            self.saver.restore(self.sess, ckpt_file)
+            print("Loaded reward predictor checkpoint from '{}'".format(ckpt_file))
+        else:
+            self.sess.run(self.init_op)
+
+    def save(self):
+        ckpt_name = self.saver.save(self.sess,
+                                    self.checkpoint_file,
+                                    self.n_steps)
+        print("Saved reward predictor checkpoint to '{}'".format(ckpt_name))
+
     def raw_rewards(self, obs):
         """
-        Return (unnormalized) reward for each frame from each member of the
-        ensemble.
+        Return (unnormalized) reward for each frame of a single segment
+        from each member of the ensemble.
         """
+        assert_equal(obs.shape[1:], (84, 84, 4))
         n_steps = obs.shape[0]
-        assert_equal(obs.shape, (n_steps, 84, 84, 4))
-
         feed_dict = {}
         for rp in self.rps:
             feed_dict[rp.training] = False
-            # reward_ops corresponds to the rewards calculated from the
-            # s1 input
             feed_dict[rp.s1] = [obs]
         # This will return nested lists of sizes n_preds x 1 x nsteps
         # (x 1 because of the batch size of 1)
-        rs = self.sess.run(self.reward_ops, feed_dict)
+        rs = self.sess.run([rp.r1 for rp in self.rps], feed_dict)
         rs = np.array(rs)
         # Get rid of the extra x 1 dimension
         rs = rs[:, 0, :]
         assert_equal(rs.shape, (self.n_preds, n_steps))
-
         return rs
 
     def reward(self, obs):
         """
-        Return (normalized) reward for each frame.
+        Return (normalized) reward for each frame of a single segment.
 
         (Normalization involves normalizing the rewards from each member of the
-        ensemble separately (zero mean and constant standard deviation), then
-        averaging the resulting rewards across all ensemble members.)
+        ensemble separately, then averaging the resulting rewards across all
+        ensemble members.)
         """
+        assert_equal(obs.shape[1:], (84, 84, 4))
         n_steps = obs.shape[0]
-        assert_equal(obs.shape, (n_steps, 84, 84, 4))
 
         # Get unnormalized rewards
 
         ensemble_rs = self.raw_rewards(obs)
-        # Shape should be 'n_preds x n_steps'
-        assert_equal(len(ensemble_rs), len(self.rps))
-        assert_equal(len(ensemble_rs[0]), n_steps)
-        if params.params['debug']:
-            print("Unnormalized rewards:", ensemble_rs)
+        logging.debug("Unnormalized rewards:\n%s", ensemble_rs)
 
         # Normalize rewards
 
-        # Note that we don't just implement reward normalization in the network
-        # graph itself because:
+        # Note that we implement this here instead of in the network itself
+        # because:
         # * It's simpler not to do it in TensorFlow
-        # * Preference calculation doesn't need normalized rewards. Only
+        # * Preference prediction doesn't need normalized rewards. Only
         #   rewards sent to the the RL algorithm need to be normalized.
         #   So we can save on computation.
 
         # Page 4:
         # "We normalized the rewards produced by r^ to have zero mean and
         #  constant standard deviation."
-        # Page 15:
+        # Page 15: (Atari)
         # "Since the reward predictor is ultimately used to compare two sums
         #  over timesteps, its scale is arbitrary, and we normalize it to have
         #  a standard deviation of 0.05"
@@ -513,143 +191,144 @@ class RewardPredictorEnsemble:
         ensemble_rs *= 0.05
         ensemble_rs = ensemble_rs.transpose()
         assert_equal(ensemble_rs.shape, (self.n_preds, n_steps))
-        if params.params['debug']:
-            print("Reward mean/stddev:", self.r_norm.mean, self.r_norm.std)
-            print("Normalized rewards:", ensemble_rs)
+        logging.debug("Reward mean/stddev:\n%s %s",
+                      self.r_norm.mean,
+                      self.r_norm.std)
+        logging.debug("Normalized rewards:\n%s", ensemble_rs)
 
         # "...and then averaging the results."
         rs = np.mean(ensemble_rs, axis=0)
         assert_equal(rs.shape, (n_steps, ))
-        if params.params['debug']:
-            print("After ensemble averaging:", rs)
+        logging.debug("After ensemble averaging:\n%s", rs)
 
         return rs
 
     def preferences(self, s1s, s2s):
         """
         Predict probability of human preferring one segment over another
-        for each segment in the supplied segment pairs.
+        for each segment in the supplied batch of segment pairs.
         """
         feed_dict = {}
         for rp in self.rps:
             feed_dict[rp.s1] = s1s
             feed_dict[rp.s2] = s2s
             feed_dict[rp.training] = False
-        preds = self.sess.run(self.pred_ops, feed_dict)
+        preds = self.sess.run([rp.pred for rp in self.rps], feed_dict)
         return preds
 
-    def save(self):
-        # TODO put back n_steps
-        ckpt_name = self.saver.save(self.sess, self.checkpoint_file)
-        return ckpt_name
-
-    def train(self, prefs_train, prefs_val):
+    def train(self, prefs_train, prefs_val, val_interval):
         """
-        Train the ensemble for one full epoch
+        Train all ensemble members for one epoch.
         """
         print("Training/testing with %d/%d preferences" % (len(prefs_train),
                                                            len(prefs_val)))
 
-        val_interval = params.params['reward_predictor_val_interval']
-        for batch_n, batch in enumerate(
-                batch_iter(prefs_train.prefs, batch_size=32, shuffle=True)):
-            print("Training batch {}".format(batch_n))
-            # TODO: refactor this so that each can be taken directly from
-            # pref_db
-            s1s = []
-            s2s = []
-            mus = []
-            for k1, k2, mu in batch:
-                s1s.append(prefs_train.segments[k1])
-                s2s.append(prefs_train.segments[k2])
-                mus.append(mu)
+        start_steps = self.n_steps
+        start_time = time.time()
 
-            feed_dict = {}
-            for rp in self.rps:
-                feed_dict[rp.s1] = s1s
-                feed_dict[rp.s2] = s2s
-                feed_dict[rp.mu] = mus
-                feed_dict[rp.training] = True
-            summaries, _ = self.sess.run([self.summaries, self.train_ops],
-                                         feed_dict)
-            self.train_writer.add_summary(summaries, self.n_steps)
+        for _, batch in enumerate(batch_iter(prefs_train.prefs,
+                                             batch_size=32,
+                                             shuffle=True)):
+            self.train_step(batch, prefs_train)
             self.n_steps += 1
-            print("Trained reward predictor for %d steps" % self.n_steps)
 
             if self.n_steps and self.n_steps % val_interval == 0:
-                print("Running a validation batch")
-                if len(prefs_val) <= 32:
-                    val_batch = prefs_val.prefs
-                else:
-                    idxs = np.random.choice(
-                        len(prefs_val.prefs), 32, replace=False)
-                    val_batch = []
-                    for idx in idxs:
-                        val_batch.append(prefs_val.prefs[idx])
-                s1s = []
-                s2s = []
-                mus = []
-                for k1, k2, mu in val_batch:
-                    s1s.append(prefs_val.segments[k1])
-                    s2s.append(prefs_val.segments[k2])
-                    mus.append(mu)
-                feed_dict = {}
-                for rp in self.rps:
-                    feed_dict[rp.s1] = s1s
-                    feed_dict[rp.s2] = s2s
-                    feed_dict[rp.mu] = mus
-                    feed_dict[rp.training] = False
+                self.val_step(prefs_val)
 
-                summaries = self.sess.run(self.summaries, feed_dict)
-                self.test_writer.add_summary(summaries, self.n_steps)
+        end_time = time.time()
+        end_steps = self.n_steps
+        rate = (end_steps - start_steps) / (end_time - start_time)
+        easy_tf_log.tflog('reward_predictor_training_steps_per_second',
+                          rate)
 
-            ckpt_interval = params.params['reward_predictor_ckpt_interval']
-            if self.n_steps % ckpt_interval == 0 and self.n_steps != 0:
-                saved_path = self.save()
-                print("Saved reward predictor checkpoint to '{}'".format(
-                    saved_path))
+    def train_step(self, batch, prefs_train):
+        s1s = [prefs_train.segments[k1] for k1, k2, pref, in batch]
+        s2s = [prefs_train.segments[k2] for k1, k2, pref, in batch]
+        prefs = [pref for k1, k2, pref, in batch]
+        feed_dict = {}
+        for rp in self.rps:
+            feed_dict[rp.s1] = s1s
+            feed_dict[rp.s2] = s2s
+            feed_dict[rp.pref] = prefs
+            feed_dict[rp.training] = True
+        ops = [self.summaries, [rp.train for rp in self.rps]]
+        summaries, _ = self.sess.run(ops, feed_dict)
+        self.train_writer.add_summary(summaries, self.n_steps)
+
+    def val_step(self, prefs_val):
+        val_batch_size = 32
+        if len(prefs_val) <= val_batch_size:
+            batch = prefs_val.prefs
+        else:
+            idxs = np.random.choice(len(prefs_val.prefs),
+                                    val_batch_size,
+                                    replace=False)
+            batch = [prefs_val.prefs[i] for i in idxs]
+        s1s = [prefs_val.segments[k1] for k1, k2, pref, in batch]
+        s2s = [prefs_val.segments[k2] for k1, k2, pref, in batch]
+        prefs = [pref for k1, k2, pref, in batch]
+        feed_dict = {}
+        for rp in self.rps:
+            feed_dict[rp.s1] = s1s
+            feed_dict[rp.s2] = s2s
+            feed_dict[rp.pref] = prefs
+            feed_dict[rp.training] = False
+        summaries = self.sess.run(self.summaries, feed_dict)
+        self.test_writer.add_summary(summaries, self.n_steps)
 
 
-class RewardPredictor:
+class RewardPredictorNetwork:
     """
-    Inputs:
-    - s1/s2     Two batches of trajectories
-    - mu        One batch of preferences between each pair of trajectories
-    Outputs:
+    Predict the reward that a human would assign to each frame of
+    the input trajectory, trained using the human's preferences between
+    pairs of trajectories.
+
+    Network inputs:
+    - s1/s2     Trajectory pairs
+    - pref      Preferences between each pair of trajectories
+    Network outputs:
     - r1/r2     Reward predicted for each frame
     - rs1/rs2   Reward summed over all frames for each trajectory
     - pred      Predicted preference
-    - loss      Loss summed over the whole batch
     """
 
-    def __init__(self, dropout, batchnorm, lr):
+    def __init__(self, core_network, dropout, batchnorm, lr):
         training = tf.placeholder(tf.bool)
-
         # Each element of the batch is one trajectory segment.
         # (Dimensions are n segments x n frames per segment x ...)
-        s1 = tf.placeholder(tf.uint8, shape=(None, None, 84, 84, 4))
-        s2 = tf.placeholder(tf.uint8, shape=(None, None, 84, 84, 4))
+        s1 = tf.placeholder(tf.float32, shape=(None, None, 84, 84, 4))
+        s2 = tf.placeholder(tf.float32, shape=(None, None, 84, 84, 4))
         # For each trajectory segment, there is one human judgement.
-        mu = tf.placeholder(tf.float32, shape=(None, 2))
+        pref = tf.placeholder(tf.float32, shape=(None, 2))
 
-        # Concatenate trajectory segments, so that the first dimension
-        # is just frames
-        s1_unrolled = tf.reshape(s1, [-1, 84, 84, 4], name='a')
-        s2_unrolled = tf.reshape(s2, [-1, 84, 84, 4], name='b')
+        # Concatenate trajectory segments so that the first dimension is just
+        # frames
+        # (necessary because of conv layer's requirements on input shape)
+        s1_unrolled = tf.reshape(s1, [-1, 84, 84, 4])
+        s2_unrolled = tf.reshape(s2, [-1, 84, 84, 4])
 
-        _r1 = reward_pred_net(
-            s1_unrolled, dropout, batchnorm, reuse=None, training=training)
-        _r2 = reward_pred_net(
-            s2_unrolled, dropout, batchnorm, reuse=True, training=training)
+        # Predict rewards for each frame in the unrolled batch
+        _r1 = core_network(
+            s=s1_unrolled,
+            dropout=dropout,
+            batchnorm=batchnorm,
+            reuse=False,
+            training=training)
+        _r2 = core_network(
+            s=s2_unrolled,
+            dropout=dropout,
+            batchnorm=batchnorm,
+            reuse=True,
+            training=training)
 
         # Shape should be 'unrolled batch size'
         # where 'unrolled batch size' is 'batch size' x 'n frames per segment'
         c1 = tf.assert_rank(_r1, 1)
         c2 = tf.assert_rank(_r2, 1)
         with tf.control_dependencies([c1, c2]):
-            __r1 = tf.reshape(_r1, tf.shape(s1)[0:2], name='c')
-            __r2 = tf.reshape(_r2, tf.shape(s2)[0:2], name='d')
-
+            # Re-roll to 'batch size' x 'n frames per segment'
+            __r1 = tf.reshape(_r1, tf.shape(s1)[0:2])
+            __r2 = tf.reshape(_r2, tf.shape(s2)[0:2])
         # Shape should be 'batch size' x 'n frames per segment'
         c1 = tf.assert_rank(__r1, 2)
         c2 = tf.assert_rank(__r2, 2)
@@ -657,6 +336,7 @@ class RewardPredictor:
             r1 = __r1
             r2 = __r2
 
+        # Sum rewards over all frames in each segment
         _rs1 = tf.reduce_sum(r1, axis=1)
         _rs2 = tf.reduce_sum(r2, axis=1)
         # Shape should be 'batch size'
@@ -666,28 +346,23 @@ class RewardPredictor:
             rs1 = _rs1
             rs2 = _rs2
 
+        # Predict preferences for each segment
         _rs = tf.stack([rs1, rs2], axis=1)
-
         # Shape should be 'batch size' x 2
         c1 = tf.assert_rank(_rs, 2)
         with tf.control_dependencies([c1]):
             rs = _rs
-
         _pred = tf.nn.softmax(rs)
-
         # Shape should be 'batch_size' x 2
         c1 = tf.assert_rank(_pred, 2)
         with tf.control_dependencies([c1]):
             pred = _pred
 
-        preds_correct = tf.equal(tf.argmax(mu, 1), tf.argmax(pred, 1))
+        preds_correct = tf.equal(tf.argmax(pref, 1), tf.argmax(pred, 1))
         accuracy = tf.reduce_mean(tf.cast(preds_correct, tf.float32))
 
-        # Prevent tf.nn.softmax_cross_entropy_with_logits_v2 from propagating
-        # gradients into labels
-        _mu = tf.stop_gradient(mu)
-        _loss = tf.nn.softmax_cross_entropy_with_logits(
-            labels=_mu, logits=rs)
+        _loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=pref,
+                                                           logits=rs)
         # Shape should be 'batch size'
         c1 = tf.assert_rank(_loss, 1)
         with tf.control_dependencies([c1]):
@@ -695,28 +370,23 @@ class RewardPredictor:
 
         # Make sure that batch normalization ops are updated
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+
         with tf.control_dependencies(update_ops):
             train = tf.train.AdamOptimizer(learning_rate=lr).minimize(loss)
 
-        # TODO (L2 loss)
-        """
-        reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-        reg_loss = tf.add_n(reg_losses)
-        loss += reg_loss
-        """
-
+        # Inputs
+        self.training = training
         self.s1 = s1
         self.s2 = s2
-        self.mu = mu
+        self.pref = pref
+
+        # Outputs
         self.r1 = r1
         self.r2 = r2
         self.rs1 = rs1
         self.rs2 = rs2
-        self.rs = rs
-        self.mu = mu
         self.pred = pred
-        self.training = training
-        self._loss = _loss
-        self.loss = loss
+
         self.accuracy = accuracy
+        self.loss = loss
         self.train = train

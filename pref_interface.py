@@ -1,173 +1,68 @@
 #!/usr/bin/env python
 
+"""
+A simple CLI-based interface for querying the user about segment preferences.
+"""
+
+import logging
 import queue
 import time
 from itertools import combinations
-from multiprocessing import Process, Queue
+from multiprocessing import Queue
+from random import shuffle
 
+import easy_tf_log
 import numpy as np
-from numpy.testing import assert_equal
 
-import params
-from scipy.ndimage import zoom
-from utils import vid_proc
+from utils import VideoRenderer
 
 
 class PrefInterface:
 
-    def __init__(self, headless, synthetic_prefs=False):
+    def __init__(self, synthetic_prefs, max_segs, log_dir):
         self.vid_q = Queue()
-        if not headless:
-            Process(target=vid_proc, args=(self.vid_q,), daemon=True).start()
-        self.synthetic_prefs = synthetic_prefs
-
-    def least_certain_seg_pair(self, segments, pair_idxs):
-        """
-        - Calculate predicted preferences for every possible pair of segments
-        - Calculate the pair with the highest uncertainty
-        - Return the index of that pair of segments
-        - Send that pair of segments, along with segment IDs, to be checked by
-          the user
-        """
-        s1s = []
-        s2s = []
-        for i1, i2 in pair_idxs:
-            s1s.append(segments[i1].frames)
-            s2s.append(segments[i2].frames)
-        pair_preds = self.reward_predictor.preferences(s1s, s2s)
-        pair_preds = np.array(pair_preds)
-        n_preds = self.reward_predictor.n_preds
-        assert_equal(pair_preds.shape, (n_preds, len(pair_idxs), 2))
-
-        # Each predictor gives two outputs:
-        # - p1: the probability of segment 1 being preferred
-        # - p2: the probability of segment 2 being preferred
-        #       (= 1 - p1)
-        # We want to calculate variance of predictions across all
-        # predictors in the ensemble.
-        # If L is a list, var(L) = var(1 - L).
-        # So we can calculate the variance based on either p1 or p2
-        # and get the same result.
-        preds = pair_preds[:, :, 0]
-        assert_equal(preds.shape, (n_preds, len(pair_idxs)))
-
-        # Calculate variances across ensemble members
-        pred_vars = np.var(preds, axis=0)
-        assert_equal(pred_vars.shape, (len(pair_idxs), ))
-
-        highest_var_i = np.argmax(pred_vars)
-        check_idxs = pair_idxs[highest_var_i]
-        check_s1 = segments[check_idxs[0]]
-        check_s2 = segments[check_idxs[1]]
-
-        return check_idxs, check_s1, check_s2
-
-    def recv_segments(self, segments, seg_pipe, segs_max):
-        n_segs = 0
-        while True:
-            try:
-                segment = seg_pipe.get(timeout=0.1)
-                n_segs += 1
-            except queue.Empty:
-                break
-            segments.append(segment)
-            # (The maximum number of segments kept being 5,000 isn't mentioned
-            # in the paper anywhere - it's just something I decided on. This
-            # should be maximum ~ 700 MB.)
-            if len(segments) > segs_max:
-                del segments[0]
-
-    def sample_pair_idxs(self, segments, exclude_pairs):
-        # Page 14: "[We] draw a factor 10 more clip pair candidates than we
-        # ultimately present to the human."
-        possible_pairs = combinations(range(len(segments)), 2)
-        possible_pairs = list(set(possible_pairs) - set(exclude_pairs))
-
-        if len(possible_pairs) <= 10:
-            return possible_pairs
+        if not synthetic_prefs:
+            self.renderer = VideoRenderer(vid_queue=self.vid_q,
+                                          mode=VideoRenderer.restart_on_get_mode,
+                                          zoom=4)
         else:
-            idxs = np.random.choice(range(len(possible_pairs)),
-                                    size=10, replace=False)
-            pairs = []
-            for i in idxs:
-                pairs.append(possible_pairs[i])
-            return pairs
+            self.renderer = None
+        self.synthetic_prefs = synthetic_prefs
+        self.seg_idx = 0
+        self.segments = []
+        self.tested_pairs = set()  # For O(1) lookup
+        self.max_segs = max_segs
+        easy_tf_log.set_dir(log_dir)
 
-    def ask_user(self, n1, n2, s1, s2):
-        border = np.zeros((84, 10), dtype=np.uint8)
+    def stop_renderer(self):
+        if self.renderer:
+            self.renderer.stop()
 
-        seg_len = len(s1)
-        vid = []
-        for t in range(seg_len):
-            # Show only the most recent frame of the 4-frame stack
-            frame = np.hstack((s1[t][:, :, -1], border, s2[t][:, :, -1]))
-            frame = zoom(frame, 4)
-            vid.append(frame)
-        n_pause_frames = 7
-        vid.extend([vid[-1]] * n_pause_frames)
-        self.vid_q.put(vid)
+    def run(self, seg_pipe, pref_pipe):
+        while len(self.segments) < 2:
+            print("Preference interface waiting for segments")
+            time.sleep(5.0)
+            self.recv_segments(seg_pipe)
 
         while True:
-            print("Segments {} and {}: ".format(n1, n2))
-            choice = input()
-            if choice == "L" or choice == "R" or choice == "E" or choice == "":
-                break
-            else:
-                print("Invalid choice '{}'".format(choice))
+            seg_pair = None
+            while seg_pair is None:
+                try:
+                    seg_pair = self.sample_seg_pair()
+                except IndexError:
+                    print("Preference interface ran out of untested segments;"
+                          "waiting...")
+                    # If we've tested all possible pairs of segments so far,
+                    # we'll have to wait for more segments
+                    time.sleep(1.0)
+                    self.recv_segments(seg_pipe)
+            s1, s2 = seg_pair
 
-        if choice == "L":
-            pref = (1., 0.)
-        elif choice == "R":
-            pref = (0., 1.)
-        elif choice == "E":
-            pref = (0.5, 0.5)
-        elif choice == "":
-            pref = None
-
-        self.vid_q.put("Pause")
-
-        return pref
-
-    def init_reward_predictor(self, reward_predictor):
-        self.reward_predictor = reward_predictor
-
-    def run(self, seg_pipe, pref_pipe, segs_max):
-        tested_pairs = []
-        segments = []
-
-        while True:
-            self.recv_segments(segments, seg_pipe, segs_max)
-            if len(segments) >= 2:
-                break
-            print("Waiting for segments")
-            time.sleep(2.0)
-
-        while True:
-            pair_idxs = []
-            # If we've tested all the possible pairs of segments so far,
-            # we might have to wait
-            while len(pair_idxs) == 0:
-                self.recv_segments(segments, seg_pipe, segs_max)
-                pair_idxs = self.sample_pair_idxs(segments,
-                                                  exclude_pairs=tested_pairs)
-            if params.params['debug']:
-                print("Sampled segment pairs:")
-                print(pair_idxs)
-
-            if not params.params['random_query']:
-                (n1, n2), s1, s2 = \
-                    self.least_certain_seg_pair(segments, pair_idxs)
-            else:
-                i = np.random.choice(len(pair_idxs))
-                (n1, n2) = pair_idxs[i]
-                s1 = segments[n1]
-                s2 = segments[n2]
-
-            if params.params['debug']:
-                print("Querying preference for segments", n1, "and", n2)
+            logging.debug("Querying preference for segments %s and %s",
+                          s1.hash, s2.hash)
 
             if not self.synthetic_prefs:
-                pref = self.ask_user(n1, n2, s1.frames, s2.frames)
+                pref = self.ask_user(s1, s2)
             else:
                 if sum(s1.rewards) > sum(s2.rewards):
                     pref = (1.0, 0.0)
@@ -176,11 +71,89 @@ class PrefInterface:
                 else:
                     pref = (0.5, 0.5)
 
-            # We don't need the rewards from this point on
-            s1 = s1.frames
-            s2 = s2.frames
-
             if pref is not None:
-                pref_pipe.put((s1, s2, pref))
-            tested_pairs.append((n1, n2))
-            tested_pairs.append((n2, n1))
+                # We don't need the rewards from this point on, so just send
+                # the frames
+                pref_pipe.put((s1.frames, s2.frames, pref))
+            # If pref is None, the user answered "incomparable" for the segment
+            # pair. The pair has been marked as tested; we just drop it.
+
+            self.recv_segments(seg_pipe)
+
+    def recv_segments(self, seg_pipe):
+        """
+        Receive segments from `seg_pipe` into circular buffer `segments`.
+        """
+        max_wait_seconds = 0.5
+        start_time = time.time()
+        n_recvd = 0
+        while time.time() - start_time < max_wait_seconds:
+            try:
+                segment = seg_pipe.get(block=True, timeout=max_wait_seconds)
+            except queue.Empty:
+                return
+            if len(self.segments) < self.max_segs:
+                self.segments.append(segment)
+            else:
+                self.segments[self.seg_idx] = segment
+                self.seg_idx = (self.seg_idx + 1) % self.max_segs
+            n_recvd += 1
+        easy_tf_log.tflog('segment_idx', self.seg_idx)
+        easy_tf_log.tflog('n_segments_rcvd', n_recvd)
+        easy_tf_log.tflog('n_segments', len(self.segments))
+
+    def sample_seg_pair(self):
+        """
+        Sample a random pair of segments which hasn't yet been tested.
+        """
+        segment_idxs = list(range(len(self.segments)))
+        shuffle(segment_idxs)
+        possible_pairs = combinations(segment_idxs, 2)
+        for i1, i2 in possible_pairs:
+            s1, s2 = self.segments[i1], self.segments[i2]
+            if ((s1.hash, s2.hash) not in self.tested_pairs) and \
+               ((s2.hash, s1.hash) not in self.tested_pairs):
+                self.tested_pairs.add((s1.hash, s2.hash))
+                self.tested_pairs.add((s2.hash, s1.hash))
+                return s1, s2
+        raise IndexError("No segment pairs yet untested")
+
+    def ask_user(self, s1, s2):
+        vid = []
+        seg_len = len(s1)
+        for t in range(seg_len):
+            border = np.zeros((84, 10), dtype=np.uint8)
+            # -1 => show only the most recent frame of the 4-frame stack
+            frame = np.hstack((s1.frames[t][:, :, -1],
+                               border,
+                               s2.frames[t][:, :, -1]))
+            vid.append(frame)
+        n_pause_frames = 7
+        for _ in range(n_pause_frames):
+            vid.append(np.copy(vid[-1]))
+        self.vid_q.put(vid)
+
+        while True:
+            print("Segments {} and {}: ".format(s1.hash, s2.hash))
+            choice = input()
+            # L = "I prefer the left segment"
+            # R = "I prefer the right segment"
+            # E = "I don't have a clear preference between the two segments"
+            # "" = "The segments are incomparable"
+            if choice == "L" or choice == "R" or choice == "E" or choice == "":
+                break
+            else:
+                print("Invalid choice '{}'".format(choice))
+
+        if choice == "L":
+            pref = (1.0, 0.0)
+        elif choice == "R":
+            pref = (0.0, 1.0)
+        elif choice == "E":
+            pref = (0.5, 0.5)
+        elif choice == "":
+            pref = None
+
+        self.vid_q.put([np.zeros(vid[0].shape, dtype=np.uint8)])
+
+        return pref
