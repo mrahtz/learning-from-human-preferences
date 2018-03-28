@@ -89,7 +89,19 @@ On a 16-core machine without GPU, this takes about 13 hours. TensorBoard logs sh
 
 ![](images/pong-graphs.png)
 
-To train Enduro: TODO (mentioned `--render_episodes`)
+To train Enduro using *human* preferences:
+
+`$ python3 run.py train_policy_with_preferences EnduroNoFrameskip-v4 --n_envs 16 --render_episodes`
+
+`--render_episodes` creates another small window which displays complete
+episodes played by the agents, so you can check how qualitative behaviour is
+progressing.
+
+On an 8-core machine with GPU, it takes about 2.5 hours to reproduce the video
+above - about an hour to collect 500 preferences about behaviour from a random
+policy, then half an hour to pretrain the reward predictor using those 500
+preferences, then an hour to train the policy (while still collecting
+preferences.)
 
 ### Piece-by-piece runs
 
@@ -109,17 +121,15 @@ saving to run directory `moving_dot-initial_prefs`:
 
 `$ python run.py gather_initial_prefs MovingDotNoFrameskip-v0 --synthetic_prefs --run_name moving_dot-initial_prefs`
 
-
 ### Running on FloydHub
 
 To run on [FloydHub](https://www.floydhub.com) (a cloud platform for
- running ML jobs), use something like:
+ running machine learning jobs), use something like:
 
 `floyd run --follow --env tensorflow-1.5 --tensorboard
 'bash floydhub_utils/floyd_wrapper.sh python run.py
 --log_dir /output --synthetic_prefs
 train_policy_with_preferences PongNoFrameskip-v4'`
-
 
 ### Running checkpoints
 
@@ -128,11 +138,19 @@ To run a trained policy checkpoint so you can see what the agent was doing, use
 
 `$ python3 run_checkpoint.py <environment> <policy checkpoint directory>`
 
-For example: TODO
+For example:
+
+* To run the agent trained for the moving dot environment:
 
 `$ python3 run_checkpoint.py MovingDotNoFrameskip-v0 runs/moving-dot_45cb953/policy_checkpoints`
 
+* To run the agent trained for Pong:
+
 `$ python3 run_checkpoint.py PongNoFrameskip-v4 runs/pong_45cb953/policy_checkpoints`
+
+* To run the agent trained for Enduro:
+
+`$ python3 run_checkpoint.py EnduroNoFrameskip-v4 runs/enduro_8471d5d/policy_checkpoints`
 
 
 ## Architecture notes
