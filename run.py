@@ -344,6 +344,8 @@ def start_reward_predictor_training(cluster_dict,
         if prefs_dir is None:
             pref_buffer.wait_until_len(n_initial_prefs)
 
+        save_prefs(log_dir, pref_db_train, pref_db_val)
+
         if not load_ckpt_dir:
             print("Pretraining reward predictor for {} epochs".format(
                 n_initial_epochs))
