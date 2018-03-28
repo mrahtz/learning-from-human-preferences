@@ -93,9 +93,12 @@ To train Enduro using *human* preferences:
 
 `$ python3 run.py train_policy_with_preferences EnduroNoFrameskip-v4 --n_envs 16 --render_episodes`
 
-`--render_episodes` creates another small window which displays complete
-episodes played by the agents, so you can check how qualitative behaviour is
-progressing.
+You'll see two windows: a larger one showing a pair of examples of agent
+behaviour, and another smaller window showing the last full episode that the
+agent played (so you can see how qualitative behaviour is changing). Enter 'L'
+in the terminal to indicate that you prefer the left example; 'R' to indicate
+you prefer the right example; 'E' to indicate you prefer them both equally; and
+just press enter if the two clips are incomparable.
 
 On an 8-core machine with GPU, it takes about 2.5 hours to reproduce the video
 above - about an hour to collect 500 preferences about behaviour from a random
