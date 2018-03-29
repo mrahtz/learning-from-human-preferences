@@ -62,19 +62,9 @@ def parse_args():
         'batchnorm': args.batchnorm,
         'load_ckpt_dir': args.load_reward_predictor_ckpt_dir,
         'ckpt_interval': args.reward_predictor_ckpt_interval,
-        'lr': args.reward_predictor_learning_rate
+        'lr': args.reward_predictor_learning_rate,
+        'val_interval': 50
     }
-
-    if general_args['test_mode']:
-        reward_predictor_training_args['val_interval'] = 1
-        # Override arguments
-        general_args['n_initial_prefs'] = 1
-        reward_predictor_training_args['n_initial_epochs'] = 1
-        reward_predictor_training_args['ckpt_interval'] = 1
-        a2c_args['save_interval'] = 10
-        a2c_args['total_timesteps'] = 100
-    else:
-        reward_predictor_training_args['val_interval'] = 50
 
     with open(osp.join(log_dir, 'args.txt'), 'w') as args_file:
         args_file.write(' '.join(sys.argv))
