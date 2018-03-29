@@ -22,6 +22,13 @@ The main milestones of this reproduction were:
 
 ## Usage
 
+### Cloning
+
+Note that some files in the repository are stored using [Git Large File
+storage](https://git-lfs.github.com/). Please install Git LFS before cloning if
+you want to use any of the data (checkpoints, preferences) stored in
+[`runs`](runs).
+
 ### Python setup
 
 To set up an isolated environment and install dependencies, install
