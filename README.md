@@ -75,7 +75,8 @@ For example, to train `MovingDotNoFrameskip-v0` using *synthetic* preferences:
 
 `$ python3 run.py train_policy_with_preferences MovingDotNoFrameskip-v0 --synthetic_prefs --ent_coef 0.02 --million_timesteps 0.15`
 
-On a machine with a GPU, this takes about an hour. TensorBoard logs should look something like:
+On a machine with a GPU, this takes about an hour. TensorBoard logs (created in
+a new directory in `runs/` automatically) should look something like:
 
 ![](images/moving-dot-graphs.png)
 
@@ -83,7 +84,8 @@ To train Pong using *synthetic* preferences:
 
 `$ python3 run.py train_policy_with_preferences PongNoFrameskip-v4 --synthetic_prefs --dropout 0.5 --n_envs 16 --million_timesteps 20`
 
-On a 16-core machine without GPU, this takes about 13 hours. TensorBoard logs should look something like:
+On a 16-core machine without GPU, this takes about 13 hours. TensorBoard logs
+should look something like:
 
 ![](images/pong-graphs.png)
 
@@ -202,7 +204,7 @@ There are three tricky parts to this:
 * Video clips must be sent from the A2C process to the process asking for
   preferences using a queue. Video clips are cheap, and the A2C process should
   never stop, so the A2C process only puts a clip onto the queue if the queue
-  is empt, and otherwise drops the clips. The preference interface then just
+  is empty, and otherwise drops the clips. The preference interface then just
   gets as many clips as it can from the queue in 0.5 seconds, in between asking
   about each pair of clips. (Pairs to show the user are selected from the clip
   database internal to the preference interface into which clips from the queue
@@ -211,7 +213,7 @@ There are three tricky parts to this:
   predictor using a queue. Preferences should never be dropped, though, so the
   preference interface blocks until the preference can be added to the queue,
   and the reward predictor training process runs a background thread which
-  constantantly receives from the queue, storing preference in the reward
+  constantly receives from the queue, storing preference in the reward
   predictor process's internal database.
 * Both the A2C process and the reward predictor training process need to access
   the reward predictor network. This is done using Distributed TensorFlow: each
@@ -219,7 +221,7 @@ There are three tricky parts to this:
   the reward predictor training process are automatically replicated to the A2C
   worker process's network.
 
-All subproceseses are started and coordinated by [`run.py`](run.py).
+All subprocesses are started and coordinated by [`run.py`](run.py).
 
 ![](images/diagram.png)
 
@@ -230,9 +232,9 @@ It turned out to be possible to reach the milestones in the results section
 above even without implementing a number of features described in the original
 paper.
 
-* For regularization of the reward predictor network, the paper uses dropout,
-  batchnorm and an adaptive L2 regularization scheme. Here, we only use
-  dropout. (Batchnorm is also supported. L2 reguarlization is not implemented.)
+* For regularisation of the reward predictor network, the paper uses dropout,
+  batchnorm and an adaptive L2 regularisation scheme. Here, we only use
+  dropout. (Batchnorm is also supported. L2 regularisation is not implemented.)
 * In the paper's setup, the rate at which preferences are requested is
   gradually reduced over time. We just ask for preferences at a constant rate.
 * The paper selects video clips to show the user based on predicted reward
