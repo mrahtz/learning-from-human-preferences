@@ -2,7 +2,7 @@
 
 Reproduction of OpenAI and DeepMind's [Deep Reinforcement Learning from Human
 Preferences](https://blog.openai.com/deep-reinforcement-learning-from-human-preferences/),
-based on the paper at <https://arxiv.org/abs/1706.03741>.
+based on the paper at <https://arxiv.org/pdf/1706.03741.pdf>.
 
 
 ## Results
@@ -262,6 +262,40 @@ paper.
   way to implement it that would actually affect the gradients - so we just do
   the softmax directly.
 
+## Ideas for future work
+
+If you want to hack on this project to learn some deep RL, here are some ideas
+for extensions and things to investigate:
+
+* **Better ways of selecting video clips for query**. As mentioned above and in
+  the paper, it looks like using variance across ensemble members to select
+  video clips to ask the user about sometimes _harms_ performance. Why is this?
+  Is there some inherent reason that "Ask the user about the clips we're most
+  uncertain about" is a bad heuristic (e.g. because then we focus too much on
+  strange examples, and don't sample enough preferences for more common
+  situations)? Or is it a problem with the uncertainty calculation? Do we get
+  different results using [dropout-based
+  uncertainty](https://arxiv.org/pdf/1506.02142.pdf), or by [ensembling but
+  with shared parameters](https://arxiv.org/pdf/1602.04621.pdf)?
+* **Domain randomisation for the reward predictor**. The paper notes that when
+  training an agent to stay alongside other cars in Enduro, "the agent learns
+  to stay almost exactly even with other moving cars for a substantial fraction
+  of the episode, although it gets confused by changes in background". Could
+  this be mitigated with [domain
+  randomization](https://arxiv.org/pdf/1703.06907.pdf)? E.g. would randomly
+  changing the colours of the frames encourage the reward predictor to be more
+  invariant to changes in background?
+* **Alternative reward predictor architectures**. When training Enduro, the
+  user ends up giving enough preferences to cover pretty much the full range of
+  possible car positions on the track. It's therefore unclear how much success
+  in the kinds of simple environments we're playing with here is down to the
+  interesting generalisation capabilities of deep neural networks, and how much
+  it's just memorisation of examples. It could be interesting to explore much
+  simpler architectures of reward predictor - for example, one which tries to
+  establish a ranking of video clips directly from preferences (I'm not
+  familiar with the literature, but e.g. [Efficient Ranking from Pairwise
+  Comparisons](http://proceedings.mlr.press/v28/wauthier13.pdf), then gives
+  reward corresponding to the rank of the most similar video clip.
 
 ## Code credits
 
