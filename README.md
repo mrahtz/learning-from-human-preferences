@@ -294,7 +294,7 @@ for extensions and things to investigate:
   simpler architectures of reward predictor - for example, one which tries to
   establish a ranking of video clips directly from preferences (I'm not
   familiar with the literature, but e.g. [Efficient Ranking from Pairwise
-  Comparisons](http://proceedings.mlr.press/v28/wauthier13.pdf), then gives
+  Comparisons](http://proceedings.mlr.press/v28/wauthier13.pdf)), then gives
   reward corresponding to the rank of the most similar video clip.
 
 ## Code credits
