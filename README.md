@@ -96,7 +96,7 @@ should look something like:
 
 ![](images/pong-graphs.png)
 
-To train Enduro (a modified version with a time limit so that the weather doesn't change) using *human* preferences:
+To train Enduro (a modified version with a time limit so the weather doesn't change, which the paper notes can confuse the reward prdictor) using *human* preferences:
 
 `$ python3 run.py train_policy_with_preferences EnduroNoFrameskip-v4 --n_envs 16 --render_episodes`
 
