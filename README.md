@@ -296,6 +296,14 @@ for extensions and things to investigate:
   familiar with the literature, but e.g. [Efficient Ranking from Pairwise
   Comparisons](http://proceedings.mlr.press/v28/wauthier13.pdf)), then gives
   reward corresponding to the rank of the most similar video clip.
+* **Automatic reward shaping**. Watching the graph of rewards predicted by the
+  reward predictor (run [`run_checkpoint.py`](run_checkpoint.py) with a reward
+  predictor checkpoint), it looks like the predicted rewards might be slightly
+  better-shaped than the original rewards, even when trained with synthetic
+  preferences based on the original rewards. Specifically, in Pong, it looks
+  like there might be a small positive reward whenever the agent hits the ball.
+  Could a reward predictor trained from synthetic preferences be used to
+  automatically shape rewards for easier training?
 
 ## Code credits
 
