@@ -147,6 +147,9 @@ To run on [FloydHub](https://www.floydhub.com) (a cloud platform for
 --log_dir /output --synthetic_prefs
 train_policy_with_preferences PongNoFrameskip-v4'`
 
+Check out runs reproducing the above results at
+<https://www.floydhub.com/mrahtz/projects/learning-from-human-preferences>.
+
 ### Running checkpoints
 
 To run a trained policy checkpoint so you can see what the agent was doing, use
