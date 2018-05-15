@@ -1,28 +1,21 @@
 [[source]]
-
 url = "https://pypi.python.org/simple"
 verify_ssl = true
 name = "pypi"
 
-
 [packages]
-
 scipy = "*"
 cloudpickle = "*"
 matplotlib = "*"
 gym = {extras = ["atari"], version = "==0.9.3"}
-easy-tf-log = {git = 'https://github.com/mrahtz/easy-tf-log'}
+easy-tf-log = "==1.1"
 gym-moving-dot = {git = "https://github.com/mrahtz/gym-moving-dot"}
 numpy = "*"
 
-
 [dev-packages]
-
 nose = "*"
 termcolor = "*"
 memory-profiler = "*"
 
-
 [requires]
-
 python_version = "3"
