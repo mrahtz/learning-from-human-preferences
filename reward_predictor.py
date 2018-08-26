@@ -250,9 +250,9 @@ class RewardPredictorEnsemble:
             ratio = val_loss / train_loss
             easy_tf_log.tflog('reward_predictor_test_train_loss_ratio', ratio)
             if ratio > 1.3:
-                self.reg_coef *= 2
+                self.reg_coef *= 1.5
             elif ratio < 1.3:
-                self.reg_coef = max(self.reg_coef / 2.0, MIN_REG_COEF)
+                self.reg_coef = max(self.reg_coef / 1.5, MIN_REG_COEF)
             easy_tf_log.tflog('reward_predictor_reg_coef', self.reg_coef)
 
         end_time = time.time()
