@@ -63,7 +63,7 @@ def parse_args():
         'load_ckpt_dir': args.load_reward_predictor_ckpt_dir,
         'ckpt_interval': args.reward_predictor_ckpt_interval,
         'lr': args.reward_predictor_learning_rate,
-        'val_interval': 50
+        'val_interval': 5
     }
 
     with open(osp.join(log_dir, 'args.txt'), 'w') as args_file:
