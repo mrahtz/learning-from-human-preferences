@@ -1,13 +1,15 @@
 import logging
-import os.path as osp
 import time
 
 import easy_tf_log
 import numpy as np
-from numpy.testing import assert_equal
+import os.path as osp
 import tensorflow as tf
+from numpy.testing import assert_equal
 
 from utils import RunningStat, batch_iter
+
+MIN_REG_COEF = 0.1
 
 
 class RewardPredictorEnsemble:
@@ -69,7 +71,7 @@ class RewardPredictorEnsemble:
 
         self.n_steps = 0
         self.r_norm = RunningStat(shape=n_preds)
-        self.reg_coef = 0.01
+        self.reg_coef = MIN_REG_COEF
 
         misc_logs_dir = osp.join(log_dir, 'reward_predictor', 'misc')
         easy_tf_log.set_dir(misc_logs_dir)
@@ -203,7 +205,7 @@ class RewardPredictorEnsemble:
 
         # "...and then averaging the results."
         rs = np.mean(ensemble_rs, axis=0)
-        assert_equal(rs.shape, (n_steps, ))
+        assert_equal(rs.shape, (n_steps,))
         logging.debug("After ensemble averaging:\n%s", rs)
 
         return rs
@@ -250,7 +252,7 @@ class RewardPredictorEnsemble:
             if ratio > 1.3:
                 self.reg_coef *= 2
             elif ratio < 1.3:
-                self.reg_coef /= 2
+                self.reg_coef = max(self.reg_coef / 2.0, MIN_REG_COEF)
             easy_tf_log.tflog('reward_predictor_reg_coef', self.reg_coef)
 
         end_time = time.time()
