@@ -52,7 +52,7 @@ def run(general_params,
 
     if a2c_params['env_id'] in ['MovingDot-v0', 'MovingDotNoFrameskip-v0']:
         reward_predictor_network = net_moving_dot_features
-    elif a2c_params['env_id'] in ['PongNoFrameskip-v4', 'EnduroNoFrameskip-v4']:
+    elif a2c_params['env_id'] in ['PongNoFrameskip-v4', 'EnduroNoFrameskip-v4', 'SeaquestNoFrameskip-v4']:
         reward_predictor_network = net_cnn
     else:
         raise Exception("Unsure about reward predictor network for {}".format(
@@ -244,7 +244,7 @@ def start_policy_training(cluster_dict, make_reward_predictor, gen_segments,
     env_id = a2c_params['env_id']
     if env_id in ['MovingDotNoFrameskip-v0', 'MovingDot-v0']:
         policy_fn = MlpPolicy
-    elif env_id in ['PongNoFrameskip-v4', 'EnduroNoFrameskip-v4']:
+    elif env_id in ['PongNoFrameskip-v4', 'EnduroNoFrameskip-v4', 'SeaquestNoFrameskip-v4']:
         policy_fn = CnnPolicy
     else:
         msg = "Unsure about policy network for {}".format(a2c_params['env_id'])
