@@ -69,6 +69,7 @@ class RewardPredictorEnsemble:
 
         self.n_steps = 0
         self.r_norm = RunningStat(shape=n_preds)
+        self.reg_coef = 0.01
 
         misc_logs_dir = osp.join(log_dir, 'reward_predictor', 'misc')
         easy_tf_log.set_dir(misc_logs_dir)
@@ -99,6 +100,10 @@ class RewardPredictorEnsemble:
 
         mean_loss = tf.reduce_mean([rp.loss for rp in self.rps])
         op = tf.summary.scalar('reward_predictor_loss_mean', mean_loss)
+        summary_ops.append(op)
+
+        mean_reg_loss = tf.reduce_mean([rp.reg_loss for rp in self.rps])
+        op = tf.summary.scalar('reward_predictor_l2_loss_mean', mean_reg_loss)
         summary_ops.append(op)
 
         summaries = tf.summary.merge(summary_ops)
@@ -226,14 +231,27 @@ class RewardPredictorEnsemble:
         start_steps = self.n_steps
         start_time = time.time()
 
+        train_losses = []
+        val_losses = []
         for _, batch in enumerate(batch_iter(prefs_train.prefs,
                                              batch_size=32,
                                              shuffle=True)):
-            self.train_step(batch, prefs_train)
+            train_losses.append(self.train_step(batch, prefs_train))
             self.n_steps += 1
 
             if self.n_steps and self.n_steps % val_interval == 0:
-                self.val_step(prefs_val)
+                val_losses.append(self.val_step(prefs_val))
+
+        if val_losses:
+            train_loss = np.mean(train_losses)
+            val_loss = np.mean(val_losses)
+            ratio = val_loss / train_loss
+            easy_tf_log.tflog('reward_predictor_test_train_loss_ratio', ratio)
+            if ratio > 1.3:
+                self.reg_coef *= 2
+            elif ratio < 1.3:
+                self.reg_coef /= 2
+            easy_tf_log.tflog('reward_predictor_reg_coef', self.reg_coef)
 
         end_time = time.time()
         end_steps = self.n_steps
@@ -250,10 +268,15 @@ class RewardPredictorEnsemble:
             feed_dict[rp.s1] = s1s
             feed_dict[rp.s2] = s2s
             feed_dict[rp.pref] = prefs
+            feed_dict[rp.reg_coef] = self.reg_coef
             feed_dict[rp.training] = True
-        ops = [self.summaries, [rp.train for rp in self.rps]]
-        summaries, _ = self.sess.run(ops, feed_dict)
+        # Why do we only check the loss from the first reward predictor?
+        # As a quick hack to get adaptive L2 regularization working quickly,
+        # assuming we're only using one reward predictor.
+        ops = [self.rps[0].loss, self.summaries, [rp.train for rp in self.rps]]
+        loss, summaries, _ = self.sess.run(ops, feed_dict)
         self.train_writer.add_summary(summaries, self.n_steps)
+        return loss
 
     def val_step(self, prefs_val):
         val_batch_size = 32
@@ -272,9 +295,11 @@ class RewardPredictorEnsemble:
             feed_dict[rp.s1] = s1s
             feed_dict[rp.s2] = s2s
             feed_dict[rp.pref] = prefs
+            feed_dict[rp.reg_coef] = self.reg_coef
             feed_dict[rp.training] = False
-        summaries = self.sess.run(self.summaries, feed_dict)
+        loss, summaries = self.sess.run([self.rps[0].loss, self.summaries], feed_dict)
         self.test_writer.add_summary(summaries, self.n_steps)
+        return loss
 
 
 class RewardPredictorNetwork:
@@ -307,19 +332,24 @@ class RewardPredictorNetwork:
         s1_unrolled = tf.reshape(s1, [-1, 84, 84, 4])
         s2_unrolled = tf.reshape(s2, [-1, 84, 84, 4])
 
+        regularizer_coef = tf.placeholder(tf.float32)
+        l2_regularizer = tf.contrib.layers.l2_regularizer(scale=regularizer_coef)
+
         # Predict rewards for each frame in the unrolled batch
         _r1 = core_network(
             s=s1_unrolled,
             dropout=dropout,
             batchnorm=batchnorm,
             reuse=False,
-            training=training)
+            training=training,
+            regularizer=l2_regularizer)
         _r2 = core_network(
             s=s2_unrolled,
             dropout=dropout,
             batchnorm=batchnorm,
             reuse=True,
-            training=training)
+            training=training,
+            regularizer=l2_regularizer)
 
         # Shape should be 'unrolled batch size'
         # where 'unrolled batch size' is 'batch size' x 'n frames per segment'
@@ -368,6 +398,11 @@ class RewardPredictorNetwork:
         with tf.control_dependencies([c1]):
             loss = tf.reduce_sum(_loss)
 
+        # L2 regularization
+        reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+        reg_loss = tf.add_n(reg_losses)
+        loss += reg_loss
+
         # Make sure that batch normalization ops are updated
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 
@@ -376,6 +411,7 @@ class RewardPredictorNetwork:
 
         # Inputs
         self.training = training
+        self.reg_coef = regularizer_coef
         self.s1 = s1
         self.s2 = s2
         self.pref = pref
@@ -388,5 +424,6 @@ class RewardPredictorNetwork:
         self.pred = pred
 
         self.accuracy = accuracy
+        self.reg_loss = reg_loss
         self.loss = loss
         self.train = train

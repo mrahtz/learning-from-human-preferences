@@ -45,7 +45,7 @@ def net_moving_dot_features(s, batchnorm, dropout, training, reuse):
     return x
 
 
-def net_cnn(s, batchnorm, dropout, training, reuse):
+def net_cnn(s, batchnorm, dropout, training, reuse, regularizer):
     x = s / 255.0
     # Page 15: (Atari)
     # "[The] input is fed through 4 convolutional layers of size 7x7, 5x5, 3x3,
@@ -53,19 +53,19 @@ def net_cnn(s, batchnorm, dropout, training, reuse):
     # nonlinearities (α = 0.01). This is followed by a fully connected layer of
     # size 64 and then a scalar output. All convolutional layers use batch norm
     # and dropout with α = 0.5 to prevent predictor overfitting"
-    x = conv_layer(x, 16, 7, 3, batchnorm, training, "c1", reuse, 'relu')
+    x = conv_layer(x, 16, 7, 3, batchnorm, training, "c1", reuse, regularizer, 'relu')
     x = tf.layers.dropout(x, dropout, training=training)
-    x = conv_layer(x, 16, 5, 2, batchnorm, training, "c2", reuse, 'relu')
+    x = conv_layer(x, 16, 5, 2, batchnorm, training, "c2", reuse, regularizer, 'relu')
     x = tf.layers.dropout(x, dropout, training=training)
-    x = conv_layer(x, 16, 3, 1, batchnorm, training, "c3", reuse, 'relu')
+    x = conv_layer(x, 16, 3, 1, batchnorm, training, "c3", reuse, regularizer, 'relu')
     x = tf.layers.dropout(x, dropout, training=training)
-    x = conv_layer(x, 16, 3, 1, batchnorm, training, "c4", reuse, 'relu')
+    x = conv_layer(x, 16, 3, 1, batchnorm, training, "c4", reuse, regularizer, 'relu')
 
     w, h, c = x.get_shape()[1:]
     x = tf.reshape(x, [-1, int(w * h * c)])
 
-    x = dense_layer(x, 64, "d1", reuse, activation='relu')
-    x = dense_layer(x, 1, "d2", reuse, activation=None)
+    x = dense_layer(x, 64, "d1", reuse, regularizer, activation='relu')
+    x = dense_layer(x, 1, "d2", reuse, regularizer, activation=None)
     x = x[:, 0]
 
     return x

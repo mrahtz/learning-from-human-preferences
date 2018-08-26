@@ -6,7 +6,7 @@ Wrappers for TensorFlow's layers integrating batchnorm in the right place.
 
 
 def conv_layer(x, filters, kernel_size, strides, batchnorm, training, name,
-               reuse, activation='relu'):
+               reuse, regularizer, activation='relu'):
     x = tf.layers.conv2d(
         x,
         filters,
@@ -14,7 +14,8 @@ def conv_layer(x, filters, kernel_size, strides, batchnorm, training, name,
         strides,
         activation=None,
         name=name,
-        reuse=reuse)
+        reuse=reuse,
+        kernel_regularizer=regularizer)
 
     if batchnorm:
         batchnorm_name = name + "_batchnorm"
@@ -29,12 +30,13 @@ def conv_layer(x, filters, kernel_size, strides, batchnorm, training, name,
     return x
 
 
-def dense_layer(x,
-                units,
-                name,
-                reuse,
-                activation=None):
-    x = tf.layers.dense(x, units, activation=None, name=name, reuse=reuse)
+def dense_layer(x, units, name, reuse, regularizer, activation=None):
+    x = tf.layers.dense(x,
+                        units,
+                        activation=None,
+                        name=name,
+                        reuse=reuse,
+                        kernel_regularizer=regularizer)
 
     if activation is None:
         pass
