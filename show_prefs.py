@@ -27,6 +27,7 @@ def main():
         print("done!")
 
     print("{} preferences found".format(len(prefs)))
+    print("Preferred segment on the right")
 
     q = Queue()
     VideoRenderer(q, zoom=2, mode=VideoRenderer.restart_on_get_mode)
