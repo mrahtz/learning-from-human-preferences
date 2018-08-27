@@ -6,7 +6,7 @@ from multiprocessing import Process
 
 import gym
 import numpy as np
-import pyglet
+import pygame
 
 from a2c.common.atari_wrappers import wrap_deepmind
 from scipy.ndimage import zoom
@@ -55,37 +55,23 @@ class RunningStat(object):
         return self._M.shape
 
 
-# Based on SimpleImageViewer in OpenAI gym
 class Im(object):
-    def __init__(self, display=None):
-        self.window = None
-        self.isopen = False
-        self.display = display
+    def __init__(self):
+        self.screen = None
+        self.video_size = None
 
     def imshow(self, arr):
-        if self.window is None:
-            height, width = arr.shape
-            self.window = pyglet.window.Window(
-                width=width, height=height, display=self.display)
-            self.width = width
-            self.height = height
-            self.isopen = True
-
-        assert arr.shape == (self.height, self.width), \
-            "You passed in an image with the wrong number shape"
-
-        image = pyglet.image.ImageData(self.width, self.height,
-                                       'L', arr.tobytes(), pitch=-self.width)
-        self.window.clear()
-        self.window.switch_to()
-        self.window.dispatch_events()
-        image.blit(0, 0)
-        self.window.flip()
+        if self.screen is None:
+            self.video_size = (arr.shape[1], arr.shape[0])
+            self.screen = pygame.display.set_mode(self.video_size)
+        arr = np.tile(arr[:, :, np.newaxis], 3)
+        pyg_img = pygame.surfarray.make_surface(arr.swapaxes(0, 1))
+        pyg_img = pygame.transform.scale(pyg_img, self.video_size)
+        self.screen.blit(pyg_img, (0,0))
+        pygame.display.flip()
 
     def close(self):
-        if self.isopen:
-            self.window.close()
-            self.isopen = False
+        pygame.quit()
 
     def __del__(self):
         self.close()
