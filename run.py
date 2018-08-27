@@ -374,6 +374,7 @@ def start_reward_predictor_training(cluster_dict,
             rew_pred.train(pref_db_train, pref_db_val, val_interval)
             if i and i % ckpt_interval == 0:
                 rew_pred.save()
+            i += 1
 
     proc = Process(target=f, daemon=True)
     proc.start()
