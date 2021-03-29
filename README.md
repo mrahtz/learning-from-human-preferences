@@ -263,7 +263,7 @@ paper.
   which doesn’t decay to 0 as the difference in reward difference becomes
   extreme." I wasn't sure how to implement this - at least, I couldn't see a
   way to implement it that would actually affect the gradients - so we just do
-  the softmax directly.
+  the softmax directly. (Update: see https://github.com/mrahtz/learning-from-human-preferences/issues/8.)
 
 ## Ideas for future work
 
