@@ -38,11 +38,11 @@ To set up an isolated environment and install dependencies, install
 
 However, note that TensorFlow must be installed manually. Either:
 
-`$ pipenv run pip install tensorflow`
+`$ pipenv run pip install tensorflow==1.15`
 
 or
 
-`$ pipenv run pip install tensorflow-gpu`
+`$ pipenv run pip install tensorflow-gpu==1.15`
 
 depending on whether you have a GPU. (If you run into problems, try installing
 TensorFlow 1.6.0, which was used for development.)
