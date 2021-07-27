@@ -31,6 +31,8 @@ you want to use any of the data (checkpoints, preferences) stored in
 
 ### Python setup
 
+This project uses Tensorflow 1, which needs Python 3.7 or below.
+
 To set up an isolated environment and install dependencies, install
 [Pipenv](https://github.com/pypa/pipenv), then just run:
 
