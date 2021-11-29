@@ -22,13 +22,6 @@ The main milestones of this reproduction were:
 
 ## Usage
 
-### Cloning
-
-Note that some files in the repository are stored using [Git Large File
-storage](https://git-lfs.github.com/). Please install Git LFS before cloning if
-you want to use any of the data (checkpoints, preferences) stored in
-[`runs`](runs).
-
 ### Python setup
 
 This project uses Tensorflow 1, which needs Python 3.7 or below.
@@ -115,9 +108,9 @@ policy, then half an hour to pretrain the reward predictor using those 500
 preferences, then an hour to train the policy (while still collecting
 preferences.)
 
-The bottleneck is mainly labelling speed, so to train Enduro using saved human preferences:
+The bottleneck is mainly labelling speed, so if you're already saved human preferences in `runs/enduro`, you can re-use those preferences by training with:
 
-`$ python3 run.py train_policy_with_preferences EnduroNoFrameskip-v4 --n_envs 16 --render_episodes --load_prefs_dir runs/enduro_8471d5d --n_initial_epochs 10`
+`$ python3 run.py train_policy_with_preferences EnduroNoFrameskip-v4 --n_envs 16 --render_episodes --load_prefs_dir runs/enduro --n_initial_epochs 10`
 
 This only takes about half an hour.
 
@@ -159,19 +152,9 @@ To run a trained policy checkpoint so you can see what the agent was doing, use
 
 `$ python3 run_checkpoint.py <environment> <policy checkpoint directory>`
 
-For example:
+For example, to run an agent saved in `runs/pong`:
 
-* To run the agent trained for the moving dot environment:
-
-`$ python3 run_checkpoint.py MovingDotNoFrameskip-v0 runs/moving-dot_45cb953/policy_checkpoints`
-
-* To run the agent trained for Pong:
-
-`$ python3 run_checkpoint.py PongNoFrameskip-v4 runs/pong_45cb953/policy_checkpoints`
-
-* To run the agent trained for Enduro:
-
-`$ python3 run_checkpoint.py EnduroNoFrameskip-v4 runs/enduro_8471d5d/policy_checkpoints`
+`$ python3 run_checkpoint.py PongNoFrameskip-v4 runs/pong/policy_checkpoints`
 
 
 ## Architecture notes
